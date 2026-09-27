@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>무무토리 타자기 편지</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="stamp.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Gothic+Coding:wght@400;700&display=swap">
+<link rel="stylesheet" href="letter.css">
+</head>
+<body data-mode="print">
+<div class="demo" id="demo" hidden>미리보기 모드 · 입력한 내용은 이 기기에만 임시 저장돼요 (Firebase 연결 전)</div>
+<main class="shell">
+  <header class="brand"><img src="logo.png" alt="무무토리"><div><b>타자기 편지 쓰기</b><span>MUMUTORI LETTER SERVICE</span></div></header>
+  <div class="prog" id="prog"><span class="now"></span><ol></ol></div>
+
+  <section class="step" data-step="order">
+    <h1>편지를 타자기로 찍어 보내드려요</h1>
+    <p class="intro">적어주신 편지를 무무토리가 수동 타자기로 한 자 한 자 찍고, 고르신 봉투에 담아 포장해 보내드려요. 주문 확인부터 차근차근 진행할게요.</p>
+    <div class="card">
+      <h3>주문 확인</h3>
+      <p class="small muted">결제하신 주문과 편지를 연결하기 위해 필요해요. 주문번호는 결제 완료 문자나 마이페이지에서 확인할 수 있어요.</p>
+      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" autocomplete="off" inputmode="text" placeholder="예: 2026092712345"><p class="err" hidden></p></div>
+      <div class="f"><label for="o-name">주문하신 분 이름<span class="req">필수</span></label><input type="text" id="o-name" autocomplete="name"><p class="err" hidden></p></div>
+      <div class="f"><label for="o-phone4">휴대폰 번호 뒤 4자리<span class="req">필수</span></label><input type="tel" id="o-phone4" inputmode="numeric" maxlength="4" placeholder="0000"><p class="err" hidden></p></div>
+    </div>
+  </section>
+
+  <section class="step" data-step="write" hidden>
+    <h2>편지를 써주세요</h2>
+    <p class="muted small">적어주신 글은 수동 타자기로 한 자 한 자 찍어요. 타자기는 한 줄에 <b id="spec-line"></b>자, 편지지 한 장에 <b id="spec-max"></b>줄까지 들어가요.</p>
+    <div class="card">
+      <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" maxlength="20" placeholder="예: 사랑하는 엄마"><p class="help">편지 첫 줄에 "OO에게"로 찍혀요.</p><p class="err" hidden></p></div>
+      <div class="f"><label for="w-body">편지 내용<span class="req">필수</span></label><textarea id="w-body" rows="10" placeholder="하고 싶은 말을 편하게 적어주세요. 줄바꿈도 그대로 찍혀요."></textarea><p class="err" hidden></p></div>
+      <div class="meter" id="w-meter"></div><div class="bar"><i id="w-bar"></i></div>
+      <p class="err" id="w-over" hidden>편지지 한 장을 넘었어요. 조금만 줄여주세요.</p>
+      <div class="charwarn" id="w-bad" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
+      <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" maxlength="20" placeholder="예: 막내 지수"><p class="err" hidden></p></div>
+      <p class="help small muted">쓸 수 있는 글자: 한글, 영문, 숫자, 기본 문장부호. 이모지와 특수기호는 타자기에 없어서 찍을 수 없어요.</p>
+    </div>
+    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><div class="paper"><span class="tag">MUMUTORI</span><pre id="w-paper"></pre></div></div>
+  </section>
+
+  <section class="step" data-step="env" hidden>
+    <h2>편지를 담을 봉투를 골라주세요</h2>
+    <p class="muted small">봉투는 무무토리가 직접 포장해서 보내드려요.</p>
+    <div class="envs" id="envs"></div>
+    <label class="consent"><input type="checkbox" id="env-name"> 봉투 앞면에 받는 분 이름을 타자기로 찍어주세요</label>
+    <p class="photo-note">봉투 이미지는 시안이에요. 촬영 후 실제 사진으로 바뀌어요.</p>
+  </section>
+
+  <section class="step" data-step="review" hidden>
+    <h2>이대로 보낼까요?</h2>
+    <div class="card"><div class="sum" id="sum"></div></div>
+    <div class="f"><span class="lab">편지 미리보기</span><div class="paper"><span class="tag">MUMUTORI</span><pre id="r-paper"></pre></div></div>
+    <div class="card"><h3>봉투</h3><div style="max-width:260px" id="r-env" class="env"></div></div>
+    <div class="card">
+      <details class="terms">
+        <summary>개인정보 수집·이용 안내</summary>
+        <ul>
+          <li>수집 항목: 주문번호, 주문자 이름, 휴대폰 번호 뒤 4자리, 받는 분·보내는 분 이름, 편지 내용</li>
+          <li>이용 목적: 편지 제작과 포장, 발송, 주문 확인 및 고객 응대</li>
+          <li>보관 기간: 발송 완료 후 3개월 뒤 파기 (분쟁 대응을 위한 보관)</li>
+          
+        </ul>
+      </details>
+      <label class="consent"><input type="checkbox" id="consent"> 위 내용을 확인했고, 편지 제작을 위한 개인정보 수집·이용에 동의해요.</label>
+      <p class="err" id="consent-err" hidden>동의해 주셔야 편지를 만들 수 있어요.</p>
+      <p class="small muted">타자기로 찍는 과정에서 줄바꿈 위치가 미리보기와 조금 다를 수 있어요. 편지 내용 확정 후에는 제작이 시작되어 단순 변심 취소가 어려워요.</p>
+    </div>
+    <p class="err" id="submit-err" hidden></p>
+  </section>
+
+  <section class="step done" id="done" hidden>
+    <img src="stamp.png" alt="">
+    <h1>편지가 접수됐어요</h1>
+    <p class="muted">적어주신 편지를 타자기로 찍어, 고르신 봉투에 담아 보내드릴게요. 발송 일정은 카카오톡으로 안내드려요.</p>
+    <span class="no" id="done-no"></span>
+    <p class="small muted">접수번호는 문의하실 때 알려주세요. 궁금한 점은 무무토리 카카오톡 채널로 편하게 물어봐 주세요.</p>
+  </section>
+  <p class="foot">무무토리 · 경기도 파주시 · acorn@mumutori.com<br>이 페이지는 결제하신 분께만 보내드리는 편지 작성 페이지예요.</p>
+</main>
+<nav class="nav"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="fb.js"></script>
+<script src="spec.js"></script>
+<script src="letter.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>무무토리 대필 편지</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="stamp.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Gothic+Coding:wght@400;700&display=swap">
+<link rel="stylesheet" href="letter.css">
+</head>
+<body data-mode="ghost">
+<div class="demo" id="demo" hidden>미리보기 모드 · 입력한 내용은 이 기기에만 임시 저장돼요 (Firebase 연결 전)</div>
+<main class="shell">
+  <header class="brand"><img src="logo.png" alt="무무토리"><div><b>대필 편지 설문</b><span>MUMUTORI LETTER SERVICE</span></div></header>
+  <div class="prog" id="prog"><span class="now"></span><ol></ol></div>
+
+  <section class="step" data-step="order">
+    <h1>마음을 들려주시면, 편지로 옮겨드려요</h1>
+    <p class="intro">몇 가지 질문에 말하듯 답해주시면, 무무토리의 편지 쓰는 씨앗 병아리콩이 편지로 옮기고 타자기로 찍어 보내드려요. 주문 확인부터 차근차근 진행할게요.</p>
+    <div class="card">
+      <h3>주문 확인</h3>
+      <p class="small muted">결제하신 주문과 편지를 연결하기 위해 필요해요. 주문번호는 결제 완료 문자나 마이페이지에서 확인할 수 있어요.</p>
+      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" autocomplete="off" inputmode="text" placeholder="예: 2026092712345"><p class="err" hidden></p></div>
+      <div class="f"><label for="o-name">주문하신 분 이름<span class="req">필수</span></label><input type="text" id="o-name" autocomplete="name"><p class="err" hidden></p></div>
+      <div class="f"><label for="o-phone4">휴대폰 번호 뒤 4자리<span class="req">필수</span></label><input type="tel" id="o-phone4" inputmode="numeric" maxlength="4" placeholder="0000"><p class="err" hidden></p></div>
+    </div>
+  </section>
+
+  <section class="step" data-step="survey" hidden>
+    <h2>마음을 정리하는 질문</h2>
+    <p class="intro">이 질문들은 글을 잘 쓰기 위한 질문이 아니에요. 마음을 정리하기 위한 질문이에요.<br>완벽한 문장이 아니어도 괜찮아요. 말하듯, 생각나는 그대로 적어주세요.</p>
+    <div class="card">
+      <div class="f"><span class="lab">누구에게 보내는 편지인가요?<span class="req">필수</span></span><div class="chips" id="rel"></div><p class="err" id="rel-err" hidden>관계를 골라주세요.</p></div>
+      <div class="f"><label for="s-to">받는 분 이름<span class="req">필수</span></label><input type="text" id="s-to" maxlength="20"><p class="err" hidden></p></div>
+      <div class="f"><label for="s-from">보내는 분 이름<span class="req">필수</span></label><input type="text" id="s-from" maxlength="20"><p class="err" hidden></p></div>
+    </div>
+    <div class="card" id="survey"></div>
+  </section>
+  <section class="step" data-step="memo" hidden>
+    <h2>편지에 꼭 넣고 싶은 말이 있나요?</h2>
+    <p class="muted small">그대로 넣고 싶은 문장, 둘만 아는 말, 빼고 싶은 이야기가 있다면 적어주세요. 없으면 비워두고 넘어가도 괜찮아요.</p>
+    <div class="card">
+      <div class="f"><label for="m-memo">꼭 넣고 싶은 말 · 부탁<span class="opt">선택</span></label><textarea id="m-memo" rows="6" placeholder="예: '우리 제주도 첫날 기억나?'는 꼭 넣어주세요 / 회사 이야기는 빼주세요"></textarea><p class="help" id="m-count"></p></div>
+    </div>
+  </section>
+
+  <section class="step" data-step="env" hidden>
+    <h2>편지를 담을 봉투를 골라주세요</h2>
+    <p class="muted small">봉투는 무무토리가 직접 포장해서 보내드려요.</p>
+    <div class="envs" id="envs"></div>
+    <label class="consent"><input type="checkbox" id="env-name"> 봉투 앞면에 받는 분 이름을 타자기로 찍어주세요</label>
+    <p class="photo-note">봉투 이미지는 시안이에요. 촬영 후 실제 사진으로 바뀌어요.</p>
+  </section>
+
+  <section class="step" data-step="review" hidden>
+    <h2>이대로 보낼까요?</h2>
+    <div class="card"><div class="sum" id="sum"></div></div>
+    
+    <div class="card"><h3>봉투</h3><div style="max-width:260px" id="r-env" class="env"></div></div>
+    <div class="card">
+      <details class="terms">
+        <summary>개인정보 수집·이용 안내</summary>
+        <ul>
+          <li>수집 항목: 주문번호, 주문자 이름, 휴대폰 번호 뒤 4자리, 받는 분·보내는 분 이름, 관계, 설문 답변(사연), 꼭 넣고 싶은 말</li>
+          <li>이용 목적: 편지 제작과 포장, 발송, 주문 확인 및 고객 응대</li>
+          <li>보관 기간: 발송 완료 후 3개월 뒤 파기 (분쟁 대응을 위한 보관)</li>
+          <li>편지 초안 작성: [D7 결정 후 AI 사용 고지 문구가 들어갈 자리]</li>
+        </ul>
+      </details>
+      <label class="consent"><input type="checkbox" id="consent"> 위 내용을 확인했고, 편지 제작을 위한 개인정보 수집·이용에 동의해요.</label>
+      <p class="err" id="consent-err" hidden>동의해 주셔야 편지를 만들 수 있어요.</p>
+      <p class="small muted">편지 초안을 보내드리고 확인을 받은 뒤 타자기 작업을 시작해요. 편지 내용 확정 후에는 단순 변심 취소가 어려워요.</p>
+    </div>
+    <p class="err" id="submit-err" hidden></p>
+  </section>
+
+  <section class="step done" id="done" hidden>
+    <img src="stamp.png" alt="">
+    <h1>편지가 접수됐어요</h1>
+    <p class="muted">보내주신 이야기를 바탕으로 병아리콩이 편지를 쓸게요. 초안이 준비되면 카카오톡으로 먼저 보여드려요.</p>
+    <span class="no" id="done-no"></span>
+    <p class="small muted">접수번호는 문의하실 때 알려주세요. 궁금한 점은 무무토리 카카오톡 채널로 편하게 물어봐 주세요.</p>
+  </section>
+  <p class="foot">무무토리 · 경기도 파주시 · acorn@mumutori.com<br>이 페이지는 결제하신 분께만 보내드리는 편지 작성 페이지예요.</p>
+</main>
+<nav class="nav"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="fb.js"></script>
+<script src="spec.js"></script>
+<script src="letter.js"></script>
+</body>
+</html>
