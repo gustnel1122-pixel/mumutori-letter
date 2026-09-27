@@ -2,7 +2,7 @@
  * body[data-mode] = "print"(일반 타자기) | "ghost"(대필 타자기)
  * 규격·문항·봉투는 아래 LETTER_SPEC 한 곳에서 고친다. 프로젝트 허브도 같은 값을 보여준다.
  */
-(function () {
+(function () { function boot() {
   var S = window.LETTER_SPEC, M = window.MMT || {}, store = M.store;
   var MODE = document.body.dataset.mode === "ghost" ? "ghost" : "print";
   var STEPS = MODE === "print" ? ["order", "write", "env", "review"] : ["order", "survey", "memo", "env", "review"];
@@ -164,17 +164,23 @@
   }
 
   /* 봉투 */
+  function envList() { return (S.envelopes || []).filter(function (e) { return e && !e.hidden; }); }
   function envFace(id, to) {
+    var E = (S.envelopes || []).filter(function (e) { return e && e.id === id; })[0] || {};
     var name = to ? '<span class="to">' + esc(to) + " 에게</span>" : "";
-    if (id === "kraft") return '<div class="face kraft"><span class="ck">✓</span><span class="seal"></span>' + name + "</div>";
-    if (id === "ivory") return '<div class="face ivory"><span class="ck">✓</span><img src="stamp.png" alt="">' + name + "</div>";
-    if (id === "airmail") return '<div class="face airmail"><span class="ck">✓</span><span class="pm">MUMU<br>TORI</span>' + name + "</div>";
-    return '<div class="face pattern"><span class="ck">✓</span>' + name + "</div>";
+    var ck = '<span class="ck">✓</span>';
+    if (E.img) return '<div class="face photo" style="background-image:url(\'' + esc(E.img).replace(/'/g, "%27") + '\')">' + ck + name + "</div>";
+    if (id === "kraft") return '<div class="face kraft">' + ck + '<span class="seal"></span>' + name + "</div>";
+    if (id === "ivory") return '<div class="face ivory">' + ck + '<img src="stamp.png" alt="">' + name + "</div>";
+    if (id === "airmail") return '<div class="face airmail">' + ck + '<span class="pm">MUMU<br>TORI</span>' + name + "</div>";
+    if (id === "pattern") return '<div class="face pattern">' + ck + name + "</div>";
+    return '<div class="face plain">' + ck + '<span class="lbl">' + esc(E.name || "") + "</span>" + name + "</div>";
   }
   function renderEnvs() {
     var box = $("#envs"); if (!box) return;
     var to = st.envName ? (st.letter.to || "받는 분") : "";
-    box.innerHTML = S.envelopes.map(function (e) {
+    var L = envList(); if (!L.some(function (e) { return e.id === st.env; }) && L[0]) st.env = L[0].id;
+    box.innerHTML = L.map(function (e) {
       return '<label class="env"><input type="radio" name="env" value="' + e.id + '"' + (st.env === e.id ? " checked" : "") + ">" + envFace(e.id, to) + '<span class="nm">' + e.name + '</span><span class="ds">' + e.desc + "</span></label>";
     }).join("");
     $("#env-name").checked = !!st.envName;
@@ -296,4 +302,6 @@
   $("#prev").addEventListener("click", function () { if (st.i > 0) { st.i--; show(); } });
   $("#consent").addEventListener("change", function () { $("#consent-err").hidden = true; });
   show();
+}
+  if (window.MMT && MMT.loadSpec) MMT.loadSpec(boot); else boot();
 })();

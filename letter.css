@@ -98,6 +98,9 @@ input:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(1
 .face.airmail .pm{position:absolute;right:10%;top:14%;font-family:var(--type);font-size:9px;color:#2E5AA8;border:1.5px solid #2E5AA8;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;transform:rotate(-12deg)}
 .face.pattern{background:#fff url(pattern.jpg) center/140% no-repeat}
 .face.pattern .to{background:rgba(255,255,255,.85);padding:2px 8px;border-radius:3px}
+.face.photo{background:#eee center/cover no-repeat}
+.face.plain{background:var(--paper-2);border:1px dashed var(--line)}
+.face.plain .lbl{position:absolute;left:10px;top:8px;font-family:var(--type);font-size:10.5px;color:var(--ink-3)}
 .photo-note{font-size:12.5px;color:var(--ink-3)}
 
 /* review */
