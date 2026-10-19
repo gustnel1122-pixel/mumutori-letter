@@ -14,7 +14,7 @@
 <body data-mode="ghost">
 <div class="demo" id="demo" hidden>미리보기 모드 · 입력한 내용은 이 기기에만 임시 저장돼요 (Firebase 연결 전)</div>
 <main class="shell">
-  <header class="brand"><img src="logo.png" alt="무무토리"><div><b>대필 편지 설문</b><span>MUMUTORI LETTER SERVICE</span></div></header>
+  <header class="brand"><img src="logo.png" alt="무무토리"><div><b>대필 편지 쓰기 · 마음 설문</b><span>MUMUTORI LETTER SERVICE</span></div></header>
   <div class="prog" id="prog"><span class="now"></span><ol></ol></div>
 
   <section class="step" data-step="order">
@@ -22,8 +22,8 @@
     <p class="intro">몇 가지 질문에 말하듯 답해주시면, 무무토리의 편지 쓰는 씨앗 병아리콩이 편지로 옮기고 타자기로 찍어 보내드려요. 주문 확인부터 차근차근 진행할게요.</p>
     <div class="card">
       <h3>주문 확인</h3>
-      <p class="small muted">결제하신 주문과 편지를 연결하기 위해 필요해요. 주문번호는 결제 완료 문자나 마이페이지에서 확인할 수 있어요.</p>
-      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" autocomplete="off" inputmode="text" placeholder="예: 2026092712345"><p class="err" hidden></p></div>
+      <p class="small muted">결제하신 주문과 편지를 이어 주는 정보예요. 주문번호는 결제 완료 화면·주문 확인 안내나 무무토리 상점 마이페이지의 주문 내역에서 볼 수 있어요.</p>
+      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" autocomplete="off" inputmode="text" placeholder="결제 완료 안내의 주문번호"><p class="err" hidden></p></div>
       <div class="f"><label for="o-name">주문하신 분 이름<span class="req">필수</span></label><input type="text" id="o-name" autocomplete="name"><p class="err" hidden></p></div>
       <div class="f"><label for="o-phone4">휴대폰 번호 뒤 4자리<span class="req">필수</span></label><input type="tel" id="o-phone4" inputmode="numeric" maxlength="4" placeholder="0000"><p class="err" hidden></p></div>
     </div>
@@ -68,12 +68,11 @@
           <li>이용 목적: 편지 제작과 포장, 발송, 주문 확인 및 고객 응대</li>
           <li>보관 기간: 구매 확정 시 지체 없이 파기 (구매 확정 절차가 없는 주문은 배송 완료 7일 뒤 파기)</li>
           <li>주문·결제 기록처럼 법으로 보관 기간이 정해진 정보는 그 기간대로 따로 보관 (편지 내용은 포함하지 않음)</li>
-          <li>편지 초안 작성: [D7 결정 후 AI 사용 고지 문구가 들어갈 자리]</li>
         </ul>
       </details>
       <label class="consent"><input type="checkbox" id="consent"> 위 내용을 확인했고, 편지 제작을 위한 개인정보 수집·이용에 동의해요.</label>
       <p class="err" id="consent-err" hidden>동의해 주셔야 편지를 만들 수 있어요.</p>
-      <p class="small muted">편지 초안을 보내드리고 확인을 받은 뒤 타자기 작업을 시작해요. 편지 내용 확정 후에는 단순 변심 취소가 어려워요.</p>
+      <p class="small muted">편지 초안을 먼저 보내 드리고, 한 번은 무료로 고쳐 드려요. 확정하시면 타자기 작업을 시작해요. 편지 내용 확정 후에는 단순 변심 취소가 어려워요.</p>
     </div>
     <p class="err" id="submit-err" hidden></p>
   </section>
@@ -81,11 +80,11 @@
   <section class="step done" id="done" hidden>
     <img src="stamp.png" alt="">
     <h1>편지가 접수됐어요</h1>
-    <p class="muted">보내주신 이야기를 바탕으로 병아리콩이 편지를 쓸게요. 초안이 준비되면 카카오톡으로 먼저 보여드려요.</p>
+    <p class="muted">보내 주신 이야기를 바탕으로 병아리콩이 편지를 쓸게요. 초안이 준비되면 카카오톡으로 먼저 보여 드려요. 확정되면 3일 안에 택배로 보내 드려요(보통 1~2영업일 · 배송비 무료).</p>
     <span class="no" id="done-no"></span>
     <p class="small muted">접수번호는 문의하실 때 알려주세요. 궁금한 점은 무무토리 카카오톡 채널로 편하게 물어봐 주세요.</p>
   </section>
-  <p class="foot">무무토리 · 경기도 파주시 · acorn@mumutori.com<br>이 페이지는 결제하신 분께만 보내드리는 편지 작성 페이지예요.</p>
+  <p class="foot">무무토리 상점 · acorn@mumutori.com · <a href="https://mumutori.sixshop.site/cmveo7vqjdi7g01xg51w5gxve">레터서비스 안내 보기</a><br>이 페이지는 결제하신 분께만 보내 드리는 편지 작성 페이지예요.</p>
 </main>
 <nav class="nav"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
