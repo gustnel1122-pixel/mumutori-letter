@@ -80,6 +80,7 @@ input:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(1
 .envs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .env{position:relative;display:flex;flex-direction:column;gap:8px;cursor:pointer}
 .env input{position:absolute;opacity:0;pointer-events:none}
+.env .face.photo{background-color:#fff;background-size:cover;background-position:center;background-repeat:no-repeat}
 .env .face{aspect-ratio:3/2;border-radius:6px;border:2px solid transparent;position:relative;overflow:hidden;box-shadow:0 6px 16px -12px rgba(60,30,10,.6);max-width:100%}
 .env input:checked ~ .face{border-color:var(--brand);box-shadow:0 0 0 3px rgba(116,56,15,.18)}
 .env input:focus-visible ~ .face{outline:2px solid var(--brand);outline-offset:2px}
