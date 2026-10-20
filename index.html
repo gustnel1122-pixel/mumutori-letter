@@ -299,6 +299,21 @@ td.n{font-family:var(--type);color:var(--brand);width:40px}
 }
 .pvopen{display:none;gap:8px;flex-wrap:wrap;justify-content:center}
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
+/* 패키지·구매 탭 (2026-10-20 letter-hub-kit) — 사진 크게, 글 짧게, 휴대폰도 2열 */
+.kit img{display:block;width:100%;height:auto;border-radius:10px;background:#fff}
+.kit .hero2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+.kit ol.layers{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.kit .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.kit .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.kit figure{margin:0;display:flex;flex-direction:column;gap:8px}
+.kit figcaption b{display:block;font-family:var(--type)}
+.kit .chips{display:flex;flex-wrap:wrap;gap:6px}
+.kit .chip{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-2)}
+.kit .chip.ok{background:var(--cream);color:var(--brand);border-color:transparent}
+.kit table{width:100%;border-collapse:collapse;font-size:13.5px}
+.kit th,.kit td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.kit th{white-space:nowrap}
+@media (max-width:760px){.kit .hero2{grid-template-columns:1fr}.kit .g3{grid-template-columns:repeat(2,minmax(0,1fr))}.kit .g2,.kit .g3{gap:10px}.kit figcaption{font-size:12.5px}}
 </style>
 </head>
 <body>
@@ -408,6 +423,60 @@ td.n{font-family:var(--type);color:var(--brand);width:40px}
             <span class="small faint" id="pvNote">초안 기준 화면이에요.</span>
           </div>
         </div>
+      </section>
+
+      <!-- 패키지·구매 (2026-10-20 총괄 letter-hub-kit-20261020-1820 · 사장님 18:08 "기존 프로젝트 페이지에 업데이트") -->
+      <section class="sec kit" data-s="kit" data-name="패키지·구매" hidden>
+        <div class="shead"><span class="eyebrow">PACKAGE · BUY</span><h2>편지 한 통의 포장과 살 것</h2>
+          <p class="lead">고객이 받는 구성, 봉투 네 가지, 로고 제작물, 살 것을 한곳에 모았다. 사진은 이해를 돕는 목업이다. 가격·재료비는 이 공개 페이지에 쓰지 않고 볼트 문서에만 둔다.</p></div>
+
+        <div class="shead"><span class="eyebrow">01</span><h2>받으시는 구성</h2></div>
+        <div class="hero2">
+          <img src="mall/img/letter/letter_kit_overview.jpg" alt="받으시는 구성 목업: 타자기 편지, 무무토리 카드, 고른 봉투와 로고 봉인, 투명 보호 봉투, 크라프트 안전봉투" loading="lazy">
+          <div class="panel"><h3>바깥에서 안으로</h3>
+            <ol class="layers"><li>크라프트 안전봉투(택배로 안전하게)</li><li>투명 보호 봉투(습기·구김 막기)</li><li>고른 봉투 + 로고 봉인</li><li>무무토리 카드(찍은 날·편지 번호)</li><li>타자기 편지(A5, 반 접어 넣음)</li></ol>
+            <p class="note">크라프트·아이보리 봉투에는 마끈 리본과 안개꽃 한 줄기를 더한다(10/20 기본 포함 결정).</p></div>
+        </div>
+
+        <div class="shead"><span class="eyebrow">02</span><h2>봉투 네 가지</h2></div>
+        <div class="g2">
+          <figure><img src="mall/img/letter/mock_kraft_logo_seal.jpg" alt="크라프트 봉투에 도토리 실링 목업" loading="lazy"><figcaption><b>크라프트 · 실링왁스</b><span class="chips"><span class="chip">로고 실링 도장</span><span class="chip">왁스 비즈</span><span class="chip ok">마끈·안개꽃</span></span></figcaption></figure>
+          <figure><img src="mall/img/letter/mock_ivory_logo_stamp.jpg" alt="아이보리 봉투에 소인 도장 목업" loading="lazy"><figcaption><b>아이보리 · 도토리 도장</b><span class="chips"><span class="chip">소인 스탬프</span><span class="chip">스탬프 잉크</span><span class="chip ok">마끈·안개꽃</span></span></figcaption></figure>
+          <figure><img src="mall/img/letter/mock_airmail_postage.jpg" alt="에어메일 봉투에 무무토리 우표와 소인 목업" loading="lazy"><figcaption><b>에어메일</b><span class="chips"><span class="chip">우표 스티커(03)</span><span class="chip">소인 스탬프</span></span></figcaption></figure>
+          <figure><img src="mall/img/letter/mock_pattern_tape.jpg" alt="무늬 테이프와 원형 봉인 라벨 목업" loading="lazy"><figcaption><b>무무토리 무늬</b><span class="chips"><span class="chip">원형 봉인 스티커(04)</span><span class="chip">무늬 테이프</span></span></figcaption></figure>
+        </div>
+
+        <div class="shead"><span class="eyebrow">03</span><h2>안개꽃 · 마끈</h2><p class="lead">크라프트와 아이보리 봉투에 기본으로 더한다.</p></div>
+        <div class="g2">
+          <figure><img src="mall/img/letter/mock_kraft_flower.jpg" alt="크라프트 봉투에 마끈과 안개꽃 목업" loading="lazy"><figcaption><b>크라프트</b></figcaption></figure>
+          <figure><img src="mall/img/letter/mock_ivory_flower.jpg" alt="아이보리 봉투에 마끈과 안개꽃 목업" loading="lazy"><figcaption><b>아이보리</b></figcaption></figure>
+        </div>
+
+        <div class="shead"><span class="eyebrow">04</span><h2>로고 제작물</h2></div>
+        <img src="img/kit/kit_logo_items.jpg" alt="로고 제작물 미리보기: 소인 스탬프, 실링 도장, 우표 스티커, 원형 봉인 스티커, 무늬 테이프" loading="lazy">
+        <div class="tbl"><table><thead><tr><th>파일</th><th>무엇</th><th>만드는 방법 · 지금</th></tr></thead><tbody>
+          <tr><th>01</th><td>소인 스탬프 30mm</td><td>업체 주문제작 · <b>이미 있음</b>(다른 곳에서 고른 것)</td></tr>
+          <tr><th>02</th><td>실링 도장 25mm</td><td>업체 주문제작 · <b>이미 있음</b></td></tr>
+          <tr><th>05b</th><td>무늬 마스킹테이프 12mm</td><td>업체 주문제작 · 사장님 직접 주문</td></tr>
+          <tr><th>06</th><td>동봉 카드 90×50 양면</td><td>업체 주문제작(명함)</td></tr>
+          <tr><th>03</th><td>우표 스티커</td><td>직접 출력 · <b>모양 바뀜</b>(우표 톱니 모양 + 우표 펀치) — 정리 중</td></tr>
+          <tr><th>04</th><td>원형 봉인 스티커 30mm</td><td>직접 출력 · 라벨지 바뀜(잉크젯 전용) — 정리 중</td></tr>
+          <tr><th>07</th><td>'편지가 들어 있어요' 스티커</td><td>직접 출력 · 방수 무광 잉크젯 라벨</td></tr>
+        </tbody></table></div>
+        <div class="g3">
+          <figure><img src="img/kit/kit_a4_square25.jpg" alt="A4 배치 미리보기: 정사각 25mm 70칸" loading="lazy"><figcaption>03 · 이전 규격(정사각) 미리보기</figcaption></figure>
+          <figure><img src="img/kit/kit_a4_round30.jpg" alt="A4 배치 미리보기: 원형 30mm 48칸" loading="lazy"><figcaption>04 · 원형 30mm 48칸</figcaption></figure>
+          <figure><img src="img/kit/kit_a4_label64.jpg" alt="A4 배치 미리보기: 64×33.8mm 24칸" loading="lazy"><figcaption>07 · 64×33.8mm 24칸</figcaption></figure>
+        </div>
+        <div class="panel"><h3>직접 출력 3단계</h3>
+          <ol class="layers"><li>라벨스페이스(space.label.kr)에서 라벨지 번호를 고른다</li><li>03·04·07 파일을 넣고 '모든 칸에 적용'</li><li>A4를 '실제 크기'로 인쇄한다(테두리 없음 인쇄는 쓰지 않음)</li></ol></div>
+
+        <div class="shead"><span class="eyebrow">05</span><h2>살 것</h2></div>
+        <div class="panel"><p><b>정리 중</b> — 사장님이 고르는 중이에요(10/20 19:29). 확정 목록이 오면 묶음별로 채운다.</p>
+          <p class="small">이미 있는 것: 크라프트 엽서봉투 · 타자기 용지 · 로고 실링 도장 · 커스텀 스탬프 · 마스킹테이프(사장님 직접 주문)</p></div>
+
+        <div class="shead"><span class="eyebrow">06</span><h2>아직 정할 것</h2></div>
+        <div class="panel"><div class="chips"><span class="chip">에어메일 소인 색</span><span class="chip">무늬 테이프 시점</span><span class="chip">편지지 색</span><span class="chip">아이보리 봉투 종이(레이드지·엠보싱)</span><span class="chip">에어메일 봉투 종류</span></div></div>
       </section>
 
       <!-- 06 접수함 -->
