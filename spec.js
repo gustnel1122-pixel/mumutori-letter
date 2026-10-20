@@ -5,10 +5,10 @@ window.LETTER_SPEC = {
   memoMax: 300,         // 대필: 꼭 넣고 싶은 문장/메모 최대 글자
   allowed: "한글, 영문, 숫자, 띄어쓰기, 줄바꿈, 기본 문장부호 . , ! ? ' \" ( ) - ~ : ; …",
   envelopes: [
-    { id: "kraft",   name: "크라프트 · 실링왁스",  desc: "레트로 크라프트 봉투에 왁스 실링", img: "mall/img/letter/photo_env_kraft_single.jpg" },
-    { id: "ivory",   name: "아이보리 · 도토리 도장", desc: "담백한 아이보리에 무무토리 도장", img: "mall/img/letter/photo_env_ivory_ai.jpg" },
-    { id: "airmail", name: "에어메일",            desc: "멀리서 건너온 편지 같은 줄무늬", img: "mall/img/letter/photo_env_airmail_ai.jpg" },
-    { id: "pattern", name: "무무토리 무늬",        desc: "무무토리 캐릭터 무늬 봉투", img: "mall/img/letter/photo_env_pattern_ai.jpg" }
+    { id: "kraft",   name: "크라프트 · 실링왁스",  desc: "크라프트 봉투에 무무토리 도토리 실링", img: "mall/img/letter/mock_kraft_logo_seal.jpg" },
+    { id: "ivory",   name: "아이보리 · 도토리 도장", desc: "아이보리 봉투에 무무토리 소인 도장", img: "mall/img/letter/mock_ivory_logo_stamp.jpg" },
+    { id: "airmail", name: "에어메일",            desc: "줄무늬 봉투에 무무토리 우표와 소인", img: "mall/img/letter/mock_airmail_postage.jpg" },
+    { id: "pattern", name: "무무토리 무늬",        desc: "무무토리 무늬 테이프와 봉인 스티커", img: "mall/img/letter/mock_pattern_tape.jpg" }
   ],
   relations: [
     { id: "lover",  label: "연인·배우자" },
