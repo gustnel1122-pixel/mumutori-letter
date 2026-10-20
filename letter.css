@@ -36,6 +36,7 @@ p{margin:0}
 
 .step{display:flex;flex-direction:column;gap:18px}
 .step[hidden]{display:none!important}
+[hidden]{display:none!important}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
 .intro{background:var(--paper);border-radius:var(--r);padding:18px;border-left:3px solid var(--brand);font-family:var(--serif);font-size:15.5px;line-height:1.85;color:var(--ink-2)}
 
