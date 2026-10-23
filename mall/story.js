@@ -51,7 +51,7 @@
 
     // ── 맨 뒤: 은은한 빛(배경 그림 없이 깊이만) ──
     var hp = P(ax, PV, .3), hr = AH * (m ? 1.7 : 2.1), gl = c.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, hr);
-    gl.addColorStop(0, 'rgba(253,233,190,.95)'); gl.addColorStop(.5, 'rgba(253,233,190,.6)'); gl.addColorStop(1, 'rgba(253,233,190,0)');
+    gl.addColorStop(0, 'rgba(245,235,221,.95)'); gl.addColorStop(.5, 'rgba(245,235,221,.6)'); gl.addColorStop(1, 'rgba(245,235,221,0)');
     c.fillStyle = gl; c.fillRect(0, 0, W, H);
 
     // ── 먼 층: 해·구름·반짝이 ──
