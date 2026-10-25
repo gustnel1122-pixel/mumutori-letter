@@ -13,7 +13,9 @@
   if (!ENV_READY) st.env = "basic";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var ALLOW = /[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9 \n.,!?'"()\-~:;…·]/;
+  // 한글 타자기(10/26 사장님): 영문은 못 찍고 ㅋㅋ 같은 낱자는 찍힘. 숫자 · 문장부호는 사진에 1 · . , 가 있음(나머지는 확인 필요)
+  var ALLOW = /[가-힣ㄱ-ㅎㅏ-ㅣ0-9 \n.,!?'"()\-~:;…·]/;
+  var LATIN = /[A-Za-zＡ-Ｚａ-ｚÀ-ɏ]/;
   /* 타자기로 못 찍는 글자 구분: 이모지(유니코드 범위 + 속성) · 한자 · 그 밖의 특수기호 */
   function re(src, flags, fallback) { try { return new RegExp(src, flags); } catch (e) { return fallback; } }
   var EMOJI_RANGE = /[←-⇿⌀-⏿①-⓿■-➿⤀-⥿⬀-⯿〰〽㊗㊙‍⃣︎️]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDFFF]|\uDB40[\uDC20-\uDC7F]/;  // U+1F000–1FAFF · U+2600–27BF · 국기·이음표 등
@@ -22,6 +24,7 @@
   function chars(s) { return Array.from(String(s || "")); }
   function kindOf(c) {
     if (ALLOW.test(c) && c.length === 1) return "";
+    if (LATIN.test(c)) return "eng";
     // 이모지 속성을 아는 브라우저: 속성 또는 보조 평면(U+1F000~) → 이모지, 나머지 기호 범위는 특수기호. 모르는 브라우저: 범위 전체를 이모지로.
     if (EMOJI_PROP ? (EMOJI_PROP.test(c) || c.length > 1 && EMOJI_RANGE.test(c)) : EMOJI_RANGE.test(c)) return "emoji";
     if (HAN.test(c)) return "han";
@@ -57,7 +60,7 @@
     lines.push("");
     lines = lines.concat(wrap(L.body, S.lineChars));
     lines.push("");
-    lines.push((L.from || "") ? ("— " + L.from) : "");
+    lines.push((L.from || "") ? ("- " + L.from) : "");   // 서명 앞 줄표는 타자기에 있는 - 로
     return lines;
   }
   function badChars(t) {
@@ -66,7 +69,7 @@
     return Object.keys(bad);
   }
   function badGroups(t) {
-    var g = { emoji: [], han: [], sym: [] };
+    var g = { eng: [], emoji: [], han: [], sym: [] };
     badChars(t).forEach(function (c) { var k = kindOf(c); if (/^[‍⃣︎️]$|^\uDB40/.test(c)) return; if (g[k].indexOf(c) < 0) g[k].push(c); });
     return g;
   }
@@ -158,6 +161,7 @@
     $("#w-bar").style.width = Math.min(100, n / S.maxLines * 100) + "%";
     var g = badGroups((st.letter.to || "") + (st.letter.body || "") + (st.letter.from || ""));
     var parts = [];
+    if (g.eng.length) parts.push("영문 " + g.eng.slice(0, 8).join(" "));
     if (g.emoji.length) parts.push("이모지 " + g.emoji.slice(0, 8).join(" "));
     if (g.han.length) parts.push("한자 " + g.han.slice(0, 8).join(" "));
     if (g.sym.length) parts.push("특수기호 " + g.sym.slice(0, 8).join(" "));
@@ -204,7 +208,11 @@
     $("#rel").addEventListener("change", function (e) { if (e.target.name === "rel") { st.rel = e.target.value; $("#rel-err").hidden = true; renderSurvey(); save(); } });
     ["from", "to"].forEach(function (k) {
       var el = $("#s-" + k); el.value = st.letter[k] || "";
-      el.addEventListener("input", function () { st.letter[k] = el.value.trim(); save(); });
+      el.addEventListener("input", function () {
+        st.letter[k] = el.value.trim(); save();
+        var b = badChars(el.value);   // 입력하자마자 표시
+        need(el, !b.length, b.length ? "타자기로 찍을 수 없는 글자가 있어요(" + b.slice(0, 6).join(" ") + "). 한글로 적어 주세요." : "");
+      });
     });
     box.addEventListener("input", onQ); box.addEventListener("change", onQ);
     function onQ(e) {
@@ -305,8 +313,10 @@
       if (bad.length || over) { ok = false; if (!first) first = bad.length ? $("#w-bad") : $("#w-over"); }
     }
     if (s === "survey") {
-      chk($("#s-to"), !!st.letter.to, "받는 분을 적어주세요.");
-      chk($("#s-from"), !!st.letter.from, "보내는 분을 적어주세요.");
+      // 대필 편지도 받는 분 · 보내는 분 이름은 타자기로 찍음 → 영문 · 이모지 등은 막음
+      var nameMsg = function (v, empty) { var b = badChars(v); return !v ? empty : (b.length ? "타자기로 찍을 수 없는 글자가 있어요(" + b.slice(0, 6).join(" ") + "). 한글로 적어 주세요." : ""); };
+      var mTo = nameMsg(st.letter.to, "받는 분을 적어주세요."), mFrom = nameMsg(st.letter.from, "보내는 분을 적어주세요.");
+      chk($("#s-to"), !mTo, mTo); chk($("#s-from"), !mFrom, mFrom);
       var relOk = !!st.rel; $("#rel-err").hidden = relOk; if (!relOk) { ok = false; first = first || $("#rel"); }
       S.survey.forEach(function (q) {
         if (!q.req) return;
