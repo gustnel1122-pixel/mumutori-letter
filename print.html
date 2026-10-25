@@ -19,7 +19,7 @@
 
   <section class="step" data-step="order">
     <h1>편지를 타자기로 찍어 보내드려요</h1>
-    <p class="intro">적어주신 편지를 무무토리가 수동 타자기로 한 자 한 자 찍고, 고르신 봉투에 담아 포장해 보내드려요. 주문 확인부터 차근차근 진행할게요.</p>
+    <p class="intro">적어주신 편지를 무무토리가 수동 타자기로 한 자 한 자 찍고, 무무토리 봉투에 담아 포장해 보내드려요. 주문 확인부터 차근차근 진행할게요.</p>
     <div class="card">
       <h3>주문 확인</h3>
       <p class="small muted">결제하신 주문과 편지를 이어 주는 정보예요. 주문번호는 결제 완료 화면·주문 확인 안내나 무무토리 상점 마이페이지의 주문 내역에서 볼 수 있어요.</p>
@@ -31,17 +31,18 @@
 
   <section class="step" data-step="write" hidden>
     <h2>편지를 써주세요</h2>
-    <p class="muted small">적어주신 글은 수동 타자기로 한 자 한 자 찍어요. 타자기는 한 줄에 <b id="spec-line"></b>자, 편지지 한 장에 <b id="spec-max"></b>줄까지 들어가요.</p>
+    <p class="muted small">적어주신 글은 A5 편지지에 수동 타자기로 한 자 한 자 찍어요. 한 줄에 <b class="spec-line"></b>자(띄어쓰기도 한 칸), 한 장에 <b class="spec-max"></b>줄까지 들어가요(받는 분 · 보내는 분 줄 포함).</p>
     <div class="card">
       <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" maxlength="20" placeholder="예: 사랑하는 엄마"><p class="help">편지 첫 줄에 "OO에게"로 찍혀요.</p><p class="err" hidden></p></div>
       <div class="f"><label for="w-body">편지 내용<span class="req">필수</span></label><textarea id="w-body" rows="10" placeholder="하고 싶은 말을 편하게 적어주세요. 줄바꿈도 그대로 찍혀요."></textarea><p class="err" hidden></p></div>
       <div class="meter" id="w-meter"></div><div class="bar"><i id="w-bar"></i></div>
       <p class="err" id="w-over" hidden>편지지 한 장을 넘었어요. 조금만 줄여주세요.</p>
-      <div class="charwarn" id="w-bad" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
+      <div class="charwarn" id="w-bad" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b><br><small>다른 말로 바꾸거나 '지우기'를 눌러 주세요. 고치기 전에는 다음으로 넘어갈 수 없어요.</small></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
+      <div class="wrapwarn" id="w-wrap" hidden></div>
       <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" maxlength="20" placeholder="예: 막내 지수"><p class="err" hidden></p></div>
-      <p class="help small muted">쓸 수 있는 글자: 한글, 영문, 숫자, 기본 문장부호. 이모지와 특수기호는 타자기에 없어서 찍을 수 없어요.</p>
+      <p class="help small muted">쓸 수 있는 글자: 한글, 영문, 숫자, 기본 문장부호(. , ! ? ' " ( ) - ~ : ; …). 이모지 · 한자 · 특수기호(★ ♥ ※ 등)는 타자기에 없어서 찍을 수 없어요.</p>
     </div>
-    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><div class="paper"><span class="tag">MUMUTORI</span><pre id="w-paper"></pre></div></div>
+    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><div class="sheetbox" id="w-paper"></div></div>
   </section>
 
   <section class="step" data-step="env" hidden>
@@ -55,7 +56,7 @@
   <section class="step" data-step="review" hidden>
     <h2>이대로 보낼까요?</h2>
     <div class="card"><div class="sum" id="sum"></div></div>
-    <div class="f"><span class="lab">편지 미리보기</span><div class="paper"><span class="tag">MUMUTORI</span><pre id="r-paper"></pre></div></div>
+    <div class="f"><span class="lab">편지 미리보기</span><div class="sheetbox" id="r-paper"></div></div>
     <div class="card"><h3>봉투</h3><div style="max-width:260px" id="r-env" class="env"></div></div>
     <div class="card">
       <details class="terms">
@@ -77,7 +78,7 @@
   <section class="step done" id="done" hidden>
     <img src="stamp.png" alt="">
     <h1>편지가 접수됐어요</h1>
-    <p class="muted">적어 주신 편지를 타자기로 찍어 고르신 봉투에 담고, 3일 안에 택배로 보내 드려요(보통 1~2영업일 · 배송비 무료). 발송 일정은 카카오톡으로 알려 드려요.</p>
+    <p class="muted">적어 주신 편지를 타자기로 찍어 봉투에 담고, 3일 안에 택배로 보내 드려요(보통 1~2영업일 · 배송비 무료). 발송 일정은 카카오톡으로 알려 드려요.</p>
     <span class="no" id="done-no"></span>
     <p class="small muted">접수번호는 문의하실 때 알려주세요. 궁금한 점은 무무토리 카카오톡 채널로 편하게 물어봐 주세요.</p>
   </section>

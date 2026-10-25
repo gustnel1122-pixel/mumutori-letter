@@ -6,28 +6,48 @@
   var S = window.LETTER_SPEC, M = window.MMT || {}, store = M.store;
   var MODE = document.body.dataset.mode === "ghost" ? "ghost" : "print";
   var STEPS = MODE === "print" ? ["order", "write", "env", "review"] : ["order", "survey", "memo", "env", "review"];
-  var LABEL = { order: "주문 확인", write: "편지 쓰기", survey: "마음 설문", memo: "꼭 넣고 싶은 말", env: "봉투 고르기", review: "확인하고 보내기" };
+  var ENV_READY = S.envReady !== false;   // 봉투 고르기 준비 전에는 기본 봉투 한 가지(spec.js envReady)
+  var LABEL = { order: "주문 확인", write: "편지 쓰기", survey: "마음 설문", memo: "꼭 넣고 싶은 말", env: ENV_READY ? "봉투 고르기" : "봉투", review: "확인하고 보내기" };
   var DKEY = "mmt-letter-draft-" + MODE;
   var st = store.get(DKEY, null) || { i: 0, order: {}, letter: {}, rel: "", survey: {}, memo: "", env: "kraft", envName: true };
+  if (!ENV_READY) st.env = "basic";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var ALLOW = /[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9 \n.,!?'"()\-~:;…·]/;
+  /* 타자기로 못 찍는 글자 구분: 이모지(유니코드 범위 + 속성) · 한자 · 그 밖의 특수기호 */
+  function re(src, flags, fallback) { try { return new RegExp(src, flags); } catch (e) { return fallback; } }
+  var EMOJI_RANGE = /[←-⇿⌀-⏿①-⓿■-➿⤀-⥿⬀-⯿〰〽㊗㊙‍⃣︎️]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDFFF]|\uDB40[\uDC20-\uDC7F]/;  // U+1F000–1FAFF · U+2600–27BF · 국기·이음표 등
+  var EMOJI_PROP = re("[\\p{Extended_Pictographic}\\p{Regional_Indicator}]", "u", null);
+  var HAN = re("\\p{Script=Han}", "u", /[⺀-⿟々〇〡-〩〸-〻㐀-䶿一-鿿豈-﫿]|[\uD840-\uD87F][\uDC00-\uDFFF]/);
+  function chars(s) { return Array.from(String(s || "")); }
+  function kindOf(c) {
+    if (ALLOW.test(c) && c.length === 1) return "";
+    // 이모지 속성을 아는 브라우저: 속성 또는 보조 평면(U+1F000~) → 이모지, 나머지 기호 범위는 특수기호. 모르는 브라우저: 범위 전체를 이모지로.
+    if (EMOJI_PROP ? (EMOJI_PROP.test(c) || c.length > 1 && EMOJI_RANGE.test(c)) : EMOJI_RANGE.test(c)) return "emoji";
+    if (HAN.test(c)) return "han";
+    return "sym";
+  }
 
   if (!M.live) { var d = $("#demo"); if (d) d.hidden = false; }
 
   /* ---------- 편지 줄바꿈 (타자기 한 줄 글자 수 기준) ---------- */
+  // 한 칸 = 한 글자(한글 한 음절 · 영문 · 숫자 · 띄어쓰기 모두 한 칸). 이모지처럼 두 단위인 글자도 한 칸으로 센다.
+  var wrapInfo = { long: 0, cut: 0 };
   function wrap(text, n) {
-    var out = [];
+    var out = []; wrapInfo = { long: 0, cut: 0 };
     String(text || "").replace(/\r/g, "").split("\n").forEach(function (para) {
       if (para === "") { out.push(""); return; }
-      var line = "";
+      if (chars(para).length > n) wrapInfo.long++;
+      var line = [];
       para.split(" ").forEach(function (w) {
-        while (w.length > n) { if (line) { out.push(line); line = ""; } out.push(w.slice(0, n)); w = w.slice(n); }
-        if (!line) line = w;
-        else if ((line + " " + w).length <= n) line += " " + w;
-        else { out.push(line); line = w; }
+        var a = chars(w);
+        if (a.length > n) wrapInfo.cut++;
+        while (a.length > n) { if (line.length) { out.push(line.join("")); line = []; } out.push(a.slice(0, n).join("")); a = a.slice(n); }
+        if (!line.length) line = a;
+        else if (line.length + 1 + a.length <= n) line = line.concat([" "], a);
+        else { out.push(line.join("")); line = a; }
       });
-      out.push(line);
+      out.push(line.join(""));
     });
     return out;
   }
@@ -42,8 +62,41 @@
   }
   function badChars(t) {
     var bad = {};
-    Array.from(String(t || "")).forEach(function (c) { if (!ALLOW.test(c)) bad[c] = 1; });
+    chars(t).forEach(function (c) { if (kindOf(c)) bad[c] = 1; });
     return Object.keys(bad);
+  }
+  function badGroups(t) {
+    var g = { emoji: [], han: [], sym: [] };
+    badChars(t).forEach(function (c) { var k = kindOf(c); if (/^[‍⃣︎️]$|^\uDB40/.test(c)) return; if (g[k].indexOf(c) < 0) g[k].push(c); });
+    return g;
+  }
+
+  /* ---------- A5 편지지 미리보기 (spec.js paper 값 그대로, 한 칸 = cellMm, 한 줄 = lineMm) ---------- */
+  var P = S.paper || { w: 148, h: 210, top: 20, right: 15, bottom: 15, left: 15, cellMm: 3.81, lineMm: 8.467 };
+  function fitSheets() {
+    $$(".sheet").forEach(function (s) {
+      var w = s.offsetWidth; if (!w) return;
+      var v = (w / P.w) + "px"; s.style.setProperty("--mm", v);
+      var o = s.parentNode.querySelector(".ovf"); if (o) { o.style.setProperty("--mm", v); o.style.setProperty("--cell", "calc(var(--mm) * " + P.cellMm + ")"); o.style.setProperty("--line", "calc(var(--mm) * " + P.lineMm + ")"); }
+    });
+  }
+  window.addEventListener("resize", fitSheets);
+  function renderSheet(box, lines, empty) {
+    if (!box) return;
+    var mm = function (v) { return "calc(var(--mm) * " + v + ")"; };
+    var row = function (t) {
+      return '<div class="ln">' + chars(t).map(function (c) {
+        return '<span class="c' + (kindOf(c) && c !== "\n" ? " bad" : "") + '">' + (c === " " ? "&nbsp;" : esc(c)) + "</span>";
+      }).join("") + "</div>";
+    };
+    var keep = lines.slice(0, S.maxLines), rest = lines.slice(S.maxLines);
+    var html = '<div class="sheet" style="padding:' + mm(P.top) + " " + mm(P.right) + " " + mm(P.bottom) + " " + mm(P.left) + ";--cell:" + mm(P.cellMm) + ";--line:" + mm(P.lineMm) + ';aspect-ratio:' + P.w + "/" + P.h + '">' +
+      '<div class="area" style="height:' + mm(P.lineMm * S.maxLines) + ";width:" + mm(P.cellMm * S.lineChars) + '">' +
+      (empty ? '<p class="ph">' + empty + "</p>" : keep.map(row).join("")) + "</div></div>";
+    if (!empty && rest.length) html += '<div class="ovf"><b>한 장을 넘는 줄 ' + rest.length + "줄 — 이 부분은 찍을 수 없어요</b>" + rest.map(row).join("") + "</div>";
+    html += '<p class="sheet-cap">A5 편지지(148×210mm) 비율 · 한 줄 ' + S.lineChars + "자 · 한 장 " + S.maxLines + "줄 · 여백 위 " + P.top + " · 옆 " + P.left + " · 아래 " + P.bottom + "mm</p>";
+    box.innerHTML = html;
+    fitSheets();
   }
 
   /* ---------- 화면 그리기 ---------- */
@@ -61,6 +114,7 @@
     if (STEPS[st.i] === "review") renderReview();
     if (STEPS[st.i] === "write") renderPreview();
     if (STEPS[st.i] === "env") renderEnvs();
+    fitSheets();
     window.scrollTo({ top: 0, behavior: "smooth" });
     save();
   }
@@ -87,30 +141,37 @@
     });
     $("#w-clean").addEventListener("click", function () {
       ["to", "body", "from"].forEach(function (k) {
-        var v = Array.from(st.letter[k] || "").filter(function (c) { return ALLOW.test(c); }).join("");
+        var v = chars(st.letter[k]).filter(function (c) { return !kindOf(c); }).join("");
         st.letter[k] = v; $("#w-" + k).value = v;
       });
       renderPreview(); save();
     });
-    $("#spec-line").textContent = S.lineChars;
-    $("#spec-max").textContent = S.maxLines;
+    $$(".spec-line").forEach(function (e) { e.textContent = S.lineChars; });
+    $$(".spec-max").forEach(function (e) { e.textContent = S.maxLines; });
   }
   function renderPreview() {
     if (!$("#w-body")) return;
     var lines = letterLines(), n = lines.length, over = n > S.maxLines;
     var meter = $("#w-meter");
     meter.classList.toggle("over", over);
-    meter.innerHTML = "<span>편지지 1장 기준</span><span><b>" + n + "</b> / " + S.maxLines + "줄 · " + (st.letter.body || "").length + "자</span>";
+    meter.innerHTML = "<span>편지지 1장 기준</span><span><b>" + n + "</b> / " + S.maxLines + "줄 · " + chars(st.letter.body).length + "자</span>";
     $("#w-bar").style.width = Math.min(100, n / S.maxLines * 100) + "%";
-    var bad = badChars((st.letter.to || "") + (st.letter.body || "") + (st.letter.from || ""));
-    var cw = $("#w-bad");
-    cw.hidden = !bad.length;
-    if (bad.length) $("#w-badlist").textContent = bad.slice(0, 12).join(" ");
+    var g = badGroups((st.letter.to || "") + (st.letter.body || "") + (st.letter.from || ""));
+    var parts = [];
+    if (g.emoji.length) parts.push("이모지 " + g.emoji.slice(0, 8).join(" "));
+    if (g.han.length) parts.push("한자 " + g.han.slice(0, 8).join(" "));
+    if (g.sym.length) parts.push("특수기호 " + g.sym.slice(0, 8).join(" "));
+    var anyBad = badChars((st.letter.to || "") + (st.letter.body || "") + (st.letter.from || "")).length > 0;
+    $("#w-bad").hidden = !anyBad;
+    $("#w-badlist").textContent = parts.join(" · ") || "보이지 않는 기호";
+    var wi = $("#w-wrap"), msg = [];
+    if (wrapInfo.long) msg.push("한 줄(" + S.lineChars + "자)보다 긴 줄이 " + wrapInfo.long + "곳 있어요. 그 줄은 자동으로 다음 줄로 넘어가요.");
+    if (wrapInfo.cut) msg.push("띄어쓰기 없이 " + S.lineChars + "자를 넘는 말이 " + wrapInfo.cut + "곳 있어요. 낱말 중간에서 줄이 바뀌니 띄어쓰기를 넣어 주세요.");
+    wi.hidden = !msg.length; wi.innerHTML = msg.map(function (m) { return "<span>" + m + "</span>"; }).join("");
     var body = (st.letter.body || "").trim();
-    var pre = $("#w-paper");
-    if (!body) pre.innerHTML = '<span class="ph">여기에 타자기로 찍힐 모습이 보여요.\n한 줄에 ' + S.lineChars + '자씩 찍혀요.</span>';
-    else pre.textContent = lines.join("\n");
+    renderSheet($("#w-paper"), lines, body ? "" : "여기에 타자기로 찍힐 모습이 보여요.<br>한 줄에 " + S.lineChars + "자, 한 장에 " + S.maxLines + "줄까지 찍혀요.");
     $("#w-over").hidden = !over;
+    if (over) $("#w-over").textContent = "편지지 한 장(" + S.maxLines + "줄)을 " + (n - S.maxLines) + "줄 넘었어요. 조금만 줄여 주세요.";
   }
 
   /* 대필 설문 */
@@ -179,6 +240,15 @@
   function renderEnvs() {
     var box = $("#envs"); if (!box) return;
     var to = st.envName ? (st.letter.to || "받는 분") : "";
+    if (!ENV_READY) {
+      st.env = "basic";
+      box.innerHTML = '<div class="envwait"><b>봉투 선택은 준비 중이에요</b><span>' + esc(S.envNote || "") + "</span></div>";
+      var sec = box.closest(".step"), h = sec && $("h2", sec), note = sec && $(".photo-note", sec);
+      if (h) h.textContent = "편지를 담을 봉투";
+      if (note) note.hidden = true;
+      $("#env-name").checked = !!st.envName;
+      return;
+    }
     var L = envList(); if (!L.some(function (e) { return e.id === st.env; }) && L[0]) st.env = L[0].id;
     box.innerHTML = L.map(function (e) {
       return '<label class="env"><input type="radio" name="env" value="' + e.id + '"' + (st.env === e.id ? " checked" : "") + ">" + envFace(e.id, to) + '<span class="nm">' + e.name + '</span><span class="ds">' + e.desc + "</span></label>";
@@ -192,11 +262,11 @@
 
   /* 확인 */
   function renderReview() {
-    var E = S.envelopes.filter(function (e) { return e.id === st.env; })[0] || S.envelopes[0];
+    var E = ENV_READY ? (S.envelopes.filter(function (e) { return e.id === st.env; })[0] || S.envelopes[0]) : { name: "무무토리 기본 봉투(봉투 선택은 준비 중)" };
     var rows = [["주문번호", st.order.no], ["주문자", st.order.name + " (" + (st.order.phone4 || "") + ")"]];
     if (MODE === "print") {
       rows.push(["받는 분", st.letter.to]); rows.push(["보내는 분", st.letter.from]);
-      rows.push(["편지", letterLines().length + "줄 · " + (st.letter.body || "").length + "자"]);
+      rows.push(["편지", letterLines().length + " / " + S.maxLines + "줄 · " + chars(st.letter.body).length + "자"]);
     } else {
       var rel = S.relations.filter(function (r) { return r.id === st.rel; })[0];
       rows.push(["관계", rel ? rel.label : ""]); rows.push(["받는 분", st.letter.to]); rows.push(["보내는 분", st.letter.from]);
@@ -206,8 +276,9 @@
     }
     rows.push(["봉투", E.name + (st.envName ? " · 받는 분 이름 적기" : "")]);
     $("#sum").innerHTML = rows.map(function (r) { return "<div><span class=\"k\">" + r[0] + "</span><span>" + esc(r[1] || "-") + "</span></div>"; }).join("");
-    if ($("#r-paper")) $("#r-paper").textContent = letterLines().join("\n");
-    $("#r-env").innerHTML = envFace(st.env, st.envName ? (st.letter.to || "받는 분") : "");
+    if ($("#r-paper")) renderSheet($("#r-paper"), letterLines(), "");
+    $("#r-env").innerHTML = ENV_READY ? envFace(st.env, st.envName ? (st.letter.to || "받는 분") : "")
+      : '<div class="envwait"><b>무무토리 기본 봉투</b><span>봉투 선택은 준비 중이에요.' + (st.envName ? " 봉투 앞면에 받는 분 이름을 찍어 드려요." : "") + "</span></div>";
   }
 
   /* ---------- 검사 ---------- */
@@ -231,7 +302,7 @@
       chk($("#w-from"), !!(st.letter.from || "").trim(), "보내는 분을 적어주세요.");
       var bad = badChars((st.letter.to || "") + (st.letter.body || "") + (st.letter.from || ""));
       var over = letterLines().length > S.maxLines;
-      if (bad.length || over) { ok = false; if (!first) first = $("#w-body"); }
+      if (bad.length || over) { ok = false; if (!first) first = bad.length ? $("#w-bad") : $("#w-over"); }
     }
     if (s === "survey") {
       chk($("#s-to"), !!st.letter.to, "받는 분을 적어주세요.");
@@ -257,9 +328,9 @@
       type: MODE,
       order: { no: st.order.no, name: st.order.name, phone4: st.order.phone4 },
       letter: { to: st.letter.to || "", from: st.letter.from || "" },
-      envelope: { id: st.env, writeName: !!st.envName },
+      envelope: { id: ENV_READY ? st.env : "basic", writeName: !!st.envName },
       consent: { privacy: true, at: new Date().toISOString() },
-      spec: { lineChars: S.lineChars, maxLines: S.maxLines },
+      spec: { lineChars: S.lineChars, maxLines: S.maxLines, paper: "A5" },
       status: "접수",
       createdAt: M.live ? M.fb.ts : Date.now()
     };
