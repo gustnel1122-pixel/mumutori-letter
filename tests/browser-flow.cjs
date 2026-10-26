@@ -48,7 +48,7 @@ async function fresh(viewport, mock = false) {
     writes.push({ url: req.url(), body: req.postDataJSON() });
     return route.fulfill({ json: { ...req.postDataJSON(), createdAt: Date.now() } });
   });
-  if (mock) await page.route('**/letter-intake-config.js', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'letter-intake-config.js'), 'utf8').replace('enabled: false', 'enabled: true') }));
+  if (mock) await page.route('**/letter-intake-config.js*', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'letter-intake-config.js'), 'utf8').replace('enabled: false', 'enabled: true') }));
   return { context, page, errors, writes, reads };
 }
 async function order(page, url = '/print.html') {
