@@ -1,0 +1,68 @@
+name: Prepare approved orderless letter files
+on:
+  push:
+    branches: [qa/letter-orderless-20261026]
+    paths: [.github/workflows/orderless-prepare.yml]
+permissions: {}
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Read the exact existing public commit
+        run: |
+          git init work
+          cd work
+          git remote add origin https://github.com/gustnel1122-pixel/mumutori-letter.git
+          git fetch --depth=1 origin ec648004318ff3a29b850345ad5c49d86d17dafc
+          git checkout --detach FETCH_HEAD
+      - name: Apply only the nine approved files and verify every byte
+        env:
+          DELTA_B64: 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
+        run: |
+          python3 - <<'PY'
+          import os,json,gzip,base64,hashlib,pathlib,subprocess
+          raw=gzip.decompress(base64.b64decode(os.environ['DELTA_B64']))
+          assert hashlib.sha256(raw).hexdigest()=='2552b3dd97b715f6ac5b8ae08504888ddbc850ee246d770bdf8926c39675c621'
+          delta=json.loads(raw)
+          allowed={'firebase/letters.rules.json','ghost.html','index.html','letter-submit.js','letter.js','print.html','tests/browser-flow.cjs','tests/firebase-rules.test.cjs','tests/intake-client.test.cjs'}
+          assert set(delta)==allowed
+          pathlib.Path('/tmp/orderless-delta.json').write_bytes(raw)
+          os.chdir('work')
+          def blob(data): return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          for name,d in delta.items():
+              p=pathlib.Path(name); data=p.read_bytes(); assert blob(data)==d['before'],name
+              lines=data.decode().splitlines(keepends=True)
+              for first,last,replacement in reversed(d['edits']): lines[first:last]=replacement
+              data=''.join(lines).encode(); assert blob(data)==d['after'],name
+              p.write_bytes(data)
+          assert pathlib.Path('CNAME').read_text().strip()=='letter.mumutori.com'
+          assert set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())==allowed
+          print('EXACT_APPROVED_FILES',json.dumps({k:v['after'] for k,v in delta.items()},sort_keys=True))
+          PY
+          cd work
+          node --test tests/intake-client.test.cjs
+      - name: Upload verified Git objects only - never change main here
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,json,base64,pathlib,urllib.request
+          repo='gustnel1122-pixel/mumutori-letter'
+          base='ec648004318ff3a29b850345ad5c49d86d17dafc'
+          def api(path,data=None):
+              req=urllib.request.Request('https://api.github.com/repos/'+repo+'/'+path,data=None if data is None else json.dumps(data).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
+          assert api('git/ref/heads/main')['object']['sha']==base,'main changed; stop without updating any branch'
+          delta=json.loads(pathlib.Path('/tmp/orderless-delta.json').read_text())
+          entries=[]
+          for name,d in delta.items():
+              data=(pathlib.Path('work')/name).read_bytes()
+              sha=api('git/blobs',{'content':base64.b64encode(data).decode(),'encoding':'base64'})['sha']
+              assert sha==d['after'],name
+              entries.append({'path':name,'mode':'100644','type':'blob','sha':sha})
+          tree=api('git/trees',{'base_tree':'77ca3c674207320b49ba306d7124a6a3e32e8be2','tree':entries})['sha']
+          print('MMT_PREPARED_TREE='+json.dumps({'base':base,'tree':tree,'files':entries},sort_keys=True))
+          PY
