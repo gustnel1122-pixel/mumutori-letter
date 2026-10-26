@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>무무토리 타자기 인쇄 편지 쓰기</title>
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#F5EBDD">
 <link rel="icon" href="img/brand/logo-color.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,53 +13,69 @@
 <link rel="stylesheet" href="letter.css">
 </head>
 <body data-mode="print">
-<div class="demo" id="demo" hidden>미리보기 모드 · 입력한 내용은 이 기기에만 임시 저장돼요 (Firebase 연결 전)</div>
+<div class="demo" id="demo" role="status">지금은 미리보기예요. 실제 편지 접수는 준비 중이에요.</div>
 <main class="shell">
-  <header class="brand"><img src="img/brand/logo-color.png" alt="무무토리"><div><b>타자기 인쇄 편지 쓰기</b><span>MUMUTORI LETTER SERVICE</span></div></header>
-  <div class="prog" id="prog"><span class="now"></span><ol></ol></div>
+  <header class="topbar">
+    <div class="brand"><img src="img/brand/logo-color.png" alt="무무토리" width="600" height="711"><div><b>타자기 인쇄 편지</b><span>무무토리의 편지 작업실</span></div></div>
+    <button type="button" class="sound-toggle" id="sound-toggle" aria-pressed="false" aria-label="타자기 효과음 켜기"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4V4Z" stroke-linejoin="round"/><path class="sound-wave" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" stroke-linecap="round"/><path class="sound-slash" d="m16 9 5 6m0-6-5 6" stroke-linecap="round"/></svg><span data-sound-label>소리 켜기</span></button>
+    <span class="sr-only" id="sound-status" role="status"></span>
+  </header>
+  <nav class="prog" id="prog" aria-label="편지 작성 단계"><span class="now" aria-live="polite"></span><ol></ol></nav>
 
   <section class="step" data-step="order">
-    <h1>편지를 타자기로 찍어 보내드려요</h1>
-    <div class="hello"><img src="img/brand/char-mumutori.png" alt="타자기를 치는 무무토리"><div><span class="who">타자기 담당 · 무무토리</span><p>적어주신 편지를 무무토리가 수동 타자기로 한 자 한 자 찍고, 무무토리 봉투에 담아 포장해 보내드려요. 주문 확인부터 차근차근 진행할게요.</p></div></div>
-    <div class="card">
-      <h3>주문 확인</h3>
+    <div class="welcome">
+      <p class="welcome-note">당신의 말이 한 장의 편지가 되도록.</p>
+      <div class="machine">
+        <img class="peek" src="img/brand/char-mumutori.png" alt="" aria-hidden="true" width="360" height="358" fetchpriority="high">
+        <div class="roller" aria-hidden="true"><i class="knob left"></i><i class="knob right"></i><span></span></div>
+        <div class="greeting-paper">
+          <h1 class="typed-greeting" data-greeting="안녕하세요,&#10;주문해 주셔서 고마워요.&#10;쓰신 글을 이 종이에&#10;그대로 찍어 드릴게요."><span class="sr-only">안녕하세요, 주문해 주셔서 고마워요. 쓰신 글을 이 종이에 그대로 찍어 드릴게요.</span><span class="typed-output" aria-hidden="true">안녕하세요,<br>주문해 주셔서 고마워요.<br>쓰신 글을 이 종이에<br>그대로 찍어 드릴게요.</span></h1>
+          <div class="paper-signature" aria-hidden="true"><span>한 자 한 자, 무무토리</span><i></i></div>
+        </div>
+      </div>
+      <p class="welcome-caption">수동 타자기로 찍는 편지 한 장.<br>쓰고, 담고, 보내는 일을 함께해요.</p>
+    </div>
+    <div class="card order-card">
+      <p class="section-kicker">편지를 시작하기 전에</p>
+      <h2>주문부터 확인할게요</h2>
+      <p class="form-required">필수 항목을 모두 적어 주세요.</p>
       <p class="small muted">결제하신 주문과 편지를 이어 주는 정보예요. 주문번호는 결제 완료 화면·주문 확인 안내나 무무토리 상점 마이페이지의 주문 내역에서 볼 수 있어요.</p>
-      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" autocomplete="off" inputmode="text" placeholder="결제 완료 안내의 주문번호"><p class="err" hidden></p></div>
-      <div class="f"><label for="o-name">주문하신 분 이름<span class="req">필수</span></label><input type="text" id="o-name" autocomplete="name"><p class="err" hidden></p></div>
-      <div class="f"><label for="o-phone4">휴대폰 번호 뒤 4자리<span class="req">필수</span></label><input type="tel" id="o-phone4" inputmode="numeric" maxlength="4" placeholder="0000"><p class="err" hidden></p></div>
+      <div class="f"><label for="o-no">주문번호<span class="req">필수</span></label><input type="text" id="o-no" name="orderNo" maxlength="80" aria-required="true" aria-describedby="o-no-err" autocomplete="off" inputmode="text" placeholder="결제 완료 안내의 주문번호"><p class="err" id="o-no-err" aria-live="polite" hidden></p></div>
+      <div class="f"><label for="o-name">주문하신 분 이름<span class="req">필수</span></label><input type="text" id="o-name" name="customerName" maxlength="60" aria-required="true" aria-describedby="o-name-err" autocomplete="name"><p class="err" id="o-name-err" aria-live="polite" hidden></p></div>
+      <div class="f"><label for="o-phone4">휴대폰 번호 뒤 4자리<span class="req">필수</span></label><input type="tel" id="o-phone4" name="phone4" autocomplete="off" pattern="[0-9]{4}" aria-required="true" aria-describedby="o-phone4-err" inputmode="numeric" maxlength="4" placeholder="0000"><p class="err" id="o-phone4-err" aria-live="polite" hidden></p></div>
     </div>
   </section>
 
-  <section class="step" data-step="write" hidden>
+  <section class="step editor-step" data-step="write" hidden>
     <h2>편지를 써주세요</h2>
-    <p class="muted small">적어주신 글은 A5 편지지에 수동 타자기로 한 자 한 자 찍어요. 한 줄에 <b class="spec-line"></b>자(띄어쓰기도 한 칸), 한 장에 <b class="spec-max"></b>줄까지 들어가요(받는 분 · 보내는 분 줄 포함).</p>
+    <p class="muted small step-intro">적어주신 글은 A5 편지지에 수동 타자기로 한 자 한 자 찍어요. 한 줄에 <b class="spec-line"></b>자(띄어쓰기도 한 칸), 한 장에 <b class="spec-max"></b>줄까지 들어가요(받는 분 · 보내는 분 줄 포함).</p>
     <div class="card">
-      <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" maxlength="20" placeholder="예: 사랑하는 엄마"><p class="help">편지 첫 줄에 "OO에게"로 찍혀요.</p><p class="err" hidden></p></div>
-      <div class="f"><label for="w-body">편지 내용<span class="req">필수</span></label><textarea id="w-body" rows="10" placeholder="하고 싶은 말을 편하게 적어주세요. 줄바꿈도 그대로 찍혀요."></textarea><p class="err" hidden></p></div>
-      <div class="meter" id="w-meter"></div><div class="bar"><i id="w-bar"></i></div>
-      <p class="err" id="w-over" hidden>편지지 한 장을 넘었어요. 조금만 줄여주세요.</p>
-      <div class="charwarn" id="w-bad" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b><br><small>다른 말로 바꾸거나 '지우기'를 눌러 주세요. 고치기 전에는 다음으로 넘어갈 수 없어요.</small></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
-      <div class="wrapwarn" id="w-wrap" hidden></div>
-      <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" maxlength="20" placeholder="예: 막내 지수"><p class="err" hidden></p></div>
+      <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" name="to" autocomplete="off" aria-required="true" aria-describedby="w-to-err" maxlength="20" placeholder="예: 사랑하는 엄마"><p class="help">편지 첫 줄에 "OO에게"로 찍혀요.</p><p class="err" id="w-to-err" aria-live="polite" hidden></p></div>
+      <div class="f"><label for="w-body">편지 내용<span class="req">필수</span></label><textarea id="w-body" name="letterBody" maxlength="2000" aria-required="true" aria-describedby="w-body-err" rows="10" placeholder="하고 싶은 말을 편하게 적어주세요. 줄바꿈도 그대로 찍혀요."></textarea><p class="err" id="w-body-err" aria-live="polite" hidden></p></div>
+      <div class="meter" id="w-meter" aria-live="polite" aria-atomic="true"></div><div class="bar"><i id="w-bar"></i></div>
+      <p class="err" id="w-over" role="status" aria-live="polite" tabindex="-1" hidden>편지지 한 장을 넘었어요. 조금만 줄여주세요.</p>
+      <div class="charwarn" id="w-bad" role="status" aria-live="polite" tabindex="-1" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b><br><small>다른 말로 바꾸거나 '지우기'를 눌러 주세요. 고치기 전에는 다음으로 넘어갈 수 없어요.</small></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
+      <div class="wrapwarn" id="w-wrap" role="status" aria-live="polite" hidden></div>
+      <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" name="from" autocomplete="off" aria-required="true" aria-describedby="w-from-err" maxlength="20" placeholder="예: 막내 지수"><p class="err" id="w-from-err" aria-live="polite" hidden></p></div>
       <p class="help small muted">쓸 수 있는 글자: 한글(ㅋㅋ · ㅠㅠ 같은 낱자도 돼요), 숫자, 기호 . , ! ? " ( ) - : ₩ $ % / × +. 한글 타자기라 <b>영문</b>과 이모지 · 한자 · 그 밖의 기호(' ~ ; … · ★ ♥ 등)는 찍을 수 없어요. 말줄임표는 ... 로 적어 주세요.</p>
     </div>
-    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="w-paper"></div></div>
+    <div class="f preview-panel"><div class="preview-heading"><span class="lab">종이에 놓아 보기</span><span class="note-tag">참고용 미리보기</span></div><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="w-paper"></div></div>
   </section>
 
   <section class="step" data-step="env" hidden>
     <h2>편지를 담을 봉투를 골라주세요</h2>
     <p class="muted small">봉투는 무무토리가 직접 포장해서 보내드려요.</p>
     <div class="envs" id="envs"></div>
-    <label class="consent"><input type="checkbox" id="env-name"> 봉투 앞면에 받는 분 이름을 타자기로 찍어주세요</label>
+    <label class="consent" hidden><input type="checkbox" id="env-name"> 봉투 앞면에 받는 분 이름을 타자기로 찍어주세요</label>
     <p class="photo-note">※ 봉투 사진은 이해를 돕는 목업이에요. 실제 색·무늬·스티커 위치는 조금 다를 수 있어요.</p>
   </section>
 
   <section class="step" data-step="review" hidden>
     <h2>이대로 보낼까요?</h2>
-    <div class="card"><div class="sum" id="sum"></div></div>
-    <div class="f"><span class="lab">편지 미리보기</span><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="r-paper"></div></div>
-    <div class="card"><h3>봉투</h3><div style="max-width:260px" id="r-env" class="env"></div></div>
-    <div class="card">
+    <div class="card review-summary"><h3>주문과 편지</h3><div class="sum" id="sum"></div></div>
+    <div class="f preview-panel review-preview"><div class="preview-heading"><span class="lab">마지막으로 읽어 보기</span><span class="note-tag">참고용 미리보기</span></div><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="r-paper"></div></div>
+    <div class="card review-envelope"><h3>편지를 담을 봉투</h3><div id="r-env" class="env"></div></div>
+    <div class="card review-terms">
       <details class="terms">
         <summary>개인정보 수집·이용 안내</summary>
         <ul>
@@ -68,15 +85,15 @@
           <li>주문·결제 기록처럼 법으로 보관 기간이 정해진 정보는 그 기간대로 따로 보관 (편지 내용은 포함하지 않음)</li>
         </ul>
       </details>
-      <label class="consent"><input type="checkbox" id="consent"> 위 내용을 확인했고, 편지 제작을 위한 개인정보 수집·이용에 동의해요.</label>
-      <p class="err" id="consent-err" hidden>동의해 주셔야 편지를 만들 수 있어요.</p>
+      <label class="consent"><input type="checkbox" id="consent" aria-required="true" aria-describedby="consent-err"> 위 내용을 확인했고, 편지 제작을 위한 개인정보 수집·이용에 동의해요.</label>
+      <p class="err" id="consent-err" aria-live="polite" tabindex="-1" hidden>동의해 주셔야 편지를 만들 수 있어요.</p>
       <p class="small muted">타자기로 찍는 과정에서 줄바꿈 위치가 미리보기와 조금 다를 수 있어요. 편지 내용 확정 후에는 제작이 시작되어 단순 변심 취소가 어려워요.</p>
     </div>
-    <p class="err" id="submit-err" hidden></p>
+    <p class="err" id="submit-err" aria-live="polite" tabindex="-1" hidden></p>
   </section>
 
   <section class="step done" id="done" hidden>
-    <img src="img/brand/char-mumutori.png" alt="타자기를 치는 무무토리">
+    <div class="done-portrait"><img src="img/brand/char-mumutori.png" alt="무무토리" width="360" height="358"><span class="done-mark" aria-hidden="true">✓</span></div>
     <h1>편지가 접수됐어요</h1>
     <p class="muted">적어 주신 편지를 타자기로 찍어 봉투에 담고, 3일 안에 택배로 보내 드려요(보통 1~2영업일 · 배송비 무료). 발송 일정은 카카오톡으로 알려 드려요.</p>
     <span class="no" id="done-no"></span>
@@ -84,12 +101,11 @@
   </section>
   <p class="foot">무무토리 상점 · acorn@mumutori.com · <a href="https://mumutori.sixshop.site/cmveo7vqjdi7g01xg51w5gxve">레터서비스 안내 보기</a><br>이 페이지는 결제하신 분께만 보내 드리는 편지 작성 페이지예요.</p>
 </main>
-<nav class="nav"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="fb.js"></script>
+<nav class="nav" aria-label="작성 화면 이동"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
+<script src="letter-intake-config.js"></script>
+<script src="letter-submit.js"></script>
 <script src="spec.js"></script>
+<script src="letter-experience.js"></script>
 <script src="letter.js"></script>
 </body>
 </html>

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="robots" content="noindex,nofollow"><title>레터 접수 규칙 준비 · 무무토리</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5ebdd;color:#40362f;font:16px/1.7 system-ui,sans-serif}main{max-width:860px;margin:auto;padding:40px 20px}h1{font-size:28px}section{background:#fffdf8;border:1px solid #d9cbb9;border-radius:16px;padding:24px;margin:24px 0}label{display:block;font-weight:650;margin:14px 0 6px}textarea,input{width:100%;border:1px solid #ad9c87;border-radius:8px;padding:12px;font:14px/1.5 ui-monospace,monospace;background:#fff;color:#29231e}textarea{min-height:220px;resize:vertical}button{padding:14px 20px;min-height:48px;border:0;border-radius:24px;background:#504638;color:white;font:inherit;cursor:pointer;touch-action:manipulation}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #936c38;outline-offset:3px}.note{font-size:14px;color:#6a5a48}.error{color:#8d3124;font-weight:650}code{background:#eee3d2;padding:2px 6px;border-radius:5px}[hidden]{display:none!important}
+</style><script src="merge-rules.js" defer></script><script src="prepare-rules.js" defer></script></head>
+<body><main><p>무무토리 · 사장님용 설정 도우미</p><h1>레터 접수 규칙 준비</h1>
+<p>현재 Firebase 규칙에서 <code>letters</code>와 <code>letterIntake</code>만 바꿉니다. 빠른 장부와 다른 업무의 규칙은 그대로 둡니다.</p>
+<p class="note">붙여넣은 내용은 이 브라우저 안에서만 처리하며 저장하거나 외부로 보내지 않습니다. 키·비밀번호·서비스 계정 파일은 필요하지 않습니다. 이 화면은 규칙을 직접 게시하거나 접수를 켜지 않습니다.</p>
+<section><label for="current">1. Firebase 콘솔 → Realtime Database → 규칙의 현재 내용 전체</label><textarea id="current" spellcheck="false" autocomplete="off" placeholder="{ &quot;rules&quot;: { … } }"></textarea>
+<label for="owner">2. 사장님 구글 계정 이메일 <small>(현재 규칙에서 찾으면 비워도 됩니다)</small></label><input id="owner" type="email" autocomplete="off" placeholder="구글 계정 이메일만 입력">
+<p><button id="prepare" type="button">기존 규칙을 보존하고 준비하기</button></p><p id="error" class="error" role="alert" hidden></p></section>
+<section id="result" hidden><h2>3. 이 내용을 콘솔의 규칙 칸에 붙여넣기</h2><p id="summary"></p><label for="output">합친 규칙 전체</label><textarea id="output" readonly spellcheck="false"></textarea><p><button id="copy" type="button">합친 규칙 복사</button></p><p id="copy-status" role="status"></p>
+<p>콘솔에서 <strong>게시</strong>한 뒤 담당자에게 “레터 규칙 게시 완료”라고 알려 주세요. 규칙 적용과 차단 시험이 확인될 때까지 고객 접수는 미리보기로 둡니다.</p></section>
+</main></body></html>
