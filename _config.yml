@@ -1,7 +1,7 @@
 # Customer Pages only. Keep operations, rules and development files in Git,
 # but never publish them on letter.mumutori.com.
 exclude:
-  - firebase
+  - firebase/
   - tests
   - README.md
   - database.rules.json
