@@ -1,0 +1,20 @@
+# Customer Pages only. Keep operations, rules and development files in Git,
+# but never publish them on letter.mumutori.com.
+exclude:
+  - firebase
+  - tests
+  - README.md
+  - database.rules.json
+  - intro/README.md
+  - mall/README.md
+  # Preserve the default exclusions when GitHub Pages uses Jekyll 3.
+  - .sass-cache
+  - .jekyll-cache
+  - gemfiles
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle
+  - vendor/cache
+  - vendor/gems
+  - vendor/ruby
