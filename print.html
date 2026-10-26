@@ -40,9 +40,9 @@
       <div class="charwarn" id="w-bad" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b><br><small>다른 말로 바꾸거나 '지우기'를 눌러 주세요. 고치기 전에는 다음으로 넘어갈 수 없어요.</small></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
       <div class="wrapwarn" id="w-wrap" hidden></div>
       <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" maxlength="20" placeholder="예: 막내 지수"><p class="err" hidden></p></div>
-      <p class="help small muted">쓸 수 있는 글자: 한글(ㅋㅋ · ㅠㅠ 같은 낱자도 돼요), 숫자, 기본 문장부호(. , ! ? ' " ( ) - ~ : ; …). 한글 타자기라 <b>영문</b>과 이모지 · 한자 · 특수기호(★ ♥ ※ 등)는 찍을 수 없어요.</p>
+      <p class="help small muted">쓸 수 있는 글자: 한글(ㅋㅋ · ㅠㅠ 같은 낱자도 돼요), 숫자, 기호 . , ! ? " ( ) - : ₩ $ % / × +. 한글 타자기라 <b>영문</b>과 이모지 · 한자 · 그 밖의 기호(' ~ ; … · ★ ♥ 등)는 찍을 수 없어요. 말줄임표는 ... 로 적어 주세요.</p>
     </div>
-    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><div class="sheetbox" id="w-paper"></div></div>
+    <div class="f"><span class="lab">타자기로 찍힌 모습 미리보기</span><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="w-paper"></div></div>
   </section>
 
   <section class="step" data-step="env" hidden>
@@ -56,7 +56,7 @@
   <section class="step" data-step="review" hidden>
     <h2>이대로 보낼까요?</h2>
     <div class="card"><div class="sum" id="sum"></div></div>
-    <div class="f"><span class="lab">편지 미리보기</span><div class="sheetbox" id="r-paper"></div></div>
+    <div class="f"><span class="lab">편지 미리보기</span><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="r-paper"></div></div>
     <div class="card"><h3>봉투</h3><div style="max-width:260px" id="r-env" class="env"></div></div>
     <div class="card">
       <details class="terms">

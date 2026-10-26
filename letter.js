@@ -7,14 +7,26 @@
   var MODE = document.body.dataset.mode === "ghost" ? "ghost" : "print";
   var STEPS = MODE === "print" ? ["order", "write", "env", "review"] : ["order", "survey", "memo", "env", "review"];
   var ENV_READY = S.envReady !== false;   // 봉투 고르기 준비 전에는 기본 봉투 한 가지(spec.js envReady)
+  var NAME_READY = S.envNameReady === true;   // 봉투 겉 이름 찍기(사장님 10/26 '지금 넣지 마') — false 면 칸 숨기고 늘 끔
   var LABEL = { order: "주문 확인", write: "편지 쓰기", survey: "마음 설문", memo: "꼭 넣고 싶은 말", env: ENV_READY ? "봉투 고르기" : "봉투", review: "확인하고 보내기" };
   var DKEY = "mmt-letter-draft-" + MODE;
   var st = store.get(DKEY, null) || { i: 0, order: {}, letter: {}, rel: "", survey: {}, memo: "", env: "kraft", envName: true };
   if (!ENV_READY) st.env = "basic";
+  if (!NAME_READY) st.envName = false;   // 예전 임시 저장분에 켜져 있어도 끈다
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  // 한글 타자기(10/26 사장님): 영문은 못 찍고 ㅋㅋ 같은 낱자는 찍힘. 숫자 · 문장부호는 사진에 1 · . , 가 있음(나머지는 확인 필요)
-  var ALLOW = /[가-힣ㄱ-ㅎㅏ-ㅣ0-9 \n.,!?'"()\-~:;…·]/;
+  // 타자기 = 마라톤 marathon 1000 DLX 한글(사장님 10/26 자판 사진, spec.js 맨 위). 자판에 있는 기호만: . , ! ? " ( ) - : ₩ $ % / × +
+  // 자판에 없는 ' ~ ; … · 와 영문은 '못 찍는 글자'로 표시된다. 휴대폰이 바꿔 넣는 “ ” 와 … 는 입력할 때 " 와 ... 로 고친다(fixPhone).
+  var ALLOW = /[가-힣ㄱ-ㅎㅏ-ㅣ0-9 \n.,!?"()\-:₩$%\/×+]/;
+  // 아이폰 등 자동 변환 보정: “ ” → " , … → ... (‘ ’ 와 ' 는 자판에 없어 그대로 두고 못 찍는 글자로 보인다). 커서 자리는 지킨다.
+  function fixPhone(el) {
+    var v = el.value;
+    if (!/[“”…]/.test(v)) return;
+    var pos = el.selectionStart, before = typeof pos === "number" ? v.slice(0, pos) : null;
+    var fix = function (s) { return s.replace(/[“”]/g, '"').replace(/…/g, "..."); };
+    el.value = fix(v);
+    if (before !== null && document.activeElement === el) { var p = fix(before).length; try { el.setSelectionRange(p, p); } catch (e) { /* 커서 없음 */ } }
+  }
   var LATIN = /[A-Za-zＡ-Ｚａ-ｚÀ-ɏ]/;
   /* 타자기로 못 찍는 글자 구분: 이모지(유니코드 범위 + 속성) · 한자 · 그 밖의 특수기호 */
   function re(src, flags, fallback) { try { return new RegExp(src, flags); } catch (e) { return fallback; } }
@@ -140,7 +152,8 @@
     if (!$("#w-body")) return;
     ["to", "body", "from"].forEach(function (k) {
       var el = $("#w-" + k); el.value = st.letter[k] || "";
-      el.addEventListener("input", function () { st.letter[k] = el.value; renderPreview(); save(); });
+      if (/[“”…]/.test(el.value)) { fixPhone(el); st.letter[k] = el.value; }   // 예전 임시 저장분도 같은 규칙으로
+      el.addEventListener("input", function () { fixPhone(el); st.letter[k] = el.value; renderPreview(); save(); });
     });
     $("#w-clean").addEventListener("click", function () {
       ["to", "body", "from"].forEach(function (k) {
@@ -209,6 +222,7 @@
     ["from", "to"].forEach(function (k) {
       var el = $("#s-" + k); el.value = st.letter[k] || "";
       el.addEventListener("input", function () {
+        fixPhone(el);
         st.letter[k] = el.value.trim(); save();
         var b = badChars(el.value);   // 입력하자마자 표시
         need(el, !b.length, b.length ? "타자기로 찍을 수 없는 글자가 있어요(" + b.slice(0, 6).join(" ") + "). 한글로 적어 주세요." : "");
@@ -250,7 +264,8 @@
     var to = st.envName ? (st.letter.to || "받는 분") : "";
     if (!ENV_READY) {
       st.env = "basic";
-      box.innerHTML = '<div class="envwait"><b>봉투 선택은 준비 중이에요</b><span>' + esc(S.envNote || "") + "</span></div>";
+      box.innerHTML = '<div class="envwait"><b>봉투 고르기는 준비 중이에요.</b><span>' + esc(S.envNote || "") + "</span></div>"
+        + (S.envPhoto ? '<figure class="envphoto"><img src="' + esc(S.envPhoto) + '" alt="크라프트 편지봉투 앞면의 우표와 뒷면의 실링왁스" loading="lazy"><figcaption>예전 무무토리 레터 포장 사진</figcaption></figure>' : "");
       var sec = box.closest(".step"), h = sec && $("h2", sec), note = sec && $(".photo-note", sec);
       if (h) h.textContent = "편지를 담을 봉투";
       if (note) note.hidden = true;
@@ -265,12 +280,14 @@
   }
   function bindEnv() {
     $("#envs").addEventListener("change", function (e) { if (e.target.name === "env") { st.env = e.target.value; save(); } });
-    $("#env-name").addEventListener("change", function (e) { st.envName = e.target.checked; renderEnvs(); save(); });
+    var nameBox = $("#env-name"), nameRow = nameBox && nameBox.closest("label");
+    if (!NAME_READY) { if (nameRow) nameRow.hidden = true; return; }   // 봉투 겉 이름 찍기는 지금 안 함
+    nameBox.addEventListener("change", function (e) { st.envName = e.target.checked; renderEnvs(); save(); });
   }
 
   /* 확인 */
   function renderReview() {
-    var E = ENV_READY ? (S.envelopes.filter(function (e) { return e.id === st.env; })[0] || S.envelopes[0]) : { name: "무무토리 기본 봉투(봉투 선택은 준비 중)" };
+    var E = ENV_READY ? (S.envelopes.filter(function (e) { return e.id === st.env; })[0] || S.envelopes[0]) : { name: "기본 편지봉투(편지지 · 우표 · 안개꽃 · 실링왁스 장식)" };
     var rows = [["주문번호", st.order.no], ["주문자", st.order.name + " (" + (st.order.phone4 || "") + ")"]];
     if (MODE === "print") {
       rows.push(["받는 분", st.letter.to]); rows.push(["보내는 분", st.letter.from]);
@@ -286,7 +303,7 @@
     $("#sum").innerHTML = rows.map(function (r) { return "<div><span class=\"k\">" + r[0] + "</span><span>" + esc(r[1] || "-") + "</span></div>"; }).join("");
     if ($("#r-paper")) renderSheet($("#r-paper"), letterLines(), "");
     $("#r-env").innerHTML = ENV_READY ? envFace(st.env, st.envName ? (st.letter.to || "받는 분") : "")
-      : '<div class="envwait"><b>무무토리 기본 봉투</b><span>봉투 선택은 준비 중이에요.' + (st.envName ? " 봉투 앞면에 받는 분 이름을 찍어 드려요." : "") + "</span></div>";
+      : '<div class="envwait"><b>기본 편지봉투</b><span>봉투 고르기는 준비 중이에요. 편지지 · 우표 · 안개꽃 · 실링왁스 장식으로 보내 드려요.' + (st.envName ? " 봉투 앞면에 받는 분 이름을 찍어 드려요." : "") + "</span></div>";
   }
 
   /* ---------- 검사 ---------- */
