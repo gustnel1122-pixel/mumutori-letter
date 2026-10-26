@@ -10,7 +10,7 @@ const rules = JSON.parse(fs.readFileSync(path.join(__dirname, '../firebase/lette
 const id = () => 'ltr_' + randomBytes(16).toString('hex');
 const stamp = { '.sv': 'timestamp' };
 function payload(type = 'print') {
-  const p = { schemaVersion: 1, type, order: { no: 'TEST-ONLY', name: '시험주문자', phone4: '0000' }, letter: { to: '시험받는분', from: '시험보내는분' }, envelope: { id: 'basic', writeName: false }, consent: { privacy: true, at: new Date().toISOString() }, spec: { lineChars: 33, maxLines: 20, paper: 'A5' }, status: 'received', createdAt: stamp };
+  const p = { schemaVersion: 1, type, order: { name: '시험주문자', phone4: '0000' }, letter: { to: '시험받는분', from: '시험보내는분' }, envelope: { id: 'basic', writeName: false }, consent: { privacy: true, at: new Date().toISOString() }, spec: { lineChars: 33, maxLines: 20, paper: 'A5' }, status: 'received', createdAt: stamp };
   if (type === 'print') p.letter.body = '고마운 마음을 편지에 담아 보냅니다.';
   else { p.relation = 'friend'; p.survey = { call: '친구야', tone: '반말', why: ['고마워서'], scene: '함께 걸었던 날이 생각나요.', heart: ['고마움'], feel: ['웃었으면'], last: '늘 고마워' }; p.memo = ''; }
   return p;
@@ -35,8 +35,12 @@ async function main() {
   const applied = await request('PUT', '.settings/rules', rules, null, true); assert.equal(applied.code, 200, JSON.stringify(applied));
   const seed = await request('PUT', 'letterIntake', { enabled: true, rulesVersion: 'letter-v1-20261026', verifiedAt: Date.now() }, null, true); assert.equal(seed.code, 200);
   let printID, ghostID;
-  await check('미로그인 새 일반 편지 작성 허용', async () => { printID = id(); const r = await request('PUT', 'letters/' + printID, payload()); assert.equal(r.code, 200, JSON.stringify(r)); assert.equal(typeof r.data.createdAt, 'number'); });
-  await check('미로그인 새 대필 작성 허용', async () => { ghostID = id(); const r = await request('PUT', 'letters/' + ghostID, payload('ghost')); assert.equal(r.code, 200, JSON.stringify(r)); });
+  await check('주문번호 없는 미로그인 새 일반 편지 작성 허용', async () => { printID = id(); const r = await request('PUT', 'letters/' + printID, payload()); assert.equal(r.code, 200, JSON.stringify(r)); assert.equal(typeof r.data.createdAt, 'number'); });
+  await check('주문번호 없는 미로그인 새 대필 작성 허용', async () => { ghostID = id(); const r = await request('PUT', 'letters/' + ghostID, payload('ghost')); assert.equal(r.code, 200, JSON.stringify(r)); });
+  await check('기존 주문번호는 선택 항목이며 있으면 기존 검사 유지', async () => {
+    for (const type of ['print', 'ghost']) { const p = payload(type); p.order.no = 'LEGACY-ORDER'; assert.equal((await request('PUT', 'letters/' + id(), p)).code, 200); }
+    for (const no of ['', '   ', 123, 'x'.repeat(81)]) { const p = payload(); p.order.no = no; denied(await request('PUT', 'letters/' + id(), p)); }
+  });
   await check('일반 편지의 실제 줄바꿈·빈 줄 허용', async () => { for (const body of ['고맙습니다.\n함께 걸어 주어서 고마워요.', '첫 줄의 마음을 담아요.\n\n끝 줄에도 마음을 담아요.', '\n\n가나다라마바사아자차\n\n']) { const p = payload(); p.letter.body = body; assert.equal((await request('PUT', 'letters/' + id(), p)).code, 200, JSON.stringify(body)); } });
   await check('마라톤 자판의 모든 허용기호·한글·숫자 허용', async () => { for (const c of Array.from('가힣ㄱㅎㅏㅣ0123456789 .,!?"()-:₩$%/×+')) { const p = payload(); p.letter.body += c; assert.equal((await request('PUT', 'letters/' + id(), p)).code, 200, JSON.stringify(c)); } });
   await check('영문 n·s 포함 영문과 비허용 제어문자 차단', async () => { for (const c of ['n', 's', 'A', 'z', '\t', '\r', '\\', "'", '~', ';', '…', '·']) { const p = payload(); p.letter.body += c; denied(await request('PUT', 'letters/' + id(), p)); } });

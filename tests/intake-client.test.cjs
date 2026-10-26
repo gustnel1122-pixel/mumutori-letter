@@ -10,16 +10,15 @@ const merge = require('../firebase/merge-rules.js');
 const rules = JSON.parse(fs.readFileSync(path.join(__dirname, '../firebase/letters.rules.json'), 'utf8'));
 const CONFIG = { enabled: true, databaseURL: 'https://example-test.firebaseio.com', rulesVersion: 'letter-v1-20261026', gatePath: 'letterIntake', timeoutMs: 1000 };
 const gate = { enabled: true, rulesVersion: CONFIG.rulesVersion, verifiedAt: 1 };
-function payload() { return { type: 'print', order: { no: 'TEST-ONLY', name: '시험주문자', phone4: '0000' }, letter: { to: '시험받는분', from: '시험보내는분', body: '고마운 마음을 편지에 담아 보냅니다.' }, envelope: { id: 'basic', writeName: false }, consent: { privacy: true, at: new Date().toISOString() }, spec: { lineChars: 33, maxLines: 20, paper: 'A5' } }; }
+function payload() { return { type: 'print', order: { name: '시험주문자', phone4: '0000' }, letter: { to: '시험받는분', from: '시험보내는분', body: '고마운 마음을 편지에 담아 보냅니다.' }, envelope: { id: 'basic', writeName: false }, consent: { privacy: true, at: new Date().toISOString() }, spec: { lineChars: 33, maxLines: 20, paper: 'A5' } }; }
 function response(data, code = 200) { return new Response(JSON.stringify(data), { status: code }); }
 function boot(fetcher, config = CONFIG) {
   const context = { LETTER_INTAKE_CONFIG: config, fetch: fetcher, crypto: webcrypto, URL, AbortController, TextEncoder, setTimeout, clearTimeout };
   context.window = context; vm.runInNewContext(source, context); return context.LetterIntake;
 }
-test('배포 설정은 기본 미리보기이며 네트워크를 전혀 호출하지 않는다', async () => {
+test('미리보기 설정은 네트워크를 전혀 호출하지 않는다', async () => {
   const context = {}; context.window = context; vm.runInNewContext(configSource, context);
-  assert.equal(context.LETTER_INTAKE_CONFIG.enabled, false);
-  const api = boot(() => { throw Error('network must not run'); }, context.LETTER_INTAKE_CONFIG);
+  const api = boot(() => { throw Error('network must not run'); }, { ...context.LETTER_INTAKE_CONFIG, enabled: false });
   assert.equal((await api.initialize()).enabled, false);
   await assert.rejects(api.submit(payload()), { code: 'CLOSED' });
 });
@@ -38,9 +37,30 @@ test('고객은 공개 gate만 읽고 키 없이 새 접수번호 경로에 PUT�
   const p = payload(); const result = await api.submit(p);
   assert.match(result.id, /^ltr_[a-f0-9]{32}$/); assert.equal(result.receivedAt, 123456789);
   assert.equal(calls.length, 2); assert.match(calls[0].url, /\/letterIntake\.json$/); assert.match(calls[1].url, /\/letters\/ltr_[a-f0-9]{32}\.json$/);
+  assert.deepEqual(Object.keys(JSON.parse(calls[1].opts.body).order).sort(), ['name', 'phone4']);
   assert.equal(calls[1].opts.method, 'PUT'); assert.equal(calls[1].opts.credentials, 'omit'); assert.equal(calls[1].opts.referrerPolicy, 'no-referrer');
   assert.equal(calls[1].opts.headers.Authorization, undefined); assert.ok(!calls[1].url.includes('auth='));
   assert.equal(p.schemaVersion, undefined, '호출자의 초안은 변경하지 않는다');
+});
+test('기존 주문번호가 있는 전송 원문은 재시도 때 그대로 유지한다', async () => {
+  const bodies = []; const id = 'ltr_' + 'a'.repeat(32);
+  const api = boot(async (_, opts) => {
+    if (opts.method === 'GET') return response(gate);
+    const p = JSON.parse(opts.body); bodies.push(p);
+    if (bodies.length === 1) throw new TypeError('network lost');
+    return response({ ...p, createdAt: 1 });
+  });
+  const p = payload(); p.order.no = 'LEGACY-ORDER';
+  await assert.rejects(api.submit(p, id), { code: 'UNCERTAIN' });
+  assert.equal((await api.submit(p, id)).id, id);
+  assert.deepEqual(bodies[0], bodies[1]); assert.equal(bodies[1].order.no, 'LEGACY-ORDER');
+});
+test('선택 주문번호는 있을 때 기존 자료형·공백·길이 검사를 유지한다', async () => {
+  const api = boot(async (_, opts) => { assert.equal(opts.method, 'GET'); return response(gate); });
+  for (const no of ['', '   ', 123, null, 'x'.repeat(81)]) {
+    const p = payload(); p.order.no = no;
+    await assert.rejects(api.submit(p), { code: 'VALIDATION' });
+  }
 });
 test('성공 HTTP여도 저장 내용이나 서버 시각이 다르면 완료 처리하지 않는다', async () => {
   for (const change of [p => ({ ...p, createdAt: 1, status: 'wrong' }), p => p, () => null]) {

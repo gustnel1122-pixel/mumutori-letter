@@ -48,11 +48,11 @@ async function fresh(viewport, mock = false) {
     writes.push({ url: req.url(), body: req.postDataJSON() });
     return route.fulfill({ json: { ...req.postDataJSON(), createdAt: Date.now() } });
   });
-  if (mock) await page.route('**/letter-intake-config.js*', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'letter-intake-config.js'), 'utf8').replace('enabled: false', 'enabled: true') }));
+  await page.route('**/letter-intake-config.js*', route => route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(root, 'letter-intake-config.js'), 'utf8').replace(/enabled: (true|false)/, 'enabled: ' + mock) }));
   return { context, page, errors, writes, reads };
 }
 async function order(page, url = '/print.html') {
-  await page.goto(origin + url); await page.locator('#o-no').fill('TEST-ONLY-001'); await page.locator('#o-name').fill('시험주문자'); await page.locator('#o-phone4').fill('0000'); await page.locator('#next').click();
+  await page.goto(origin + url); assert.equal(await page.locator('#o-no').count(), 0); await page.locator('#o-name').fill('시험주문자'); await page.locator('#o-phone4').fill('0000'); await page.locator('#next').click();
 }
 async function write(page) {
   await page.locator('#w-to').fill('사랑하는 민지'); await page.locator('#w-from').fill('지수'); await page.locator('#w-body').fill(fixture);
@@ -83,8 +83,8 @@ let origin;
     await page.waitForFunction(() => document.getElementById('sound-toggle').getAttribute('aria-pressed') === 'true');
     assert.equal(await page.evaluate(() => window.__audioContexts), 1);
     await page.locator('#sound-toggle').click(); assert.equal(await page.locator('#sound-toggle').getAttribute('aria-pressed'), 'false');
-    await next(page); assert.equal(await page.evaluate(() => document.activeElement.id), 'o-no');
-    await page.locator('#o-no').fill('TEST-ONLY-001'); await page.locator('#o-name').fill('시험주문자'); await page.locator('#o-phone4').fill('0000'); await next(page);
+    await next(page); assert.equal(await page.evaluate(() => document.activeElement.id), 'o-name');
+    await page.locator('#o-name').fill('시험주문자'); await page.locator('#o-phone4').fill('0000'); await next(page);
     await write(page);
     await page.locator('#w-body').fill('“고마워”… 늘 함께 걸어 줘서 고마워.');
     assert.equal(await page.locator('#w-body').inputValue(), '"고마워"... 늘 함께 걸어 줘서 고마워.');
@@ -125,7 +125,7 @@ let origin;
     await page.locator('label:has([data-q="feel"][value="웃었으면"])').click(); await page.locator('#q-last').fill('늘 고마워.');
     await next(page); assert.equal(await page.locator('[data-step="memo"]').isVisible(), true); await next(page); await next(page); await page.locator('#consent').check();
     await next(page); await page.locator('#done:not([hidden])').waitFor();
-    assert.match(await page.locator('#done h1').textContent(), /접수됐어요/); assert.equal(writes.length, 1); assert.equal(writes[0].body.type, 'ghost');
+    assert.match(await page.locator('#done h1').textContent(), /접수됐어요/); assert.equal(writes.length, 1); assert.equal(writes[0].body.type, 'ghost'); assert.deepEqual(Object.keys(writes[0].body.order).sort(), ['name', 'phone4']);
     assert.equal(await page.evaluate(() => localStorage.getItem('mmt-letter-draft-ghost')), 'null');
     assert.ok(reads.every(url => url.endsWith('/letterIntake.json'))); assert.deepEqual(errors, []);
     report.push(size + ': 대필 5개 내부 화면·상단 4단계, 설문·메모·서버 응답 확인 완료 (가상 서버)');
@@ -143,14 +143,14 @@ let origin;
     await order(page); await write(page); await next(page); await next(page); await page.locator('#consent').check(); await next(page);
     await page.locator('#submit-err:not([hidden])').waitFor(); assert.equal(await page.locator('#done').isVisible(), false);
     assert.equal(await page.locator('#w-body').isDisabled(), true); await next(page); await page.locator('#done:not([hidden])').waitFor();
-    assert.equal(attempts.length, 2); assert.equal(attempts[0].url, attempts[1].url); assert.deepEqual(attempts[0].body, attempts[1].body); assert.deepEqual(errors, []);
+    assert.deepEqual(Object.keys(attempts[0].body.order).sort(), ['name', 'phone4']); assert.equal(attempts.length, 2); assert.equal(attempts[0].url, attempts[1].url); assert.deepEqual(attempts[0].body, attempts[1].body); assert.deepEqual(errors, []);
     report.push('연결 끊김: 거짓 완료 없음·원문 잠금·동일 접수번호/원문 재시도 통과 (가상 서버)');
     await context.close();
   }
   // 캡처 4장 안에 PC와 실제 390px 화면을 함께 배치한다. 각 원본 스크린샷의 내용은 그대로 둔다.
   for (const [stem, title] of [['01_first','첫 화면'],['02_write','편지 쓰기'],['03_envelope','봉투'],['04_done','미리보기 완료']]) {
     const { context, page } = await fresh({ width: 1460, height: 1100 });
-    await page.setContent('<!doctype html><html lang="ko"><meta charset="utf-8"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600&display=swap"><style>*{box-sizing:border-box}body{margin:0;background:#e9e0d4;color:#3e2416;font-family:"IBM Plex Sans KR",sans-serif;padding:28px}h1{font-size:24px;margin:0 0 10px}p{font-size:13px;margin:0 0 24px}main{display:grid;grid-template-columns:960px 390px;gap:24px;align-items:start}h2{font-size:14px;margin:0 0 12px}img{display:block;width:100%;height:auto;border:1px solid #cbb79d}</style><h1>무무토리 레터 · '+title+'</h1><p>PC 1440px · 휴대폰 390px / 가상 정보로 검수 · 운영 접수는 미리보기 상태</p><main><section><h2>PC · 1440px</h2><img src="'+origin+'/captures/'+stem+'_pc.png"></section><section><h2>휴대폰 · 390px</h2><img src="'+origin+'/captures/'+stem+'_mobile390.png"></section></main></html>');
+    await page.setContent('<!doctype html><html lang="ko"><meta charset="utf-8"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600&display=swap"><style>*{box-sizing:border-box}body{margin:0;background:#e9e0d4;color:#3e2416;font-family:"IBM Plex Sans KR",sans-serif;padding:28px}h1{font-size:24px;margin:0 0 10px}p{font-size:13px;margin:0 0 24px}main{display:grid;grid-template-columns:960px 390px;gap:24px;align-items:start}h2{font-size:14px;margin:0 0 12px}img{display:block;width:100%;height:auto;border:1px solid #cbb79d}</style><h1>무무토리 레터 · '+title+'</h1><p>PC 1440px · 휴대폰 390px / 가상 정보로 검수 · 가상 서버로 전송 시험</p><main><section><h2>PC · 1440px</h2><img src="'+origin+'/captures/'+stem+'_pc.png"></section><section><h2>휴대폰 · 390px</h2><img src="'+origin+'/captures/'+stem+'_mobile390.png"></section></main></html>');
     await page.locator('img').evaluateAll(imgs => Promise.all(imgs.map(img => img.decode())));
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(out, stem + '_pc_mobile390.png'), fullPage: true }); await context.close();

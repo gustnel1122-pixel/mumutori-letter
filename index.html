@@ -545,7 +545,7 @@ function boot(){
     ['page','대필 초안 고객 확인 방법 정하기 (카카오톡 채널 등)','대필 · 완료 안내'],
     ['page','개인정보 동의 문구 · AI 사용 고지 확정 (D7)','확인 단계'],
     ['page','식스샵 개인정보처리방침에 레터 수집 항목 추가','확인 단계'],
-    ['page','주문 확인 방식 확정 (주문번호·이름·뒤 4자리)','주문 확인 단계'],
+    ['page','주문 확인 방식 확정 (이름·휴대폰 뒤 4자리)','주문 확인 단계'],
     ['page','Firebase 프로젝트·데이터베이스·보안 규칙 연결','접수 저장 · 9/27 완료','현수',true],
     ['page','GitHub Pages 배포','배포 · 9/27 완료','현수',true],
     ['page','관리자 계정 등록 (현수 · 다희)','접수함 · 공유 저장'],
@@ -686,7 +686,7 @@ function boot(){
   function comp(p){
     var A=appliedSpec();
     if(p==='print') return {title:'일반 타자기 서비스 페이지', file:'print.html', items:[
-      ['주문 확인','주문번호 · 이름 · 휴대폰 뒤 4자리. 결제와 편지를 연결한다.'],
+      ['주문 확인','주문자 이름 · 휴대폰 뒤 4자리로 결제와 편지를 연결한다.'],
       ['편지 쓰기','받는 분 · 내용 · 보내는 분. 한 줄 '+A.lineChars+'자, 한 장 '+A.maxLines+'줄 제한. 타자기에 없는 글자(이모지 등)는 찾아서 지우게 한다.'],
       ['타자기 미리보기','타자기로 찍힐 모습을 줄 단위로 바로 보여준다.'],
       ['봉투 고르기','봉투 '+(A.envelopes||[]).filter(function(e){return !e.hidden}).length+'종 중 선택, 봉투 앞면에 받는 분 이름 찍기 여부.'],
@@ -915,7 +915,7 @@ function boot(){
     $('#inbox').innerHTML = (note?'<p class="note">'+note+'</p>':'') + (list.length ? list.map(function(p){
       var env=(A.envelopes||[]).filter(function(e){return e.id===(p.envelope&&p.envelope.id)})[0];
       var when=new Date(p.createdAt||Date.now()).toLocaleString('ko-KR');
-      return '<details class="lt"><summary><span class="ty '+p.type+'">'+(p.type==='print'?'인쇄':'대필')+'</span><span><b>'+esc(p.order&&p.order.name)+'</b> <span class="faint small mono">주문 '+esc(p.order&&p.order.no)+' · '+esc(p.id||'')+'</span></span><span class="small faint">'+when+'</span></summary><div class="body"><div class="kv"><div><span>상태</span><b>'+esc(p.status==='received'?'접수':(p.status||'접수'))+'</b></div><div><span>봉투</span><b>'+esc(env?env.name:(p.envelope&&p.envelope.id)||'')+(p.envelope&&p.envelope.writeName?' · 이름 찍기':'')+'</b></div><div><span>연락처 뒤 4자리</span><b>'+esc(p.order&&p.order.phone4)+'</b></div></div><pre>'+esc(letterText(p))+'</pre></div></details>';
+      return '<details class="lt"><summary><span class="ty '+p.type+'">'+(p.type==='print'?'인쇄':'대필')+'</span><span><b>'+esc(p.order&&p.order.name)+'</b> <span class="faint small mono">휴대폰 뒤 4자리 '+esc(p.order&&p.order.phone4)+' · 접수 '+esc(p.id||'')+'</span></span><span class="small faint">'+when+'</span></summary><div class="body"><div class="kv"><div><span>상태</span><b>'+esc(p.status==='received'?'접수':(p.status||'접수'))+'</b></div><div><span>봉투</span><b>'+esc(env?env.name:(p.envelope&&p.envelope.id)||'')+(p.envelope&&p.envelope.writeName?' · 이름 찍기':'')+'</b></div><div><span>연락처 뒤 4자리</span><b>'+esc(p.order&&p.order.phone4)+'</b></div></div><pre>'+esc(letterText(p))+'</pre></div></details>';
     }).join('') : '<div class="empty">아직 접수된 편지가 없어요.</div>');
   }
   function renderAuth(){

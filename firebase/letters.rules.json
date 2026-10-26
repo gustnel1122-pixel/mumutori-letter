@@ -18,7 +18,7 @@
           ".validate": "(newData.isString() && (newData.val() === \"print\" || newData.val() === \"ghost\")) && newData.getPriority() === null"
         },
         "order": {
-          ".validate": "newData.hasChildren([\"no\",\"name\",\"phone4\"]) && newData.getPriority() === null",
+          ".validate": "newData.hasChildren([\"name\",\"phone4\"]) && newData.getPriority() === null",
           "$other": {
             ".validate": false
           },

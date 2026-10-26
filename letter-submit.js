@@ -29,7 +29,7 @@
   function validate(p) {
     if (!keys(p, ['type', 'order', 'letter', 'envelope', 'consent', 'spec', 'status', 'createdAt', 'schemaVersion', 'relation', 'survey', 'memo'], ['type', 'order', 'letter', 'envelope', 'consent', 'spec', 'status', 'createdAt', 'schemaVersion'])) return false;
     if (p.schemaVersion !== 1 || p.status !== 'received' || ['print', 'ghost'].indexOf(p.type) < 0) return false;
-    if (!keys(p.order, ['no', 'name', 'phone4']) || !str(p.order.no, 1, 80) || !p.order.no.trim() || !str(p.order.name, 1, 60) || !p.order.name.trim() || !str(p.order.phone4, 4, 4) || !/^\d{4}$/.test(p.order.phone4)) return false;
+    if (!keys(p.order, ['no', 'name', 'phone4'], ['name', 'phone4']) || (Object.prototype.hasOwnProperty.call(p.order, 'no') && (!str(p.order.no, 1, 80) || !p.order.no.trim())) || !str(p.order.name, 1, 60) || !p.order.name.trim() || !str(p.order.phone4, 4, 4) || !/^\d{4}$/.test(p.order.phone4)) return false;
     if (!keys(p.envelope, ['id', 'writeName']) || p.envelope.id !== 'basic' || p.envelope.writeName !== false) return false;
     if (!keys(p.consent, ['privacy', 'at']) || p.consent.privacy !== true || !str(p.consent.at, 24, 24) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(p.consent.at)) return false;
     if (!keys(p.spec, ['lineChars', 'maxLines', 'paper']) || p.spec.lineChars !== 33 || p.spec.maxLines !== 20 || p.spec.paper !== 'A5') return false;

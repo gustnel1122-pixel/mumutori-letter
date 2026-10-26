@@ -23,7 +23,7 @@
   ['order', 'letter', 'survey'].forEach(function (key) { if (!st[key] || typeof st[key] !== 'object' || Array.isArray(st[key])) st[key] = {}; });
   if (!Number.isInteger(st.i) || st.i < 0 || st.i >= STEPS.length) st.i = 0;
   ['rel', 'memo'].forEach(function (key) { if (typeof st[key] !== 'string') st[key] = ''; });
-  ['no', 'name', 'phone4'].forEach(function (key) { if (typeof st.order[key] !== 'string') st.order[key] = ''; });
+  ['name', 'phone4'].forEach(function (key) { if (typeof st.order[key] !== 'string') st.order[key] = ''; });
   ['to', 'from', 'body'].forEach(function (key) { if (typeof st.letter[key] !== 'string') st.letter[key] = ''; });
   if (st.pendingReceipt) {
     var frozen = st.pendingReceipt.data;
@@ -196,7 +196,7 @@
 
   /* 주문 확인 */
   function bindOrder() {
-    ["no", "name", "phone4"].forEach(function (k) {
+    ["name", "phone4"].forEach(function (k) {
       var el = $("#o-" + k); if (!el) return;
       el.value = st.order[k] || "";
       el.addEventListener("input", function () {
@@ -357,7 +357,7 @@
   /* 확인 */
   function renderReview() {
     var E = ENV_READY ? (S.envelopes.filter(function (e) { return e.id === st.env; })[0] || S.envelopes[0]) : { name: "기본 편지봉투(편지지 · 우표 · 안개꽃 · 실링왁스 장식)" };
-    var rows = [["주문번호", st.order.no], ["주문자", st.order.name + " (" + (st.order.phone4 || "") + ")"]];
+    var rows = [["주문자", st.order.name], ["휴대폰 번호 뒤 4자리", st.order.phone4 || ""]];
     if (MODE === "print") {
       rows.push(["받는 분", st.letter.to]); rows.push(["보내는 분", st.letter.from]);
       rows.push(["편지", letterLines().length + " / " + S.maxLines + "줄 · " + chars(st.letter.body).length + "자"]);
@@ -387,7 +387,6 @@
     var s = step || STEPS[st.i], ok = true, first = null;
     function chk(el, cond, msg) { var r = need(el, cond, msg); if (!r && !first) first = el; ok = ok && r; }
     if (s === "order") {
-      chk($("#o-no"), !!st.order.no.trim() && st.order.no.length <= 80, "주문번호를 80자 안으로 적어주세요.");
       chk($("#o-name"), !!st.order.name.trim() && st.order.name.length <= 60, "주문하신 분 이름을 60자 안으로 적어주세요.");
       chk($("#o-phone4"), /^\d{4}$/.test(st.order.phone4 || ""), "휴대폰 번호 뒤 4자리를 적어주세요.");
     }
@@ -431,7 +430,7 @@
   function payload() {
     var p = {
       type: MODE,
-      order: { no: st.order.no, name: st.order.name, phone4: st.order.phone4 },
+      order: { name: st.order.name, phone4: st.order.phone4 },
       letter: { to: st.letter.to || "", from: st.letter.from || "" },
       envelope: { id: ENV_READY ? st.env : "basic", writeName: !!st.envName },
       consent: { privacy: true, at: new Date().toISOString() },
