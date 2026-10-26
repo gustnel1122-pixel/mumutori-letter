@@ -3,7 +3,7 @@
  * 자세한 적용 순서: firebase/README.md
  */
 window.LETTER_INTAKE_CONFIG = Object.freeze({
-  enabled: false,
+  enabled: true,
   databaseURL: 'https://mumutori-letter-default-rtdb.asia-southeast1.firebasedatabase.app',
   rulesVersion: 'letter-v1-20261026',
   gatePath: 'letterIntake',
