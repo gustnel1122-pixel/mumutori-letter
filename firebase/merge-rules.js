@@ -1,4 +1,4 @@
-/* 현재 콘솔 규칙을 유지하며 레터 두 경로만 병합. 외부 전송·자동 배포 없음. */
+/* 현재 콘솔 규칙을 유지하며 레터 세 경로만 병합. 외부 전송·자동 배포 없음. */
 (function (global) {
   'use strict';
   function parse(text) {
@@ -29,7 +29,7 @@
       var v = live.rules[k];
       if (v !== undefined && v !== false && v !== 'false') throw Error('맨 위의 ' + k + ' 규칙이 하위 편지 규칙보다 넓은 권한을 줄 수 있어요. 자동 병합을 멈췄어요. 현재 규칙을 담당자에게 검토받아 주세요.');
     });
-    if (!fragment || !fragment.rules || !fragment.rules.letters || !fragment.rules.letterIntake || Object.keys(fragment.rules).length !== 2) throw Error('레터 규칙 파일을 확인하지 못했어요.');
+    if (!fragment || !fragment.rules || !fragment.rules.letters || !fragment.rules.letterIntake || !fragment.rules.letterReceiptChecks || Object.keys(fragment.rules).length !== 3) throw Error('레터 규칙 파일을 확인하지 못했어요.');
     var owner = (ownerEmail || inferOwner(live)).trim();
     if (!/^[^\s@<>"'\\]+@[^\s@<>"'\\]+\.[^\s@<>"'\\]+$/.test(owner)) throw Error('사장님 구글 계정 이메일을 이 화면에 적어 주세요. 키나 비밀번호는 적지 마세요.');
     var copy = JSON.parse(JSON.stringify(live));
@@ -39,11 +39,19 @@
       return value;
     }
     var next = replace(JSON.parse(JSON.stringify(fragment.rules)));
-    copy.rules.letters = next.letters; copy.rules.letterIntake = next.letterIntake;
+    if (copy.rules.letters && copy.rules.letters.$id) {
+      var priorTemplate = JSON.parse(JSON.stringify(next.letters));
+      delete priorTemplate.$id.receiptHash;
+      var currentLetters = JSON.stringify(copy.rules.letters);
+      if (currentLetters !== JSON.stringify(priorTemplate) && currentLetters !== JSON.stringify(next.letters)) throw Error('현재 편지 규칙에 다른 권한이나 내용이 있어 자동 덮어쓰기를 중단했어요. 담당자가 현재 규칙을 기준으로 검토해 주세요.');
+    }
+    if (copy.rules.letterIntake && JSON.stringify(copy.rules.letterIntake) !== JSON.stringify(next.letterIntake)) throw Error('현재 접수 설정 규칙이 달라 자동 덮어쓰기를 중단했어요. 담당자 검토가 필요해요.');
+    if (copy.rules.letterReceiptChecks && JSON.stringify(copy.rules.letterReceiptChecks) !== JSON.stringify(next.letterReceiptChecks)) throw Error('기존 접수 확인 규칙이 있어 자동 병합을 중단했어요. 담당자 검토가 필요해요.');
+    copy.rules.letters = next.letters; copy.rules.letterIntake = next.letterIntake; copy.rules.letterReceiptChecks = next.letterReceiptChecks;
     Object.keys(live.rules).forEach(function (k) {
-      if (k !== 'letters' && k !== 'letterIntake' && JSON.stringify(copy.rules[k]) !== JSON.stringify(live.rules[k])) throw Error('기존 규칙을 그대로 보존하지 못해 중단했어요.');
+      if (k !== 'letters' && k !== 'letterIntake' && k !== 'letterReceiptChecks' && JSON.stringify(copy.rules[k]) !== JSON.stringify(live.rules[k])) throw Error('기존 규칙을 그대로 보존하지 못해 중단했어요.');
     });
-    return { rules: copy, ownerEmail: owner, changedPaths: ['letters', 'letterIntake'] };
+    return { rules: copy, ownerEmail: owner, changedPaths: ['letters', 'letterIntake', 'letterReceiptChecks'] };
   }
   var api = { parse: parse, merge: merge, inferOwner: inferOwner };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -92,6 +92,9 @@
         "createdAt": {
           ".validate": "(newData.isNumber() && newData.val() === now) && newData.getPriority() === null"
         },
+        "receiptHash": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/) && newData.getPriority() === null"
+        },
         "relation": {
           ".validate": "(newData.isString() && (newData.val() === \"lover\" || newData.val() === \"family\" || newData.val() === \"friend\" || newData.val() === \"thanks\")) && newData.getPriority() === null"
         },
@@ -146,6 +149,13 @@
         "memo": {
           ".validate": "(newData.isString() && newData.val().length >= 0 && newData.val().length <= 300) && newData.getPriority() === null"
         }
+      }
+    },
+    "letterReceiptChecks": {
+      ".read": false,
+      "$id": {
+        ".write": "$id.matches(/^ltr_[a-f0-9]{32}$/) && root.child('letters').child($id).exists() && root.child('letters').child($id).child('receiptHash').isString() && newData.isString() && newData.val() === root.child('letters').child($id).child('receiptHash').val()",
+        ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/) && newData.getPriority() === null"
       }
     },
     "letterIntake": {

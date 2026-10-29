@@ -491,11 +491,11 @@
     try {
       // 결과를 못 받은 재시도는 같은 ID와 같은 원문을 사용한다. 중복 접수를 만들지 않는다.
       if (!st.pendingReceipt) {
-        st.pendingReceipt = { id: intake.newId(), data: payload() };
+        st.pendingReceipt = { id: intake.newId(), salt: intake.newSalt(), data: payload() };
         if (!save()) { st.pendingReceipt = null; var storageError = new Error('저장 불가'); storageError.code = 'STORAGE'; throw storageError; }
       }
       lockPending();
-      var receipt = await intake.submit(st.pendingReceipt.data, st.pendingReceipt.id);
+      var receipt = await intake.submit(st.pendingReceipt.data, st.pendingReceipt.id, st.pendingReceipt.salt);
       finished(receipt.id, false);
     } catch (e) {
       btn.disabled = false; $('#prev').disabled = false;

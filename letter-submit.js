@@ -83,13 +83,36 @@
     var bytes = new Uint8Array(16); global.crypto.getRandomValues(bytes);
     return 'ltr_' + Array.from(bytes, function (x) { return x.toString(16).padStart(2, '0'); }).join('');
   }
+  function newSalt() {
+    if (!global.crypto || !global.crypto.getRandomValues || !global.crypto.subtle) throw fail('UNSUPPORTED', '이 브라우저에서 안전한 접수를 준비할 수 없어요. 최신 브라우저에서 열어 주세요.');
+    var bytes = new Uint8Array(32); global.crypto.getRandomValues(bytes);
+    return Array.from(bytes, function (x) { return x.toString(16).padStart(2, '0'); }).join('');
+  }
+  function canonical(value) {
+    if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+    if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(function (k) { return JSON.stringify(k) + ':' + canonical(value[k]); }).join(',') + '}';
+    return JSON.stringify(value);
+  }
+  async function receiptHash(id, salt, value) {
+    if (!/^[a-f0-9]{64}$/.test(salt) || !global.crypto || !global.crypto.subtle) throw fail('UNSUPPORTED', '안전한 접수 확인을 준비하지 못했어요.');
+    var data = new TextEncoder().encode(id + '\n' + salt + '\n' + canonical(value));
+    var digest = await global.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest), function (x) { return x.toString(16).padStart(2, '0'); }).join('');
+  }
+  async function confirmReceipt(id, hash) {
+    var result;
+    try {
+      result = await request(baseURL() + '/letterReceiptChecks/' + id + '.json?print=silent', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(hash)});
+    } catch (_) { return false; }
+    return result.ok && result.status === 204 && (await result.text()) === '';
+  }
   function same(a, b) {
     if (a === b) return true;
     if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
     var ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
     return ka.length === kb.length && ka.every(function (k, i) { return k === kb[i] && same(a[k], b[k]); });
   }
-  async function submit(input, existingId) {
+  async function submit(input, existingId, salt) {
     var id = existingId || newId();
     if (!/^ltr_[a-f0-9]{32}$/.test(id)) throw fail('ID', '접수번호를 확인하지 못했어요. 새로고침 후 다시 시도해 주세요.', id);
     if (pending[id]) throw fail('BUSY', '접수 결과를 확인하고 있어요. 잠시 기다려 주세요.', id);
@@ -101,6 +124,7 @@
       try { p = JSON.parse(JSON.stringify(input)); } catch (e) { throw fail('VALIDATION', '입력 내용을 확인해 주세요.', id); }
       p.schemaVersion = 1; p.status = 'received'; p.createdAt = { '.sv': 'timestamp' };
       if (!validate(p)) throw fail('VALIDATION', '입력 내용을 다시 확인해 주세요. 길이와 필수 항목을 확인해 주시면 돼요.', id);
+      if (salt != null) p.receiptHash = await receiptHash(id, salt, p);
       var body = JSON.stringify(p);
       if (new TextEncoder().encode(body).length > 18000) throw fail('VALIDATION', '적어 주신 내용이 너무 길어요. 조금 줄여 주세요.', id);
       var r;
@@ -108,7 +132,10 @@
         r = await request(baseURL() + '/letters/' + id + '.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: body });
       } catch (e) { throw fail('UNCERTAIN', '접수 결과를 아직 확인하지 못했어요. 같은 접수번호로 다시 확인해 주세요. 새 편지를 만들면 중복될 수 있어요.', id, true); }
       if (!r.ok) {
-        if (r.status === 401 || r.status === 403) throw fail('DENIED', '접수 여부를 확인하지 못했어요. 이미 전송되었거나 접수가 잠시 닫혔을 수 있어요. 주문 문의에 이 접수번호를 남겨 주세요.', id, true);
+        if (r.status === 401 || r.status === 403) {
+          if (salt != null && await confirmReceipt(id, p.receiptHash)) return {id:id, confirmed:true};
+          throw fail('DENIED', '접수 여부를 확인하지 못했어요. 이미 전송되었거나 접수가 잠시 닫혔을 수 있어요. 주문 문의에 이 접수번호를 남겨 주세요.', id, true);
+        }
         throw fail('SERVER', '접수 결과를 확인하지 못했어요. 같은 접수번호로 잠시 후 다시 시도해 주세요.', id, true);
       }
       var saved;
@@ -119,5 +146,5 @@
       return { id: id, receivedAt: saved.createdAt };
     } finally { delete pending[id]; }
   }
-  global.LetterIntake = Object.freeze({ status: status, initialize: initialize, newId: newId, submit: submit });
+  global.LetterIntake = Object.freeze({ status: status, initialize: initialize, newId: newId, newSalt: newSalt, submit: submit });
 })(window);

@@ -147,6 +147,26 @@ let origin;
     report.push('연결 끊김: 거짓 완료 없음·원문 잠금·동일 접수번호/원문 재시도 통과 (가상 서버)');
     await context.close();
   }
+  // 실제 고객 데이터를 사용하지 않고, 저장 응답 유실 뒤 390px 새로고침·확인 흐름을 검증한다.
+  {
+    const { context, page, errors } = await fresh({ width: 390, height: 844 }, true);
+    let saved = null, creates = 0, confirmations = 0;
+    await page.route('**/letters/*.json', async route => {
+      const body = route.request().postDataJSON();
+      if (!saved) { saved = body; creates++; return route.abort('connectionreset'); }
+      return route.fulfill({ status: 403, json: {error:'denied'} });
+    });
+    await page.route(/\/letterReceiptChecks\/[^/?]+\.json\?print=silent$/, async route => {
+      const hash=route.request().postDataJSON();
+      if(saved && hash===saved.receiptHash){confirmations++;return route.fulfill({status:204,body:''});}
+      return route.fulfill({status:403,json:{error:'denied'}});
+    });
+    await order(page); await write(page); await next(page); await next(page); await page.locator('#consent').check(); await next(page);
+    await page.locator('#submit-err:not([hidden])').waitFor(); await page.reload();
+    await page.locator('#pending-note').waitFor(); await next(page); await page.locator('#done:not([hidden])').waitFor();
+    assert.equal(creates,1); assert.equal(confirmations,1); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true); assert.deepEqual(errors,[]);
+    report.push('휴대폰 390px: 응답 유실 뒤 새로고침·같은 접수 확인, 중복 없음 (가상 서버)'); await context.close();
+  }
   // 캡처 4장 안에 PC와 실제 390px 화면을 함께 배치한다. 각 원본 스크린샷의 내용은 그대로 둔다.
   for (const [stem, title] of [['01_first','첫 화면'],['02_write','편지 쓰기'],['03_envelope','봉투'],['04_done','미리보기 완료']]) {
     const { context, page } = await fresh({ width: 1460, height: 1100 });

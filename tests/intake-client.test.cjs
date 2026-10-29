@@ -108,9 +108,18 @@ test('규칙 병합은 다른 경로를 보존하고 루트 광역 권한을 거
   const live = { rules: { hub: { '.read': "auth.token.email == 'owner@example.test'", '.write': false }, sourcing: { '.read': false }, letters: { '.read': true } } };
   const output = merge.merge(live, rules);
   assert.deepEqual(output.rules.rules.hub, live.rules.hub); assert.deepEqual(output.rules.rules.sourcing, live.rules.sourcing);
+  assert.equal(output.rules.rules.letterReceiptChecks['.read'], false);
+  assert.ok(output.changedPaths.includes('letterReceiptChecks'));
   assert.ok(!JSON.stringify(output.rules).includes('__OWNER_GOOGLE_EMAIL__'));
   for (const property of ['.read', '.write']) assert.throws(() => merge.merge({ rules: { ...live.rules, [property]: true } }, rules), /자동 병합/);
   assert.equal(live.rules.letters['.read'], true, '원본 객체도 변경하지 않는다');
+});
+test('기존 편지 권한이나 확인 규칙이 다르면 자동 덮어쓰지 않는다', () => {
+  const owner = 'owner@example.test';
+  const differentLetters = {rules:{letters:{'.read':'different existing authority', $id:{'.write':'existing rule'}}}};
+  assert.throws(() => merge.merge(differentLetters,rules,owner), /자동 덮어쓰기/);
+  const differentReceipt = {rules:{letterReceiptChecks:{'.read':true}}};
+  assert.throws(() => merge.merge(differentReceipt,rules,owner), /자동 병합/);
 });
 test('규칙 주석 제거는 문자열 URL과 이스케이프를 보존한다', () => {
   const parsed = merge.parse('{"rules":{/* x */ "thing":{"url":"https://example.test/a//b", "name":"a\\\"b"}} // tail\n}');

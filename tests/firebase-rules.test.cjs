@@ -20,13 +20,14 @@ function token({ email = OWNER, provider = 'google.com', verified = true, uid = 
   const now = Math.floor(Date.now() / 1000);
   return enc({ alg: 'none', typ: 'JWT' }) + '.' + enc({ iss: 'https://securetoken.google.com/' + NS, aud: NS, auth_time: now, iat: now, exp: now + 3600, sub: uid, user_id: uid, email, email_verified: verified, firebase: { sign_in_provider: provider, identities: {} } }) + '.';
 }
-async function request(method, target, data, auth, admin = false) {
+async function request(method, target, data, auth, admin = false, silent = false) {
   // owner는 로컬 emulator에서 규칙을 넣는 시험 전용 값이다. 실제 자격증명이 아니다.
-  const url = BASE + '/' + target + '.json?ns=' + NS + (auth ? '&auth=' + encodeURIComponent(auth) : '');
+  const url = BASE + '/' + target + '.json?ns=' + NS + (auth ? '&auth=' + encodeURIComponent(auth) : '') + (silent ? '&print=silent' : '');
   assert.equal(new URL(url).hostname, '127.0.0.1');
   const headers = { 'Content-Type': 'application/json' }; if (admin) headers.Authorization = 'Bearer owner';
   const response = await fetch(url, { method, headers, body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(5000) });
-  return { code: response.status, data: await response.json() };
+  const text = await response.text();
+  return { code: response.status, data: text ? JSON.parse(text) : null, text };
 }
 let count = 0;
 async function check(title, fn) { await fn(); count++; console.log('PASS', title); }
@@ -49,6 +50,19 @@ async function main() {
   await check('규격은 한줄33자·한장20줄 고정값만 허용', async () => { for (const [key, value] of [['lineChars', 32], ['lineChars', 34], ['maxLines', 19], ['maxLines', 21]]) { const p = payload(); p.spec[key] = value; denied(await request('PUT', 'letters/' + id(), p)); } const p = payload(); assert.equal((await request('PUT', 'letters/' + id(), p)).code, 200); });
   await check('미로그인 목록·단건·하위필드 읽기 차단', async () => { for (const p of ['letters', 'letters/' + printID, 'letters/' + printID + '/letter/body']) denied(await request('GET', p)); });
   await check('미로그인 덮어쓰기·부분수정·삭제 차단', async () => { denied(await request('PUT', 'letters/' + printID, payload())); denied(await request('PATCH', 'letters/' + printID, { status: 'done' })); denied(await request('DELETE', 'letters/' + printID)); });
+  await check('확인 지문은 실제 접수와 같은 원자 쓰기에만 포함되고 읽기는 막는다', async () => {
+    const receiptID = id(), hash = 'a'.repeat(64), p = payload(); p.receiptHash = hash;
+    denied(await request('PUT', 'letterReceiptChecks/' + receiptID, hash));
+    assert.equal((await request('PUT', 'letters/' + receiptID, p)).code, 200);
+    for (const auth of [undefined, token()]) denied(await request('GET', 'letterReceiptChecks/' + receiptID, undefined, auth));
+    denied(await request('GET', 'letters/' + receiptID + '/receiptHash'));
+    denied(await request('PUT', 'letterReceiptChecks/' + receiptID, 'b'.repeat(64)));
+    denied(await request('PUT', 'letterReceiptChecks/' + id(), hash));
+    for (let i=0;i<2;i++) { const ack=await request('PUT', 'letterReceiptChecks/' + receiptID, hash, undefined, false, true); assert.equal(ack.code,204); assert.equal(ack.text,''); }
+    denied(await request('PATCH', 'letters/' + receiptID, {receiptHash:'b'.repeat(64)}));
+    const stored=await request('GET', 'letters/' + receiptID, undefined, token()); assert.equal(stored.code,200); assert.equal(stored.data.receiptHash,hash);
+    const malformed=payload(); malformed.receiptHash='x'.repeat(64); denied(await request('PUT', 'letters/' + id(), malformed));
+  });
   await check('사장님 verified Google 계정 읽기 허용', async () => { const r = await request('GET', 'letters', undefined, token()); assert.equal(r.code, 200, JSON.stringify(r)); assert.equal(r.data[printID].type, 'print'); });
   await check('다른 Google 계정·미확인 이메일·password provider 읽기 차단', async () => { for (const auth of [token({ email: 'someone@example.test', uid: 'fake-other' }), token({ verified: false }), token({ provider: 'password' })]) denied(await request('GET', 'letters', undefined, auth)); });
   await check('admins에 있어도 사장님이 아니면 편지 읽기 차단', async () => { await request('PUT', 'admins/fake-admin', true, null, true); denied(await request('GET', 'letters', undefined, token({ email: 'admin@example.test', uid: 'fake-admin' }))); });
