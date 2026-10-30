@@ -334,3 +334,6 @@ body[data-mode="print"] .step[data-step="review"]>h2{grid-area:heading;font-size
 }
 @media (max-width:350px){.shell{padding-left:16px;padding-right:16px}.brand b{font-size:12px}.brand span{font-size:10px}.sound-toggle{padding:7px 8px;font-size:10px}.typed-greeting{font-size:18px}.prog ol{gap:5px}.prog li{font-size:10px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.greeting-paper{transform:none}.typed-output::after{display:none}}
+
+/* 모바일에서 버튼이 입력란을 가리지 않도록 카드 뒤에 둡니다. */
+@media (max-width:600px){.nav{position:static;border-top:0;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0}.nav .in{max-width:none}.shell{padding-bottom:32px}}
