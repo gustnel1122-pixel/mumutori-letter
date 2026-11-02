@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>무무토리</title>
+<!--
+  매장 테이블 판 QR이 가리키는 주소입니다 (2026-11-02).
+  인쇄된 QR은 바꾸지 않고, 아래 GO 주소(와 meta refresh 주소) 한 곳만 바꾸면 랜딩페이지가 바뀝니다.
+-->
+<meta http-equiv="refresh" content="0; url=https://www.instagram.com/mumutori_official/">
+<style>
+  :root{--bg:#F4DC92;--ink:#682301;--card:#FCF7E5}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  main{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+  .card{background:var(--card);border-radius:20px;padding:28px 24px;text-align:center;max-width:360px;width:100%}
+  a{display:inline-block;margin-top:12px;padding:12px 20px;border-radius:999px;background:var(--ink);color:var(--card);text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+<main><div class="card">
+  <p>무무토리로 이동하고 있어요…</p>
+  <a id="go" href="https://www.instagram.com/mumutori_official/">바로 가기</a>
+</div></main>
+<script>
+  var GO = 'https://www.instagram.com/mumutori_official/';
+  document.getElementById('go').href = GO;
+  location.replace(GO);
+</script>
+</body>
+</html>
