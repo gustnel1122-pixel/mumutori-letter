@@ -25,10 +25,13 @@
   ['rel', 'memo'].forEach(function (key) { if (typeof st[key] !== 'string') st[key] = ''; });
   ['name', 'phone4'].forEach(function (key) { if (typeof st.order[key] !== 'string') st.order[key] = ''; });
   ['to', 'from', 'body'].forEach(function (key) { if (typeof st.letter[key] !== 'string') st.letter[key] = ''; });
+  if (['to', 'none'].indexOf(st.letter.greet) < 0) st.letter.greet = 'to';              // 첫 줄: "받는 분에게"(기본) | 없이
+  if (['dash', 'ga', 'olim', 'none'].indexOf(st.letter.sign) < 0) st.letter.sign = 'dash'; // 끝 줄: "- 보내는 분"(기본) | 가 | 올림 | 없이
   if (st.pendingReceipt) {
     var frozen = st.pendingReceipt.data;
     if (/^ltr_[a-f0-9]{32}$/.test(st.pendingReceipt.id || '') && frozen && frozen.type === MODE && frozen.order && frozen.letter) {
       st.order = Object.assign({}, frozen.order); st.letter = Object.assign({ body: '' }, frozen.letter);
+      if (frozen.type === 'print') { st.letter.greet = 'none'; st.letter.sign = 'none'; }   // 보낸 본문에 첫 줄 · 끝 줄이 이미 들어 있음
       st.rel = frozen.relation || ''; st.survey = frozen.survey || {}; st.memo = frozen.memo || '';
     } else st.pendingReceipt = null;
   }
@@ -42,9 +45,9 @@
   // 아이폰 등 자동 변환 보정: “ ” → " , … → ... (‘ ’ 와 ' 는 자판에 없어 그대로 두고 못 찍는 글자로 보인다). 커서 자리는 지킨다.
   function fixPhone(el) {
     var v = el.value;
-    if (!/[“”…]/.test(v)) return;
+    if (!/[“”…\u00a0\u2000-\u200a\u202f\u3000]/.test(v)) return;
     var pos = el.selectionStart, before = typeof pos === "number" ? v.slice(0, pos) : null;
-    var fix = function (s) { return s.replace(/[“”]/g, '"').replace(/…/g, "..."); };
+    var fix = function (s) { return s.replace(/[“”]/g, '"').replace(/…/g, "...").replace(/[\u00a0\u2000-\u200a\u202f\u3000]/g, " "); };
     el.value = fix(v);
     if (before !== null && document.activeElement === el) { var p = fix(before).length; try { el.setSelectionRange(p, p); } catch (e) { /* 커서 없음 */ } }
   }
@@ -79,35 +82,13 @@
     if (!sending) $('#next').textContent = nextLabel();
   }).catch(function () { M.live = false; });
 
-  /* ---------- 편지 줄바꿈 (타자기 한 줄 글자 수 기준) ---------- */
-  // 한 칸 = 한 글자(한글 한 음절 · 영문 · 숫자 · 띄어쓰기 모두 한 칸). 이모지처럼 두 단위인 글자도 한 칸으로 센다.
+  /* ---------- 편지 줄바꿈 (실제 타자기 칸 기준, spec.js LetterTypewriter) ---------- */
+  // 한글 한 글자 = 1칸, 띄어쓰기 · 숫자 · 기호 = 반 칸, 한 줄 S.lineCells칸. 관리자 접수함도 같은 함수로 줄을 나눈다.
+  var TW = window.LetterTypewriter;
   var wrapInfo = { long: 0, cut: 0 };
-  function wrap(text, n) {
-    var out = []; wrapInfo = { long: 0, cut: 0 };
-    String(text || "").replace(/\r/g, "").split("\n").forEach(function (para) {
-      if (para === "") { out.push(""); return; }
-      if (chars(para).length > n) wrapInfo.long++;
-      var line = [];
-      para.split(" ").forEach(function (w) {
-        var a = chars(w);
-        if (a.length > n) wrapInfo.cut++;
-        while (a.length > n) { if (line.length) { out.push(line.join("")); line = []; } out.push(a.slice(0, n).join("")); a = a.slice(n); }
-        if (!line.length) line = a;
-        else if (line.length + 1 + a.length <= n) line = line.concat([" "], a);
-        else { out.push(line.join("")); line = a; }
-      });
-      out.push(line.join(""));
-    });
-    return out;
-  }
   function letterLines() {
-    var L = st.letter, lines = [];
-    lines.push((L.to || "") ? (L.to + "에게") : "");
-    lines.push("");
-    lines = lines.concat(wrap(L.body, S.lineChars));
-    lines.push("");
-    lines.push((L.from || "") ? ("- " + L.from) : "");   // 서명 앞 줄표는 타자기에 있는 - 로
-    return lines;
+    wrapInfo = { long: 0, cut: 0 };
+    return TW.letterLines(st.letter, wrapInfo);   // 서명 앞 줄표는 타자기에 있는 - 로
   }
   function badChars(t) {
     var bad = {};
@@ -120,7 +101,7 @@
     return g;
   }
 
-  /* ---------- A5 편지지 미리보기 (spec.js paper 값 그대로, 한 칸 = cellMm, 한 줄 = lineMm) ---------- */
+  /* ---------- A5 편지지 미리보기 (spec.js paper 값 그대로, 한글 한 칸 = cellMm · 띄어쓰기 등은 반 칸, 한 줄 = lineMm) ---------- */
   var P = S.paper || { w: 148, h: 210, top: 20, right: 15, bottom: 15, left: 15, cellMm: 3.81, lineMm: 8.467 };
   function fitSheets() {
     $$(".sheet").forEach(function (s) {
@@ -135,17 +116,117 @@
     var mm = function (v) { return "calc(var(--mm) * " + v + ")"; };
     var row = function (t) {
       return '<div class="ln">' + chars(t).map(function (c) {
-        return '<span class="c' + (kindOf(c) && c !== "\n" ? " bad" : "") + '">' + (c === " " ? "&nbsp;" : esc(c)) + "</span>";
+        return '<span class="c' + (TW.half(c) === 1 ? " h" : "") + (kindOf(c) && c !== "\n" ? " bad" : "") + '">' + (c === " " ? "&nbsp;" : esc(c)) + "</span>";
       }).join("") + "</div>";
     };
     var keep = lines.slice(0, S.maxLines), rest = lines.slice(S.maxLines);
     var html = '<div class="sheet" style="padding:' + mm(P.top) + " " + mm(P.right) + " " + mm(P.bottom) + " " + mm(P.left) + ";--cell:" + mm(P.cellMm) + ";--line:" + mm(P.lineMm) + ';aspect-ratio:' + P.w + "/" + P.h + '">' +
-      '<div class="area" style="height:' + mm(P.lineMm * S.maxLines) + ";width:" + mm(P.cellMm * S.lineChars) + '">' +
+      '<div class="area" style="height:' + mm(P.lineMm * S.maxLines) + ";width:" + mm(P.cellMm * TW.lineCells()) + '">' +
       (empty ? '<p class="ph">' + empty + "</p>" : keep.map(row).join("")) + "</div></div>";
     if (!empty && rest.length) html += '<div class="ovf"><b>한 장을 넘는 줄 ' + rest.length + "줄 — 이 부분은 찍을 수 없어요</b>" + rest.map(row).join("") + "</div>";
-    html += '<p class="sheet-cap">A5 편지지(148×210mm) 비율 · 한 줄 ' + S.lineChars + "자 · 한 장 " + S.maxLines + "줄 · 여백 위 " + P.top + " · 옆 " + P.left + " · 아래 " + P.bottom + "mm</p>";
+    html += '<p class="sheet-cap">A5 편지지(148×210mm) 비율 · 한 줄 ' + TW.lineCells() + "칸(띄어쓰기 · 숫자 · 기호는 반 칸) · 한 장 " + S.maxLines + "줄</p>";
     box.innerHTML = html;
     fitSheets();
+  }
+
+  /* ---------- 편지지에 바로 쓰기 (2026-11-02 사장님 "하나로 합치면 안되나? 바로 미리보기처럼") ----------
+   * 편지 내용 칸 = textarea 하나를 편지지처럼(letter.css .pe). contenteditable 대신 textarea를 쓰는 까닭:
+   * 휴대폰 한글 입력(조합 중 글자) · 붙여넣기 · 커서 · 되돌리기를 브라우저가 그대로 맡고, 우리는 값을 절대 고쳐 쓰지 않는다.
+   * 줄바꿈은 브라우저가 하지만 글꼴(Nanum Gothic Coding)과 폭을 맞춰 spec.js LetterTypewriter와 같게 했다.
+   * 줄 번호 · 받는 분/보내는 분 줄 · 21줄부터 빨간 줄은 그 함수로 그린다. 저장되는 글은 손님이 친 그대로(엔터만 줄바꿈).
+   * 혹시 이 기기의 줄바꿈이 함수와 다르면(글꼴을 못 받은 경우 등) 아래에 '실제로 찍힐 모습'을 따로 보여 준다. */
+  var ED = $("#w-ed"), EDTA = ED ? $("textarea", ED) : null, edLh = 22, fontsSettled = false, checkTimer = 0, mirror = null;
+  function fitEditor() {
+    if (!ED) return false;
+    var W = ED.parentNode.clientWidth; if (!W) return false;
+    var cells = TW.lineCells(), fs = Math.max(7, Math.min(16, (W - 2) / (cells + 3.35)));
+    fs = Math.floor(fs * 100) / 100; edLh = Math.round(fs * 2.2);
+    ED.style.setProperty("--cells", cells); ED.style.setProperty("--fs", fs + "px"); ED.style.setProperty("--lh", edLh + "px");
+    return true;
+  }
+  function renderEditor(lines) {
+    if (!ED || !fitEditor()) return;
+    var L = st.letter, g = TW.greetLine(L), sg = TW.signLine(L), head = g === null ? 0 : 2, tail = sg === null ? 0 : 2;
+    var total = lines.length, body = total - head - tail, rows = Math.max(S.maxLines, total), html = "";
+    EDTA.style.height = Math.max(1, body) * edLh + "px";
+    var to = $(".pe-to", ED), from = $(".pe-from", ED);
+    to.hidden = $(".pe-gap-top", ED).hidden = g === null; from.hidden = $(".pe-gap-bottom", ED).hidden = sg === null;
+    to.textContent = L.to ? g : "받는 분에게"; to.classList.toggle("ph", !L.to);
+    from.textContent = L.from ? sg : TW.signLine({ from: "보내는 분", sign: L.sign }); from.classList.toggle("ph", !L.from);
+    $(".pe-fill", ED).style.height = Math.max(0, S.maxLines - total) * edLh + "px";
+    for (var r = 1; r <= rows; r++) html += '<div class="' + (r > S.maxLines ? "over" : r > total ? "empty" : "") + (r === S.maxLines ? " end" : "") + '"><i>' + r + "</i></div>";
+    $(".pe-grid", ED).innerHTML = html;
+    ED.dataset.lines = total; ED.dataset.head = head;
+    clearTimeout(checkTimer); checkTimer = setTimeout(checkEditor, 150);
+    if (chkOn) { clearTimeout(chkTimer); chkTimer = setTimeout(runCheck, 250); }
+  }
+  // 이 기기에서 칸 안 줄바꿈이 LetterTypewriter와 같은지 숨긴 복사본으로 잰다(값은 건드리지 않음).
+  function checkEditor() {
+    if (!ED || !fontsSettled || !ED.parentNode.clientWidth) return;
+    var t = EDTA.value, fb = $("#w-fallback");
+    if (badChars(t).length) { ED.dataset.match = "skip"; if (fb) fb.hidden = true; return; }   // 못 찍는 글자 안내가 먼저
+    if (!mirror) { mirror = document.createElement("div"); mirror.className = "pe-mirror"; mirror.setAttribute("aria-hidden", "true"); $(".pe-page", ED).appendChild(mirror); }
+    mirror.textContent = t;
+    var node = mirror.firstChild, got = [], last = null, rg = document.createRange();
+    if (node) for (var i = 0; i < t.length; i++) {
+      var cc = t.charCodeAt(i); if (t[i] === " " || t[i] === "\n" || (cc >= 0xDC00 && cc <= 0xDFFF)) continue;
+      rg.setStart(node, i); rg.setEnd(node, i + (cc >= 0xD800 && cc <= 0xDBFF ? 2 : 1));
+      var rc = rg.getClientRects(); if (!rc.length) continue;
+      if (last === null || rc[0].top > last + edLh / 2) { got.push(i); last = rc[0].top; }
+    }
+    var want = TW.layout(t).filter(function (l) { return /[^ ]/.test(l.text); }).map(function (l) { return l.start + l.text.match(/^ */)[0].length; });
+    var same = got.length === want.length && got.every(function (v, k) { return v === want[k]; });
+    ED.dataset.match = same ? "1" : "0";
+    if (fb) { fb.hidden = same; if (!same) renderSheet($("#w-paper"), letterLines(), ""); }
+  }
+  /* ---------- 검사하기: 줄 나눔 · 띄어쓰기 · 맞춤법 (letter-check.js, 이 기기 안에서만, 고치지 않고 표시만) ---------- */
+  var chkOn = false, chkTimer = 0, marks = null;
+  function clearMarks() { if (marks) marks.innerHTML = ""; }
+  function runCheck() {
+    var box = $("#w-chk-res"); if (!box || !window.LetterCheck || !EDTA) return;
+    var t = EDTA.value, head = Number(ED.dataset.head || 0), list = window.LetterCheck.run(t, TW, head);
+    if (!marks) { marks = document.createElement("div"); marks.className = "pe-marks"; marks.setAttribute("aria-hidden", "true"); $(".pe-page", ED).insertBefore(marks, EDTA); }
+    marks.style.top = EDTA.offsetTop + "px";
+    var html = "", at = 0;
+    list.forEach(function (it) { html += esc(t.slice(at, it.start)) + '<mark class="' + it.kind + '">' + esc(t.slice(it.start, it.end)) + "</mark>"; at = it.end; });
+    marks.innerHTML = html + esc(t.slice(at)) + "\u200b";
+    var KIND = { spell: "맞춤법", space: "띄어쓰기", punct: "띄어쓰기", line: "줄 나눔" };
+    box.hidden = false;
+    box.innerHTML = list.length
+      ? '<p class="chk-head">표시한 곳 ' + list.length + '곳 · 고치지 않았어요. 고칠지는 직접 정해 주세요.</p><ul>' + list.slice(0, 12).map(function (it, k) {
+          return '<li><button type="button" class="chk-go" data-k="' + k + '"><b>' + (it.line || "") + '줄</b> <span class="k ' + it.kind + '">' + KIND[it.kind] + "</span> " + esc(it.msg) + "</button></li>";
+        }).join("") + "</ul>" + (list.length > 12 ? '<p class="chk-more">그 밖에 ' + (list.length - 12) + "곳</p>" : "")
+      : '<p class="chk-head">표시할 곳을 찾지 못했어요. 자주 틀리는 것만 살펴봐요.</p>';
+    box._list = list;
+  }
+  function setCheck(on) {
+    chkOn = on; var b = $("#w-check"); if (!b) return;
+    b.textContent = on ? "표시 끄기" : "검사하기"; b.setAttribute("aria-pressed", String(on));
+    if (on) runCheck(); else { clearMarks(); $("#w-chk-res").hidden = true; }
+  }
+  if ($("#w-check")) {
+    $("#w-check").addEventListener("click", function () { setCheck(!chkOn); });
+    $("#w-chk-res").addEventListener("click", function (e) {   // 목록을 누르면 그 자리를 골라 보여 줌(고치지는 않음)
+      var b = e.target.closest(".chk-go"); if (!b || EDTA.disabled) return;
+      var it = ($("#w-chk-res")._list || [])[Number(b.dataset.k)]; if (!it) return;
+      EDTA.focus({ preventScroll: true }); try { EDTA.setSelectionRange(it.start, it.end); } catch (_) { /* 커서 없음 */ }
+      ED.scrollIntoView({ behavior: motion(), block: "center" });
+    });
+  }
+  if (ED) {
+    ED.addEventListener("click", function (e) {   // 이름 줄을 누르면 그 칸으로, 빈 줄을 누르면 글 끝으로
+      if (e.target === EDTA || EDTA.disabled) return;
+      if (e.target.classList && e.target.classList.contains("pe-to")) { $("#w-to").focus(); return; }
+      if (e.target.classList && e.target.classList.contains("pe-from")) { $("#w-from").focus(); return; }
+      EDTA.focus(); var n = EDTA.value.length; try { EDTA.setSelectionRange(n, n); } catch (_) { /* 커서 없음 */ }
+    });
+    window.addEventListener("resize", function () { if (STEPS[st.i] === "write") renderEditor(letterLines()); });
+    var settle = function () { fontsSettled = true; if (STEPS[st.i] === "write") renderEditor(letterLines()); };
+    if (document.fonts && document.fonts.load) document.fonts.load('16px "Nanum Gothic Coding"', "가 1.").then(settle, settle); else settle();
+    // 아이폰은 16px보다 작은 입력칸을 누르면 화면을 확대한다 → 편지지 칸에서는 막는다(손가락으로 늘리는 확대는 그대로 됨).
+    if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+      var vp = document.querySelector('meta[name="viewport"]'); if (vp && !/maximum-scale/.test(vp.content)) vp.content += ", maximum-scale=1";
+    }
   }
 
   /* ---------- 화면 그리기 ---------- */
@@ -213,7 +294,7 @@
     if (!$("#w-body")) return;
     ["to", "body", "from"].forEach(function (k) {
       var el = $("#w-" + k); el.value = st.letter[k] || "";
-      if (/[“”…]/.test(el.value)) { fixPhone(el); st.letter[k] = el.value; }   // 예전 임시 저장분도 같은 규칙으로
+      if (/[“”…\u00a0\u2000-\u200a\u202f\u3000]/.test(el.value)) { fixPhone(el); st.letter[k] = el.value; }   // 예전 임시 저장분도 같은 규칙으로
       el.addEventListener("input", function (event) { if (!event.isComposing) fixPhone(el); st.letter[k] = el.value; renderPreview(); save(); });
       el.addEventListener('compositionend', function () { fixPhone(el); st.letter[k] = el.value; renderPreview(); save(); });
     });
@@ -224,7 +305,9 @@
       });
       renderPreview(); save();
     });
-    $$(".spec-line").forEach(function (e) { e.textContent = S.lineChars; });
+    $$('input[name="greet"]').forEach(function (r) { r.checked = r.value === st.letter.greet; r.addEventListener("change", function () { if (r.checked) { st.letter.greet = r.value; renderPreview(); save(); } }); });
+    $$('input[name="sign"]').forEach(function (r) { r.checked = r.value === st.letter.sign; r.addEventListener("change", function () { if (r.checked) { st.letter.sign = r.value; renderPreview(); save(); } }); });
+    $$(".spec-line").forEach(function (e) { e.textContent = TW.lineCells(); });
     $$(".spec-max").forEach(function (e) { e.textContent = S.maxLines; });
   }
   function renderPreview() {
@@ -244,13 +327,16 @@
     $("#w-bad").hidden = !anyBad;
     $("#w-badlist").textContent = parts.join(" · ") || "보이지 않는 기호";
     var wi = $("#w-wrap"), msg = [];
-    if (wrapInfo.long) msg.push("한 줄(" + S.lineChars + "자)보다 긴 줄이 " + wrapInfo.long + "곳 있어요. 그 줄은 자동으로 다음 줄로 넘어가요.");
-    if (wrapInfo.cut) msg.push("띄어쓰기 없이 " + S.lineChars + "자를 넘는 말이 " + wrapInfo.cut + "곳 있어요. 낱말 중간에서 줄이 바뀌니 띄어쓰기를 넣어 주세요.");
+    if (wrapInfo.cut) msg.push("띄어쓰기 없이 한 줄(한글 " + TW.lineCells() + "자)보다 긴 말이 " + wrapInfo.cut + "곳 있어요. 그 말은 줄 끝에서 잘려 다음 줄로 이어져요. 읽기 편하게 띄어쓰기를 넣어 보세요.");
     wi.hidden = !msg.length; wi.innerHTML = msg.map(function (m) { return "<span>" + m + "</span>"; }).join("");
-    var body = (st.letter.body || "").trim();
-    renderSheet($("#w-paper"), lines, body ? "" : "여기에 타자기로 찍힐 모습이 보여요.<br>한 줄에 " + S.lineChars + "자, 한 장에 " + S.maxLines + "줄까지 찍혀요.");
+    renderEditor(lines);
+    var tn = st.letter.to || "받는 분", fn = st.letter.from || "보내는 분";
+    $$("[data-greet-label]").forEach(function (e) { e.textContent = "‘" + tn + "에게’로 시작"; });
+    $$("[data-sign]").forEach(function (e) { e.textContent = TW.signLine({ from: fn, sign: e.dataset.sign }); });
+    var tooLong = TW.compose(st.letter).length > 660;
+    $("#w-long").hidden = !tooLong;
     $("#w-over").hidden = !over;
-    if (over) $("#w-over").textContent = "편지지 한 장(" + S.maxLines + "줄)을 " + (n - S.maxLines) + "줄 넘었어요. 조금만 줄여 주세요.";
+    if (over) $("#w-over").textContent = "편지지 한 장에는 " + S.maxLines + "줄까지 들어가요. 지금 " + (n - S.maxLines) + "줄이 넘쳐서 빨간 줄로 표시했어요. 그만큼만 줄여 주시면 다음으로 넘어갈 수 있어요.";
     ['to', 'body', 'from'].forEach(function (key) {
       var el = $('#w-' + key), value = st.letter[key];
       var valid = value.trim().length >= (key === 'body' ? 10 : 1) && value.length <= (key === 'body' ? 660 : 31) && !badChars(value).length && (key === 'body' ? !over : value.indexOf('\n') < 0);
@@ -397,8 +483,9 @@
         var msg = bad.length ? '타자기로 찍을 수 없는 글자가 있어요: ' + bad.slice(0, 6).join(' ') : key === 'body' ? '편지 내용을 10자 이상 적고, 한 장 안에 맞춰 주세요.' : '이름을 31자 안으로 적어주세요.';
         chk($('#w-' + key), value.trim().length >= min && value.length <= max && !bad.length && (key === 'body' || value.indexOf('\n') < 0), msg);
       });
+      if (TW.compose(st.letter).length > 660) { ok = false; if (!first) first = $('#w-body'); need($('#w-body'), false, '편지 글이 너무 길어요. 첫 줄 · 끝 줄을 합쳐 660자 안으로 줄여 주세요.'); }
       var over = letterLines().length > S.maxLines;
-      if (over) { ok = false; if (!first) first = $('#w-body'); need($('#w-body'), false, '편지지 한 장(' + S.maxLines + '줄)을 넘었어요. 내용을 조금 줄여 주세요.'); }
+      if (over) { ok = false; if (!first) first = $('#w-body'); need($('#w-body'), false, '편지지 한 장(' + S.maxLines + '줄)을 넘었어요. 빨간 줄만큼 줄여 주세요.'); }
     }
     if (s === "survey") {
       // 대필 편지도 받는 분 · 보내는 분 이름은 타자기로 찍음 → 영문 · 이모지 등은 막음
@@ -439,7 +526,7 @@
       schemaVersion: 1,
       createdAt: { '.sv': 'timestamp' }
     };
-    if (MODE === "print") p.letter.body = st.letter.body || "";
+    if (MODE === "print") p.letter.body = TW.compose(st.letter);   // 고른 첫 줄 · 끝 줄을 넣은 글 = 찍을 글 전부(접수함은 이 글만 보여 줌)
     else { p.relation = st.rel; p.survey = st.survey; p.memo = st.memo || ""; }
     return p;
   }

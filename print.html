@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Gothic+Coding:wght@400;700&family=Black+And+White+Picture&display=swap">
-<link rel="stylesheet" href="letter.css?v=20261026-letter-v1">
+<link rel="stylesheet" href="letter.css?v=20261102-tw29">
 </head>
 <body data-mode="print">
 <div class="demo" id="demo" role="status">지금은 미리보기예요. 실제 편지 접수는 준비 중이에요.</div>
@@ -47,18 +47,23 @@
 
   <section class="step editor-step" data-step="write" hidden>
     <h2>편지를 써주세요</h2>
-    <p class="muted small step-intro">적어주신 글은 A5 편지지에 수동 타자기로 한 자 한 자 찍어요. 한 줄에 <b class="spec-line"></b>자(띄어쓰기도 한 칸), 한 장에 <b class="spec-max"></b>줄까지 들어가요(받는 분 · 보내는 분 줄 포함).</p>
+    <p class="muted small step-intro">적어주신 글은 A5 편지지에 수동 타자기로 한 자 한 자 찍어요. 한 줄에 한글 <b class="spec-line"></b>자 정도(띄어쓰기 · 숫자 · 기호는 반 칸), 한 장에 <b class="spec-max"></b>줄까지 들어가요(받는 분 · 보내는 분 줄 포함).</p>
     <div class="card">
-      <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" name="to" autocomplete="off" aria-required="true" aria-describedby="w-to-err" maxlength="20" placeholder="예: 사랑하는 엄마"><p class="help">편지 첫 줄에 "OO에게"로 찍혀요.</p><p class="err" id="w-to-err" aria-live="polite" hidden></p></div>
-      <div class="f"><label for="w-body">편지 내용<span class="req">필수</span></label><textarea id="w-body" name="letterBody" maxlength="2000" aria-required="true" aria-describedby="w-body-err" rows="10" placeholder="하고 싶은 말을 편하게 적어주세요. 줄바꿈도 그대로 찍혀요."></textarea><p class="err" id="w-body-err" aria-live="polite" hidden></p></div>
+      <div class="f"><label for="w-to">받는 분<span class="req">필수</span></label><input type="text" id="w-to" name="to" autocomplete="off" aria-required="true" aria-describedby="w-to-err" maxlength="20" placeholder="예: 사랑하는 엄마"><fieldset class="pick"><legend>편지 첫 줄</legend><label><input type="radio" name="greet" value="to" checked><span data-greet-label>‘받는 분에게’로 시작</span></label><label><input type="radio" name="greet" value="none"><span>첫 줄은 내가 직접 쓸게요</span></label></fieldset><p class="err" id="w-to-err" aria-live="polite" hidden></p></div>
+      <div class="f body-f"><label for="w-body">편지 내용<span class="req">필수</span></label><p class="help" id="w-body-help">편지지에 바로 써 주세요. 한 줄이 차면 실제 타자기처럼 다음 줄로 넘어가요. 줄을 바꾸고 싶은 곳에서만 엔터를 눌러 주세요.</p>
+        <div class="pe" id="w-ed"><div class="pe-grid" aria-hidden="true"></div><div class="pe-page"><div class="pe-row pe-to" aria-hidden="true"></div><div class="pe-row pe-gap-top" aria-hidden="true"></div><textarea id="w-body" name="letterBody" maxlength="2000" aria-required="true" aria-describedby="w-body-help w-meter w-body-err" rows="1" placeholder="여기에 바로 써 주세요" autocomplete="off" spellcheck="false"></textarea><div class="pe-row pe-gap-bottom" aria-hidden="true"></div><div class="pe-row pe-from" aria-hidden="true"></div><div class="pe-fill" aria-hidden="true"></div></div></div>
+        <p class="err" id="w-body-err" aria-live="polite" hidden></p></div>
+      <div class="chk"><button type="button" class="btn-s" id="w-check" aria-pressed="false" aria-controls="w-chk-res">검사하기</button><span class="chk-note">줄 나눔 · 띄어쓰기 · 맞춤법을 <b>표시만</b> 해요. 고칠지는 직접 정해 주세요. 글은 이 휴대폰 밖으로 나가지 않아요.</span></div>
+      <div class="chk-res" id="w-chk-res" role="status" aria-live="polite" hidden></div>
       <div class="meter" id="w-meter" aria-live="polite" aria-atomic="true"></div><div class="bar"><i id="w-bar"></i></div>
       <p class="err" id="w-over" role="status" aria-live="polite" tabindex="-1" hidden>편지지 한 장을 넘었어요. 조금만 줄여주세요.</p>
+      <p class="err" id="w-long" role="status" aria-live="polite" hidden>편지 글이 너무 길어요. 첫 줄 · 끝 줄을 합쳐 660자 안으로 줄여 주세요.</p>
       <div class="charwarn" id="w-bad" role="status" aria-live="polite" tabindex="-1" hidden><span>타자기로 찍을 수 없는 글자가 있어요: <b id="w-badlist"></b><br><small>다른 말로 바꾸거나 '지우기'를 눌러 주세요. 고치기 전에는 다음으로 넘어갈 수 없어요.</small></span><button type="button" class="btn-s" id="w-clean">지우기</button></div>
       <div class="wrapwarn" id="w-wrap" role="status" aria-live="polite" hidden></div>
-      <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" name="from" autocomplete="off" aria-required="true" aria-describedby="w-from-err" maxlength="20" placeholder="예: 막내 지수"><p class="err" id="w-from-err" aria-live="polite" hidden></p></div>
+      <div class="f"><label for="w-from">보내는 분<span class="req">필수</span></label><input type="text" id="w-from" name="from" autocomplete="off" aria-required="true" aria-describedby="w-from-err" maxlength="20" placeholder="예: 막내 지수"><fieldset class="pick"><legend>편지 끝 줄</legend><label><input type="radio" name="sign" value="dash" checked><span data-sign="dash">- 보내는 분</span></label><label><input type="radio" name="sign" value="ga"><span data-sign="ga">보내는 분가</span></label><label><input type="radio" name="sign" value="olim"><span data-sign="olim">보내는 분 올림</span></label><label><input type="radio" name="sign" value="none"><span>끝 줄은 내가 직접 쓸게요</span></label></fieldset><p class="err" id="w-from-err" aria-live="polite" hidden></p></div>
       <p class="help small muted">쓸 수 있는 글자: 한글(ㅋㅋ · ㅠㅠ 같은 낱자도 돼요), 숫자, 기호 . , ! ? " ( ) - : ₩ $ % / × +. 한글 타자기라 <b>영문</b>과 이모지 · 한자 · 그 밖의 기호(' ~ ; … · ★ ♥ 등)는 찍을 수 없어요. 말줄임표는 ... 로 적어 주세요.</p>
     </div>
-    <div class="f preview-panel"><div class="preview-heading"><span class="lab">종이에 놓아 보기</span><span class="note-tag">참고용 미리보기</span></div><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="w-paper"></div></div>
+    <div class="f preview-panel" id="w-fallback" hidden><div class="preview-heading"><span class="lab">실제로 찍힐 모습</span></div><p class="pv-note">이 기기에서는 위 편지지의 줄 나눔이 실제와 조금 다르게 보여요. 이 모습대로 찍어 드려요.</p><div class="sheetbox" id="w-paper"></div></div>
   </section>
 
   <section class="step" data-step="env" hidden>
@@ -72,7 +77,7 @@
   <section class="step" data-step="review" hidden>
     <h2>이대로 보낼까요?</h2>
     <div class="card review-summary"><h3>주문과 편지</h3><div class="sum" id="sum"></div></div>
-    <div class="f preview-panel review-preview"><div class="preview-heading"><span class="lab">마지막으로 읽어 보기</span><span class="note-tag">참고용 미리보기</span></div><p class="pv-note">미리보기는 문장 길이를 맞춰 보는 참고용이에요. 실제 타자기 인쇄와는 글자 모양 · 간격이 조금 달라요.</p><div class="sheetbox" id="r-paper"></div></div>
+    <div class="f preview-panel review-preview"><div class="preview-heading"><span class="lab">마지막으로 읽어 보기</span><span class="note-tag">참고용 미리보기</span></div><p class="pv-note">줄 나눔은 실제 타자기 칸에 맞췄어요. 글자 모양 · 간격은 실제 인쇄와 조금 달라요.</p><div class="sheetbox" id="r-paper"></div></div>
     <div class="card review-envelope"><h3>편지를 담을 봉투</h3><div id="r-env" class="env"></div></div>
     <div class="card review-terms">
       <details class="terms">
@@ -103,8 +108,9 @@
 <nav class="nav" aria-label="작성 화면 이동"><div class="in"><button type="button" class="btn-2" id="prev">이전</button><button type="button" class="btn" id="next">다음</button></div></nav>
 <script src="letter-intake-config.js?v=20261026-live-v1"></script>
 <script src="letter-submit.js?v=20261029-idempotent-v1"></script>
-<script src="spec.js?v=20261026-letter-v1"></script>
+<script src="spec.js?v=20261102-tw29"></script>
 <script src="letter-experience.js?v=20261026-letter-v1"></script>
-<script src="letter.js?v=20261029-idempotent-v1"></script>
+<script src="letter-check.js?v=20261102-tw29"></script>
+<script src="letter.js?v=20261102-tw29"></script>
 </body>
 </html>

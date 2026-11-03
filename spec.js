@@ -17,11 +17,21 @@
  * 넉넉히 잡은 값: 한 칸 3.7mm(재 값 3.63) · 한 줄 9.0mm(재 값 8.71)
  * 계산: 한 줄 글자 수 = (148 − 12 − 12) ÷ 3.7 = 33.5 → 33
  *       장당 줄 수   = (210 − 10 − 12) ÷ 9.0 = 20.9 → 20 (내림, 호칭 · 빈 줄 · 서명 포함)
- * 실제 타자기로 10글자 · 10줄을 찍어 재면 paper.cellMm · lineMm만 바꾸고 위 계산을 다시 한다. */
+ * 실제 타자기로 10글자 · 10줄을 찍어 재면 paper.cellMm · lineMm만 바꾸고 위 계산을 다시 한다.
+ *
+ * 2026-11-02 줄 규칙 바꿈 (사장님이 실제 타자기로 찍은 손님 편지 사진, 총괄 전달 "접수페이지 기능을 수정"):
+ *   - 띄어쓰기는 한글 한 글자의 반 칸만 나간다(사진 15줄 맞춤: 한글 1칸, 띄어쓰기 0.49칸, . , ! ? 0.5~0.6칸, 숫자 약 0.5칸).
+ *     예전 3.63mm는 띄어쓰기(반 칸)를 섞어 잰 평균이라, 한글 한 칸은 이보다 크다(약 4.1mm, 추정).
+ *   - 사진에서 가장 긴 줄 = 29칸(예전 셈으로 33자). → 한 줄 = 29칸(lineCells). 낱말(띄어쓰기) 단위로 넘긴다.
+ *   - 줄바꿈 계산은 아래 LetterTypewriter 하나로 한다. 고객 작성 화면(letter.js)과 관리자 접수함(대시보드 letter-hub.html)이 같이 쓴다.
+ *   - 타자기로 '가'를 왼쪽 여백부터 끝까지 찍어 칸 수를 다시 재면 lineCells만 바꾼다. */
 window.LETTER_SPEC = {
-  lineChars: 33,        // 한 줄 글자 수 = floor((148−24) ÷ 3.7)
+  lineCells: 29,        // 한 줄 칸 수: 한글 한 글자(ㅋ·ㅎ 같은 낱자 포함) = 1칸, 띄어쓰기 · 숫자 · 기호 . , ! ? " ( ) - : / % $ + = 반 칸
+  lineChars: 33,        // 예전 규칙(모든 글자 1칸 · 33자). 접수 데이터와 Firebase 규칙이 33만 받아 값은 그대로 둔다. 줄바꿈 계산에는 쓰지 않음.
+  lineRuleSince: null,  // 새 규칙(29칸 · 첫 줄/끝 줄 고르기)을 올린 시각 — 올릴 때 꼭 넣기(예: "2026-11-03T15:00:00+09:00").
+                        // 이보다 먼저 접수된 편지는 접수함이 예전처럼 "OO에게"/"- OO"을 붙여 보여 주고 '예전 33자 미리보기와 다름'도 알린다. null이면 모두 새 편지로 본다.
   maxLines: 20,         // 편지지 1장 최대 줄 수 = floor((210−22) ÷ 9.0), 호칭·서명 포함
-  paper: { w: 148, h: 210, top: 10, right: 12, bottom: 12, left: 12, cellMm: 3.7, lineMm: 9.0 },  // 미리보기도 이 값으로 그림
+  paper: { w: 148, h: 210, top: 10, right: 12, bottom: 12, left: 12, cellMm: 4.1, lineMm: 9.0 },  // 미리보기도 이 값으로 그림. cellMm = 한글 한 칸(띄어쓰기 등은 반 칸). 29 × 4.1 = 118.9mm ≤ 148 − 24
   memoMax: 300,         // 대필: 꼭 넣고 싶은 문장/메모 최대 글자
   // 타자기 = 마라톤 1000 DLX 한글(사장님 10/26 자판 사진): 영문 · ' ~ ; … · 는 못 찍음. letter.js ALLOW 와 같게 고친다.
   allowed: "한글(ㅋㅋ 같은 낱자 포함), 숫자, 띄어쓰기, 줄바꿈, 기호 . , ! ? \" ( ) - : ₩ $ % / × +",
@@ -67,3 +77,106 @@ window.LETTER_SPEC = {
   ]
 };
 
+/* 실제 타자기 줄바꿈 (2026-11-02). 고객 작성 칸(letter.js)과 관리자 접수함(대시보드 letter-hub.html)이 이 함수 하나를 같이 쓴다.
+ * 너비는 반 칸 단위: 한글 한 글자(낱자 포함) · ₩ · × = 2, 띄어쓰기 · 숫자 · 기호(. , ! ? " ( ) - : / % $ +) = 1.
+ *   (영문처럼 자판에 없는 영어 글자도 1로 세지만, 고객 화면에서 '못 찍는 글자'로 막힌다.)
+ * 한 줄에 lineCells × 2 까지. 띄어쓰기에서 다음 줄로 넘기고, 줄 끝에 걸린 띄어쓰기는 사라진다. 문단 맨 앞 띄어쓰기(들여쓰기)는 남는다.
+ * 띄어쓰기 없이 붙은 말은 아래 BREAK 표의 기호 자리에서만 넘어가고(예: "고마워!사랑해" → "고마워!" / "사랑해"),
+ * 그런 자리도 없이 한 줄보다 길면 줄 끝에서 자른다.
+ * 이 규칙은 고객 작성 칸(textarea · Nanum Gothic Coding 글꼴 · word-break: keep-all)의 실제 줄바꿈과 같게 맞췄다
+ * (2026-11-02 Chromium에서 글자 짝마다 재서 BREAK 표를 만듦, 무작위 글 비교). 그래서 고객이 칸에서 본 줄 = 접수함 줄 = 찍을 줄.
+ * 한 줄 칸 수는 이 파일의 lineCells(허브의 '적용본'이 덮어써도 바뀌지 않게 여기서 먼저 잡아 둔다). */
+window.LetterTypewriter = (function () {
+  var FILE_CELLS = Number((window.LETTER_SPEC || {}).lineCells) || 29;
+  var FILE_SINCE = (window.LETTER_SPEC || {}).lineRuleSince || null;
+  // 띄어쓰기 없이 붙은 두 글자 사이에서 줄을 넘길 수 있는 짝: 왼쪽 글자 → 오른쪽에 올 수 있는 글자들. H = 한글 음절, J = 한글 낱자, N = 숫자.
+  var BREAK = { H: "($+₩×", J: "($+₩×", ".": "HJ(₩", ",": "HJ(₩", ":": "HJ(₩", "!": "HJ(₩×", "?": "HJN(-%$+₩×",
+    '"': "(", ")": "HJ(₩", "-": 'HJ"(-%+₩×', "/": "HJ₩×", "%": "HJ(₩", "$": "₩", "+": "(₩", "₩": "(%$+₩", "×": "HJ" };
+  function chars(s) { return Array.from(String(s == null ? "" : s)); }
+  function half(c) { var n = c.charCodeAt(0); return c.length === 1 && n >= 32 && n <= 126 ? 1 : 2; }
+  function units(list) { var u = 0; for (var i = 0; i < list.length; i++) u += half(list[i]); return u; }
+  function cells(s) { return units(chars(s)) / 2; }
+  function lineCells() { return FILE_CELLS; }
+  function key(c) { var n = c.charCodeAt(0); return n >= 0xAC00 && n <= 0xD7A3 ? "H" : n >= 0x3131 && n <= 0x318E ? "J" : n >= 48 && n <= 57 ? "N" : c; }
+  function canBreak(x, y) { if (y === " ") return false; if (x === " ") return true; var r = BREAK[key(x)]; return !!r && r.indexOf(key(y)) > -1; }
+  // 줄마다 { text, start(원문에서 그 줄 첫 글자 위치, UTF-16) }. info(선택): { long: 한 줄보다 긴 문단 수, cut: 띄어쓰기 없이 한 줄보다 긴 말 수 }
+  function layout(text, info) {
+    var cap = FILE_CELLS * 2, out = [], st = info || {}, pos = 0;
+    st.long = 0; st.cut = 0;
+    String(text == null ? "" : text).replace(/\r/g, "").split("\n").forEach(function (para) {
+      var base = pos; pos += para.length + 1;
+      var a = chars(para), n = a.length, off = [], o = base;
+      for (var q = 0; q < n; q++) { off.push(o); o += a[q].length; }
+      off.push(o);
+      if (units(a) > cap) st.long++;
+      para.split(" ").forEach(function (w) { if (units(chars(w)) > cap) st.cut++; });
+      var s = 0, w = 0, last = -1;
+      function push(end) { out.push({ text: a.slice(s, end).join("").replace(/ +$/, ""), start: off[s] }); }
+      for (var i = 0; i < n; i++) {
+        var c = a[i];
+        if (i > s && canBreak(a[i - 1], c)) last = i;
+        if (c === " ") { w += 1; continue; }               // 띄어쓰기는 줄 끝에 걸릴 수 있어 넘침을 만들지 않음
+        var cu = half(c);
+        while (w + cu > cap && i > s) {                     // 이 글자가 안 들어가면: 마지막 넘김 자리, 없으면 이 글자 앞에서
+          var end = last > s ? last : i;
+          push(end); s = end; w = units(a.slice(s, i)); last = -1;
+          for (var j = s + 1; j <= i; j++) if (canBreak(a[j - 1], a[j])) last = j;
+        }
+        w += cu;
+      }
+      push(n);
+    });
+    return out;
+  }
+  function wrap(text, info) { return layout(text, info).map(function (l) { return l.text; }); }
+  // 첫 줄 · 끝 줄 (2026-11-02 사장님 "OO에게 · - OO 양식이 싫은 사람은?") — 손님이 고른다.
+  //   greet: "to"(기본, "받는 분에게") | "none"(첫 줄 없이, 필요하면 손님이 직접 씀)
+  //   sign : "dash"(기본, "- 보내는 분") | "ga"("보내는 분가/이가") | "olim"("보내는 분 올림") | "none"(끝 줄 없이)
+  // 접수 데이터(letter)에는 고른 값을 담을 칸이 없어(Firebase 규칙) 접수할 때 compose()로 본문 앞뒤에 넣어 보낸다.
+  // 그래서 새 편지의 body = 찍을 글 전부. 접수함은 새 편지는 body만, 바꾸기 전 편지는 예전처럼 "OO에게"/"- OO"을 붙여 보여 준다.
+  function hasFinal(s) { var c = String(s || "").trim().slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0; }
+  function greetLine(L) { L = L || {}; return L.greet === "none" ? null : (L.to ? L.to + "에게" : ""); }
+  function signLine(L) {
+    L = L || {}; var f = L.from || "";
+    if (L.sign === "none") return null;
+    if (L.sign === "ga") return f ? f + (hasFinal(f) ? "이가" : "가") : "";
+    if (L.sign === "olim") return f ? f + " 올림" : "";
+    return f ? "- " + f : "";   // 서명 앞 줄표는 타자기에 있는 -
+  }
+  // 편지 한 장의 줄: [첫 줄, 빈 줄] + 본문 + [빈 줄, 끝 줄] (고른 대로)
+  function letterLines(letter, info) {
+    var L = letter || {}, g = greetLine(L), s = signLine(L), out = g === null ? [] : [g, ""];
+    out = out.concat(wrap(L.body, info));
+    return s === null ? out : out.concat(["", s]);
+  }
+  // 접수할 본문: 고른 첫 줄 · 끝 줄을 넣은 글. wrap(compose(L))는 letterLines(L)과 같다.
+  function compose(letter) {
+    var L = letter || {}, g = greetLine(L), s = signLine(L);
+    return (g === null ? "" : g + "\n\n") + String(L.body == null ? "" : L.body) + (s === null ? "" : "\n\n" + s);
+  }
+  // 2026-11-02 전 규칙(모든 글자 1칸, 한 줄 33자). 바뀌기 전에 접수된 편지가 고객 화면과 달랐는지 접수함에서 비교할 때만 쓴다.
+  function letterLinesOld(letter, n) {
+    var L = letter || {}, out = [];
+    n = Number(n) > 0 ? Number(n) : 33;
+    String(L.body == null ? "" : L.body).replace(/\r/g, "").split("\n").forEach(function (para) {
+      if (para === "") { out.push(""); return; }
+      var line = [];
+      para.split(" ").forEach(function (w) {
+        var a = chars(w);
+        while (a.length > n) { if (line.length) { out.push(line.join("")); line = []; } out.push(a.slice(0, n).join("")); a = a.slice(n); }
+        if (!line.length) line = a;
+        else if (line.length + 1 + a.length <= n) line = line.concat([" "], a);
+        else { out.push(line.join("")); line = a; }
+      });
+      out.push(line.join(""));
+    });
+    return [L.to ? L.to + "에게" : "", ""].concat(out, ["", L.from ? "- " + L.from : ""]);
+  }
+  // 접수 시각(ms)이 새 규칙(29칸 · 첫 줄/끝 줄 넣어 보내기) 전이면 true. 규칙 시각이 없으면(null) 새 편지로 본다(올릴 때 꼭 넣기).
+  function beforeRule(createdAt) {
+    var since = FILE_SINCE ? Date.parse(FILE_SINCE) : NaN;
+    return since > 0 && Number(createdAt) < since;
+  }
+  return { chars: chars, half: half, cells: cells, lineCells: lineCells, canBreak: canBreak, layout: layout, wrap: wrap, greetLine: greetLine, signLine: signLine,
+    letterLines: letterLines, compose: compose, letterLinesOld: letterLinesOld, beforeRule: beforeRule };
+})();

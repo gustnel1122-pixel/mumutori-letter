@@ -93,8 +93,29 @@ let origin;
     assert.equal(await page.locator('#w-bad').isVisible(), true);
     await page.locator('#w-body').fill(Array(17).fill('오늘도 정말 고마워.').join('\n')); await next(page);
     assert.equal(await page.locator('[data-step="write"]').isVisible(), true); assert.equal(await page.locator('#w-over').isVisible(), true);
+    assert.equal(await page.locator('#w-ed .pe-grid .over').count(), 1, '21번째 줄만 빨간 줄');
+    await page.locator('#w-body').fill(Array(16).fill('오늘도 정말 고마워.').join('\n'));
+    assert.equal(await page.locator('#w-over').isVisible(), false, '딱 20줄은 넘침 아님'); assert.equal(await page.locator('#w-ed').getAttribute('data-lines'), '20');
     await page.locator('#w-body').fill('가'.repeat(33));
-    assert.equal(await page.locator('#w-paper .ln').nth(2).locator('.c').count(), 33);
+    assert.deepEqual(await page.evaluate(() => LetterTypewriter.wrap('가'.repeat(33)).map(l => l.length)), [29, 4], '띄어쓰기 없는 말은 29칸에서 자름');
+    assert.equal(await page.locator('#w-ed').getAttribute('data-lines'), '6'); assert.equal(await page.locator('#w-body').inputValue(), '가'.repeat(33), '저장 글은 손님이 친 그대로');
+    assert.equal(await page.evaluate(() => LetterTypewriter.wrap('가 '.repeat(30).trim())[0].length), 37, '한 글자 낱말 19개 + 띄어쓰기 18개(반 칸) = 28칸. 예전 33자 규칙이면 33자에서 넘어감');
+    if (process.env.QA_FONTS) { await page.waitForTimeout(300); assert.equal(await page.locator('#w-ed').getAttribute('data-match'), '1', '편지지 칸의 줄바꿈 = 규칙'); }
+    // 첫 줄 · 끝 줄 고르기: 고른 대로 줄 수가 바뀐다
+    await page.locator('#w-body').fill('오늘도 고마워. 늘 응원해!');
+    assert.equal(await page.locator('#w-ed').getAttribute('data-lines'), '5');
+    await page.locator('label:has(input[name="greet"][value="none"])').click();
+    assert.equal(await page.locator('#w-ed').getAttribute('data-lines'), '3', '첫 줄 없이: 1줄부터 내용'); assert.equal(await page.locator('#w-ed .pe-to').isVisible(), false);
+    await page.locator('label:has(input[name="sign"][value="none"])').click();
+    assert.equal(await page.locator('#w-ed').getAttribute('data-lines'), '1', '끝 줄도 없이');
+    await page.locator('label:has(input[name="greet"][value="to"])').click(); await page.locator('label:has(input[name="sign"][value="ga"])').click();
+    // 검사하기: 표시만, 글은 그대로
+    const typo = '요즘 어떻해 지내? 다음에 꼭 갈께요. 할수있어!';
+    await page.locator('#w-body').fill(typo); await page.locator('#w-check').click();
+    assert.equal(await page.locator('#w-chk-res').isVisible(), true); assert.match(await page.locator('#w-chk-res').textContent(), /어떡해/);
+    assert.equal(await page.locator('#w-ed .pe-marks mark').count(), 3); assert.equal(await page.locator('#w-body').inputValue(), typo, '고치지 않음');
+    await page.locator('#w-check').click(); assert.equal(await page.locator('#w-chk-res').isVisible(), false);
+    await page.locator('label:has(input[name="sign"][value="dash"])').click();
     await write(page); assert.equal(await page.locator('#w-body-err').isVisible(), false, '고친 입력의 이전 오류는 사라진다'); await snap(page, '02_write_' + size); await next(page);
     assert.equal(await page.locator('#env-name').isVisible(), false); assert.match(await page.locator('#envs').textContent(), /준비 중/);
     await snap(page, '03_envelope_' + size); await next(page);
@@ -105,7 +126,7 @@ let origin;
     assert.ok(await page.evaluate(() => JSON.parse(localStorage.getItem('mmt-letter-draft-print')).letter.body));
     await snap(page, '04_done_' + size);
     assert.equal(writes.length, 0); assert.deepEqual(errors, []);
-    report.push(size + ': 일반 편지 4단계, 33자·20줄, 금지문자, 휴대폰 자동변환, 오류 초점, 미리보기 0전송 통과');
+    report.push(size + ': 일반 편지 4단계, 29칸(띄어쓰기 반 칸)·20줄, 금지문자, 휴대폰 자동변환, 오류 초점, 미리보기 0전송 통과');
     await context.close();
   }
   {
@@ -143,7 +164,8 @@ let origin;
     await order(page); await write(page); await next(page); await next(page); await page.locator('#consent').check(); await next(page);
     await page.locator('#submit-err:not([hidden])').waitFor(); assert.equal(await page.locator('#done').isVisible(), false);
     assert.equal(await page.locator('#w-body').isDisabled(), true); await next(page); await page.locator('#done:not([hidden])').waitFor();
-    assert.deepEqual(Object.keys(attempts[0].body.order).sort(), ['name', 'phone4']); assert.equal(attempts.length, 2); assert.equal(attempts[0].url, attempts[1].url); assert.deepEqual(attempts[0].body, attempts[1].body); assert.deepEqual(errors, []);
+    assert.deepEqual(Object.keys(attempts[0].body.order).sort(), ['name', 'phone4']); assert.equal(attempts.length, 2);
+    assert.equal(attempts[0].body.letter.body, '사랑하는 민지에게\n\n' + fixture + '\n\n- 지수', '고른 첫 줄 · 끝 줄을 넣은 본문'); assert.equal(attempts[0].url, attempts[1].url); assert.deepEqual(attempts[0].body, attempts[1].body); assert.deepEqual(errors, []);
     report.push('연결 끊김: 거짓 완료 없음·원문 잠금·동일 접수번호/원문 재시도 통과 (가상 서버)');
     await context.close();
   }
