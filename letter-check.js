@@ -16,6 +16,9 @@ window.LetterCheck = (function () {
   // 따로 떨어지면 앞말에 붙이는 조사(헷갈리는 이 · 가 · 도 · 의 · 와 · 과 · 만 · 로 · 에 · 보다 · 밖에는 뺌)
   var JOSA = { "은": 1, "는": 1, "을": 1, "를": 1, "에게": 1, "에서": 1, "한테": 1, "께서": 1, "처럼": 1, "부터": 1, "까지": 1, "마다": 1 };
   var GEO = { "는": 1, "던": 1, "을": 1, "할": 1, "갈": 1, "볼": 1, "올": 1, "줄": 1, "될": 1, "살": 1, "한": 1, "된": 1, "간": 1, "본": 1, "온": 1, "준": 1 };
+  // 띄어 쓰는 꾸밈말(11/4) — 뒤에 붙어도 되는 말은 ADV_OK 로 뺀다
+  var ADV = ["너무", "정말", "진짜", "아주", "항상", "매일", "다시", "많이", "제일", "가장", "더욱", "조금", "벌써", "모두", "서로"];
+  var ADV_OK = /^(너무(나|도|해|하|한|했|할|함)|정말(로|요|이|은|인|이야|이에요)|진짜(로|요|야|는|인|가|배기|예요|이)|아주(머니|버님|까|요)|항상(은|요|이)|매일(매일|은|요|같|의|이)|다시(마|금|는|요|한번)|많이(도|요|는)|제일(가|로|은|요|이)|가장(자리|은|요|이)|더욱(이|더|요)|조금(씩|만|은|이|요|도)|벌써(요|부터)|모두(들|의|가|를|에게|요|는|도|와|랑)|서로(의|가|를|에게|요|서로|는|도))/;
   function fin(ch) { var c = (ch || "").charCodeAt(0) - 0xAC00; return c >= 0 && c < 11172 ? c % 28 : -1; }   // 받침: 0 없음 · 4 ㄴ · 8 ㄹ
   function isSyl(ch) { var c = (ch || "").charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3; }
   function run(text, TW, lineOffset) {
@@ -30,7 +33,14 @@ window.LetterCheck = (function () {
     // 2) 띄어쓰기: 낱말 하나씩
     var wre = /[^ \n]+/g;
     while ((m = wre.exec(text))) {
-      var w = m[0], at = m.index, n = w.length;
+      // 낱말 끝 문장부호는 떼고 본다(11/4 사장님 미리보기 — "만날께." 처럼 마침표가 붙으면 못 잡던 것)
+      var w = m[0].replace(/[.,!?~…"'”’)\]]+$/, ""), at = m.index, n = w.length;
+      if (!n) continue;
+      // 자주 붙여 쓰는 꾸밈말(너무좋다 → 너무 좋다). 한 낱말로 쓰는 말(너무하다 · 다시마 · 이미지 등)은 뺀다
+      for (var k = 0; k < ADV.length; k++) {
+        var A = ADV[k];
+        if (n > A.length && w.indexOf(A) === 0 && isSyl(w[A.length]) && !ADV_OK.test(w)) { add(at, at + n, "space", "'" + w + "' → '" + A + " " + w.slice(A.length) + "'"); break; }
+      }
       if (JOSA[w] && at > 0 && text[at - 1] === " " && isSyl(text[at - 2])) add(at - 1, at + n, "space", "'" + w + "'은 앞말에 붙여 써요");
       for (var i = 1; i < n; i++) {
         var ch = w[i], prev = w[i - 1], next = w[i + 1] || "", f = fin(prev), seg = function (a, b) { return w.slice(a, b); };
