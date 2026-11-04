@@ -184,7 +184,7 @@
   function clearMarks() { if (marks) marks.innerHTML = ""; }
   function runCheck() {
     var box = $("#w-chk-res"); if (!box || !window.LetterCheck || !EDTA) return;
-    var t = EDTA.value, head = Number(ED.dataset.head || 0), list = window.LetterCheck.run(t, TW, head);
+    var LC = window.LetterCheck, t = EDTA.value, head = Number(ED.dataset.head || 0), list = LC.run(t, TW, head, LC.aiFor ? LC.aiFor(t) : null);
     if (!marks) { marks = document.createElement("div"); marks.className = "pe-marks"; marks.setAttribute("aria-hidden", "true"); $(".pe-page", ED).insertBefore(marks, EDTA); }
     marks.style.top = EDTA.offsetTop + "px";
     var html = "", at = 0;
@@ -192,21 +192,23 @@
     marks.innerHTML = html + esc(t.slice(at)) + "\u200b";
     var KIND = { spell: "맞춤법", space: "띄어쓰기", punct: "띄어쓰기", line: "줄 나눔" };
     box.hidden = false;
-    box.innerHTML = list.length
+    box.innerHTML = (LC.aiPanel ? LC.aiPanel(t) : "") + (list.length
       ? '<p class="chk-head">표시한 곳 ' + list.length + '곳 · 고치지 않았어요. 고칠지는 직접 정해 주세요.</p><ul>' + list.slice(0, 12).map(function (it, k) {
-          return '<li><button type="button" class="chk-go" data-k="' + k + '"><b>' + (it.line || "") + '줄</b> <span class="k ' + it.kind + '">' + KIND[it.kind] + "</span> " + esc(it.msg) + "</button></li>";
+          return '<li><button type="button" class="chk-go" data-k="' + k + '"><b>' + (it.line || "") + '줄</b> <span class="k ' + it.kind + '">' + KIND[it.kind] + "</span> " + (it.ai ? '<span class="k ai">AI</span> ' : "") + esc(it.msg) + "</button></li>";
         }).join("") + "</ul>" + (list.length > 12 ? '<p class="chk-more">그 밖에 ' + (list.length - 12) + "곳</p>" : "")
-      : '<p class="chk-head">표시할 곳을 찾지 못했어요. 자주 틀리는 것만 살펴봐요.</p>';
+      : '<p class="chk-head">' + esc(LC.emptyMsg ? LC.emptyMsg(t) : "표시할 곳을 찾지 못했어요. 자주 틀리는 것만 살펴봐요.") + "</p>");
     box._list = list;
   }
+  function aiRedraw() { if (chkOn) runCheck(); }   // AI 검사 상태가 바뀌면(살펴보는 중 · 결과) 다시 그림 — 표시를 껐으면 안 그림
   function setCheck(on) {
     chkOn = on; var b = $("#w-check"); if (!b) return;
     b.textContent = on ? "표시 끄기" : "검사하기"; b.setAttribute("aria-pressed", String(on));
-    if (on) runCheck(); else { clearMarks(); $("#w-chk-res").hidden = true; }
+    if (on) { runCheck(); if (window.LetterCheck.aiStart) window.LetterCheck.aiStart(EDTA.value, aiRedraw); } else { clearMarks(); $("#w-chk-res").hidden = true; }
   }
   if ($("#w-check")) {
     $("#w-check").addEventListener("click", function () { setCheck(!chkOn); });
     $("#w-chk-res").addEventListener("click", function (e) {   // 목록을 누르면 그 자리를 골라 보여 줌(고치지는 않음)
+      var a = e.target.closest("[data-ai]"); if (a) { if (window.LetterCheck.aiAction) window.LetterCheck.aiAction(a.dataset.ai, EDTA.value, aiRedraw); return; }
       var b = e.target.closest(".chk-go"); if (!b || EDTA.disabled) return;
       var it = ($("#w-chk-res")._list || [])[Number(b.dataset.k)]; if (!it) return;
       EDTA.focus({ preventScroll: true }); try { EDTA.setSelectionRange(it.start, it.end); } catch (_) { /* 커서 없음 */ }
