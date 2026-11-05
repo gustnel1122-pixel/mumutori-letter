@@ -423,5 +423,10 @@ body[data-mode="print"] .step[data-step="review"]>h2{grid-area:heading;font-size
 @keyframes lgbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes lghop{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px)}}
 @media (max-width:599px){.lg{width:46px;height:46px}.lg-bub{font-size:13px}}
+/* 11/5 도토리 · 말풍선은 빈 곳에만 — 말풍선 자리 · 꼬리 방향은 letter-guide.js가 정함 */
+.lg.lg-pos .lg-bub{top:var(--by,0px);left:var(--bx,0px);right:auto;bottom:auto;transform:scale(.9);transform-origin:var(--bo,left center)}
+.lg.lg-pos.lg-talk .lg-bub{transform:scale(1)}
+.lg.lg-pos .lg-bub::after{top:var(--ay,50%);left:var(--ax,0px);right:auto;bottom:auto;transform:translate(-50%,-50%) rotate(var(--ar,45deg))}
+@media (max-width:599px){.lg.lg-pos .lg-bub{max-width:min(176px,50vw);font-size:12.5px;padding:6px 10px 5px}}
 @media (prefers-reduced-motion:reduce){.lg{transition:opacity .2s}.lg-body,.lg.lg-hop .lg-body{animation:none}.lg.lg-fly .lg-body img{transform:none}}
 @media print{.lg{display:none!important}}
