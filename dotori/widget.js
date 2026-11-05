@@ -2,6 +2,7 @@
  * 식스샵 코드 넣기(본문 끝)에 <script src="https://letter.mumutori.com/dotori/widget.js" defer></script> 한 줄
  * 시험 중엔 주소 끝에 ?dotori=1 을 붙인 사람에게만 보여요 (SHOW_ALL=false). '올려' 뒤 true로.
  * 만든 날: 2026-11-04 (총괄)
+ * v4(11/5 10시): '도토리 길' — 글 · 사진 없는 오른쪽 빈 칸으로만 다님 · 상품 설명은 상품 아래 빈 줄에서 · 스크롤하면 오른쪽 길로 후다닥 → 길 따라 내려옴 (사장님 11/5 09:49)
  * v3(11/4 23시): 상품마다 따라다니며 설명(사장님 '즉석으로 · 자기학습') · 모두에게 보이기(SHOW_ALL=true · 사장님 21:27) · 빈 답이면 카톡 안내
  *   한 줄은 서버가 AI로 만들어 두고 '보임 · 눌림' 숫자로 스스로 바꿔 감(손님 정보 X) · 서버가 안 되면 가게 설명 첫 줄
  */
@@ -188,7 +189,7 @@
 
     var btn = document.createElement('button');
     btn.className = 'dw'; btn.type = 'button'; btn.setAttribute('aria-label', 'AI 도토리 상담 열기');
-    btn.style.width = W_ + 'px'; btn.style.height = H_ + 'px';
+    btn.style.width = W_ + 'px'; btn.style.height = H_ + 'px'; btn.style.transformOrigin = '50% 100%';
     var R = {};
     if (RIG) {
       btn.innerHTML = '<span class="dw-shadow"></span><span class="dw-body"><span class="dw-rig">' +
@@ -281,12 +282,22 @@
     }
     function goTour(c, now) {
       if (!c || st.open || st.hidden || reduce) return;
-      var r = c.el.getBoundingClientRect(), img = c.el.tagName === 'IMG' ? null : c.el.querySelector('img'), ir = img ? img.getBoundingClientRect() : r;
-      var bottom = ir.height > 40 ? ir.bottom : r.top + Math.min(r.height, r.width);
-      var tx = clamp(r.right - W_ * 0.8, 12, innerWidth - W_ - 12);
-      var ty = scrollY + clamp(bottom - H_ * 0.92, 8, innerHeight - H_ - 8);
+      measureLane(now);
+      var r = c.el.getBoundingClientRect(), sp;
+      if (c.page) {   // 상품 화면: 큰 사진 옆 오른쪽 길에서 (휴대폰은 사진 바로 아래 오른쪽 끝)
+        sp = lane.edge ? { x: lane.x, y: scrollY + clamp(r.bottom + 6, 8, H - H_ - 8), sc: 1 } : { x: lane.x, y: scrollY + clamp(r.top + r.height * 0.35, 60, H - H_ - 20), sc: 1, side: 1 };
+      } else sp = spotFor(c);
+      var inLane = Math.abs(st.x - lane.x) < Math.max(14, lane.w / 2);
+      var path = [], k = st.sc || 1;
+      if (Math.abs(st.y - sp.y) < 14 && !inLane) path.push(sp);                         // 같은 줄이면 그대로 옆으로
+      else {
+        if (!inLane) path.push({ x: lane.x, y: st.y, sc: k });                          // 먼저 오른쪽 길로
+        if (Math.abs(sp.x - lane.x) > 3) { path.push({ x: lane.x, y: sp.y, sc: 1 }); path.push(sp); }   // 길 따라 그 높이로 → 옆으로
+        else path.push(sp);
+      }
       wake(); st.chase = false; st.offSince = 0; hideMark();
-      st.tour = { x: tx, y: ty, c: c, at: now, arrived: 0 };
+      st.path = path;
+      st.tour = { x: sp.x, y: sp.y, c: c, at: now, arrived: 0, road: !!sp.road, side: !!sp.side, sc: sp.sc || 1 };
       tourSeen[c.key] = now; tourLast = now; tourScroll = lastScroll; mode('idle', 1e9);
     }
     function arriveTour(now) {
@@ -300,7 +311,7 @@
       }
       speak('이건 ' + c.name + josa(c.name) + '!' + (line ? '\n' + line : ''), 4800);
     }
-    function endTour() { if (!st.tour) return; st.tour = null; mode('idle', 1200); }
+    function endTour() { if (!st.tour) return; st.tour = null; st.path = []; mode('idle', 1200); }
     // 말풍선 뒤 20초 안에 그 상품을 누르면 '눌림' 하나 (숫자만 · 손님 정보 없음)
     document.addEventListener('click', function (e) {
       var a = e.target && e.target.closest && e.target.closest('a[href*="/products/"]');
@@ -362,12 +373,66 @@
     function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
     // 스크롤 중엔 그 자리에 남겨져(화면과 같이 밀려 사라짐) → 스크롤이 멈추고 잠깐 뒤 '후다닥' 달려옴
+
+    // ── v4 '도토리 길' (11/5 사장님) — 글 · 사진이 없는 오른쪽 빈 칸이 길(휴대폰은 화면 오른쪽 끝) ──
+    // 상품 설명은 그 상품 아래 빈 줄(다음 줄 상품과의 사이)에서 · 가는 길도 오른쪽 길 → 빈 줄로만 · 스크롤하면 빈 줄을 따라 오른쪽 길로 후다닥 → 길 따라 내려옴
+    var lane = { x: innerWidth - W_ - 28, w: 0, edge: true }, laneAt = -1e9;
+    function measureLane(now) {
+      laneAt = now || performance.now();
+      var root = document.querySelector('main') || document.body, right = 0, n = 0;
+      var els = root.querySelectorAll('img,video,canvas,p,h1,h2,h3,h4,h5,li,a,button,span,input,select,textarea,label');
+      for (var i = 0; i < els.length && n < 700; i++) {
+        var el = els[i]; if (el.closest && el.closest('.dw,.dw-say,.dw-panel,.dw-call')) continue;
+        var r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > H) continue;
+        n++; if (r.width > W * 0.92) continue;                       // 화면 가득한 바탕 그림 · 띠는 빼고
+        if (r.right > right) right = r.right;
+      }
+      var free = W - right;
+      if (right && free >= W_ + 24) lane = { x: Math.round(right + (free - W_) / 2), w: free, edge: false };
+      else lane = { x: W - W_ - 12, w: 0, edge: true };
+    }
+    function laneX(x) {                                                 // 길 안에서 x (길 폭 안에서는 조금 걸어 다녀도 됨)
+      if (lane.edge || lane.w < W_ + 40) return lane.x;
+      var half = (lane.w - W_) / 2 - 10;
+      return clamp(x, lane.x - half, lane.x + half);
+    }
+    function onPath() { return !!(st.path && st.path.length); }
+    function productCards() {
+      var out = [], seen = [];
+      [].slice.call(document.querySelectorAll('a[href*="/products/"]')).forEach(function (a) { var li = a.closest('li') || a; if (seen.indexOf(li) < 0) { seen.push(li); out.push(li); } });
+      return out;
+    }
+    // 설명 자리: 그 상품 글 아래 빈 칸(다음 줄 상품 위까지) — 좁으면 도토리가 살짝 작아져서 쏙 · 너무 좁으면 오른쪽 길에서 (휴대폰은 예전처럼 사진 귀퉁이)
+    function textBottom(li) {
+      var tb = 0;
+      [].slice.call(li.querySelectorAll('p,span,div,strong,em,b,h2,h3,h4,h5,small')).forEach(function (e) {
+        if (e.children.length || !String(e.textContent || '').trim()) return;
+        var q = e.getBoundingClientRect(); if (q.height > 0 && q.bottom > tb) tb = q.bottom;
+      });
+      return tb;
+    }
+    function spotFor(c) {
+      var r = c.el.getBoundingClientRect(), img = c.el.tagName === 'IMG' ? null : c.el.querySelector('img'), ir = img ? img.getBoundingClientRect() : r;
+      var top = Math.max(textBottom(c.el), ir.bottom) + 4, below = r.bottom + 30;
+      productCards().forEach(function (li) { var q = li.getBoundingClientRect(); if (q.top > r.bottom - 4 && q.left < r.right - 4 && q.right > r.left + 4 && q.top < below) below = q.top; });
+      var zone = below - 4 - top;
+      if (zone >= H_ * 0.55) {
+        var sc = Math.min(1, zone / H_), mid = (top + below - 4) / 2;
+        return { x: clamp(r.left + r.width / 2 - W_ / 2, 12, W - W_ - 12), y: scrollY + clamp(mid + H_ * sc / 2 - H_, 8, H - H_ - 8), sc: sc, road: 1 };
+      }
+      if (!lane.edge) return { x: lane.x, y: scrollY + clamp(ir.top + ir.height / 2 - H_ / 2, 8, H - H_ - 8), sc: 1, side: 1 };
+      var bottom = ir.height > 40 ? ir.bottom : r.top + Math.min(r.height, r.width);
+      return { x: clamp(r.right - W_ * 0.8, 12, W - W_ - 12), y: scrollY + clamp(bottom - H_ * 0.92, 8, H - H_ - 8), sc: 1 };
+    }
     var REACT = 260, CATCH = 40;
+    st.path = [];
+    addEventListener('resize', function () { measureLane(); });
     st.chase = false; st.reactAt = 0; st.offSince = 0; st.lastBig = -1e9;
     var last = performance.now(), dustAcc = 0;
     function frame(now) {
       var dt = Math.min(0.05, (now - last) / 1000); last = now;
       W = innerWidth; H = innerHeight;
+      if (now - laneAt > 1500) measureLane(now);
       if (!st.open && !st.hidden) {
         var g = st.tour ? st.tour.y : ground();
         st.y = Math.max(scrollY - H_ - 8, Math.min(scrollY + H + 8, st.y)); // 화면 바로 밖까지만
@@ -378,9 +443,10 @@
         if (off && !st.offSince) st.offSince = now;
         if (scrolling) {
           if (st.tour && now - st.tour.at > 400) endTour();
+          if (!st.tour && Math.abs(laneX(st.x) - st.x) > 2 && !(onPath() && st.path[st.path.length - 1].lane)) st.path = [{ x: laneX(st.x), y: st.y, lane: 1, ky: 1, sc: st.sc || 1 }];   // v4: 지금 줄 그대로 오른쪽 길로 후다닥
           st.reactAt = now + REACT;                                   // 스크롤 중엔 따라가지 않음
           if (!st.chase && dist > CATCH && !reduce) { st.chase = true; showMark('!', 700); face('surprised', 900); st.shockUntil = now + 700; }
-        } else if (!st.tour && dist > 3 && (now >= st.reactAt || reduce)) {
+        } else if (!st.tour && !onPath() && dist > 3 && (now >= st.reactAt || reduce)) {
           if (!st.chase && dist > CATCH) st.chase = true;
           running = !reduce && dist > 60;
           var RUN = Math.max(560, Math.min(860, H * 0.85));           // 화면 한 번 가로지르는 데 약 1초
@@ -388,18 +454,26 @@
           st.y += (dy > 0 ? 1 : -1) * Math.min(dist, spd * dt);
           dist = Math.abs(g - st.y);
         }
-        if (st.tour && !scrolling) {
-          var tdx = st.tour.x - st.x, tdy = st.tour.y - st.y, td = Math.sqrt(tdx * tdx + tdy * tdy);
-          if (td > 4) {
-            running = td > 40;
-            var tsp = running ? Math.max(560, Math.min(820, H * 0.8)) : 150;
-            var stp = Math.min(td, tsp * dt); st.x += tdx / td * stp; st.y += tdy / td * stp;
-            if (Math.abs(tdx) > 2) st.face = tdx > 0 ? 1 : -1;
-            dy = tdy; dist = td;
-          } else if (!st.tour.arrived) arriveTour(now);
+        // v4: 정해진 길(점 → 점)만 따라 달리기 — 상품 설명 가는 길 · 오른쪽 길로 돌아가는 길
+        if (!st.tour && !onPath() && !scrolling && Math.abs(laneX(st.x) - st.x) > 2) st.path = [{ x: laneX(st.x), y: st.y, ky: 1, sc: st.sc || 1 }];
+        if (onPath()) {
+          var wp = st.path[0]; if (wp.ky) wp.y = st.y;                    // 오른쪽 길로 갈 땐 높이는 그대로(화면과 같이 밀림)
+          var pdx = wp.x - st.x, pdy = wp.y - st.y, pd = Math.sqrt(pdx * pdx + pdy * pdy);
+          if (pd > 3) {
+            running = !reduce;
+            var psp = reduce ? 4000 : Math.max(720, Math.min(1100, H * 1.15));
+            var pst = Math.min(pd, psp * dt); st.x += pdx / pd * pst; st.y += pdy / pd * pst;
+            if (Math.abs(pdx) > 2) st.face = pdx > 0 ? 1 : -1;
+            dy = pdy; dist = pd;
+          } else { st.x = wp.x; st.y = wp.y; st.path.shift(); }
+        }
+        if (st.tour && !onPath()) {
+          if (!st.tour.arrived) arriveTour(now);
           else if (now - st.tour.arrived > 5400) endTour();
         }
-        if (!st.tour && st.chase && dist <= 3 && !scrolling) {
+        var scT = onPath() ? (st.path[0].sc || 1) : st.tour ? (st.tour.sc || 1) : 1;   // 좁은 빈 칸에선 살짝 작게
+        st.sc = (st.sc || 1) + (scT - (st.sc || 1)) * Math.min(1, dt * 9);
+        if (!st.tour && !onPath() && st.chase && dist <= 3 && !scrolling) {
           st.chase = false;
           if (st.offSince && now - st.offSince > 250) {
             if (now - st.lastBig > 15000) { speak('헉헉… 너무 빨라서 따라잡기 힘들었어요!', 2800); st.lastBig = now; }
@@ -409,11 +483,15 @@
         }
         if (!off && !st.chase) st.offSince = 0;
         var vy = st.y - scrollY;
-        if (!st.tour && !running && !st.chase && !reduce) {
+        if (!st.tour && !onPath() && !running && !st.chase && !reduce) {
           if (st.mode === 'walk') {
-            st.x += st.dir * 46 * dt;
-            if (st.x < 12) { st.x = 12; st.dir = 1; }
-            if (st.x > W - W_ - 12) { st.x = W - W_ - 12; st.dir = -1; }
+            var lo = laneX(-1e9), hi = laneX(1e9);                      // v4: 길 폭 안에서만 걷기 (휴대폰은 제자리)
+            if (hi - lo < 8) mode('idle', 2500);
+            else {
+              st.x += st.dir * 46 * dt;
+              if (st.x < lo) { st.x = lo; st.dir = 1; }
+              if (st.x > hi) { st.x = hi; st.dir = -1; }
+            }
             if (now > st.until && Math.random() < dt * 0.35) mode('idle', 1800 + Math.random() * 2600);
           } else if (st.mode === 'idle') {
             if (now > st.until) { if (Math.random() < 0.4) st.dir *= -1; mode('walk', 2500 + Math.random() * 4000); }
@@ -423,7 +501,7 @@
           if (st.mode !== 'sleep' && faceNow === 'base' && now > (st.blinkAt || 0)) { if (st.blinkAt) face('sleep', 140); st.blinkAt = now + 2600 + Math.random() * 3600; }
         }
         if (!st.tour && st.mode === 'walk' && !running) st.face = st.dir > 0 ? 1 : -1;
-        if (reduce) st.x = W - W_ - 20;
+        if (reduce && !st.tour) st.x = lane.x;
         st.x = Math.max(12, Math.min(W - W_ - 12, st.x));
         st.t += dt;
         var k = W_ / 64;                                               // 크기에 맞춰 움직임 크기도
@@ -481,11 +559,15 @@
           R.cap.style.transform = 'translateY(' + sp.cy.a.toFixed(2) + 'px) rotate(' + sp.cr.a.toFixed(2) + 'deg)';
         }
 
-        btn.style.transform = 'translate(' + st.x.toFixed(1) + 'px,' + vy.toFixed(1) + 'px)';
+        btn.style.transform = 'translate(' + st.x.toFixed(1) + 'px,' + vy.toFixed(1) + 'px) scale(' + (st.sc || 1).toFixed(3) + ')';
         if (say.classList.contains('on')) {
           var bw = say.offsetWidth, bh = say.offsetHeight;
           var bx = Math.max(16, Math.min(W - bw - 16, st.x + W_ / 2 - bw / 2));
           var by = vy - bh - 10; if (by < 8) by = vy + H_ + 8;
+          if (st.tour && st.tour.road && st.tour.arrived) {             // v4: 빈 줄에선 말풍선도 옆으로 (위 상품 글을 안 가리게)
+            bx = st.x + W_ + 8; if (bx + bw > W - 16) bx = st.x - bw - 8; bx = Math.max(16, bx);
+            by = Math.max(8, Math.min(H - bh - 8, vy + H_ * (1 - (st.sc || 1) / 2) - bh / 2));
+          }
           say.style.transform = 'translate(' + bx.toFixed(0) + 'px,' + by.toFixed(0) + 'px)';
           if (now > st.sayUntil) say.classList.remove('on');
         }
