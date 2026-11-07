@@ -3,8 +3,8 @@
  * endpoint 가 비어 있거나 ai 가 false 이면 지금처럼 휴대폰 안 검사만 한다. 키 · 비밀값은 여기 넣지 않는다(키는 Apps Script 안에만).
  */
 window.LETTER_CHECK_CONFIG = Object.freeze({
-  ai: false,
-  endpoint: '',
+  ai: true,
+  endpoint: 'https://script.google.com/macros/s/AKfycbxZVNaGfyrNK_JJJguuqjBiz1w98Ht6GtTdPK4z6uU8Sas5nxsC2sLpAOXBDxhQz7tB5w/exec',
   timeoutMs: 15000,
   maxPerVisit: 8
 });
