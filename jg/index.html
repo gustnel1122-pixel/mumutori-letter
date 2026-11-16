@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="무무토리 매장 전시용 — 진격의 오피스 (시험판)">
+<title>진격의 오피스</title>
+
+<!-- iPad 홈 화면에 추가(Add to Home Screen) → 전체화면 standalone 앱처럼 보이게 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="진격의오피스">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+
+<style>
+  :root{ --ink:#682301; --caramel:#9F5528; --card:#FCF7E5; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0e0e0e;overflow:hidden;
+    font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+
+  /* 아이패드 가로 화면에 맞춘 4:3 틀 — 그 안에 16:9 사무실 영상을 가운데 맞춤(위아래 띠) */
+  .stage-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0e0e0e}
+  .stage{
+    position:relative;background:#000;overflow:hidden;
+    width:100vw;height:100vh;
+    max-width:133.333vh; /* 4:3 유지 */
+    max-height:75vw;     /* 4:3 유지 */
+  }
+  .frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;aspect-ratio:16/9}
+
+  #bgVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+
+  /* 유리창(창문) 자리에 겹치는 손님 실시간 카메라 — 평소엔 투명, 발동될 때만 보임 */
+  #camVideo{
+    position:absolute; left:17%; top:3%; width:66%; height:53%;
+    object-fit:cover; border-radius:10px; opacity:0;
+    transition:opacity .45s ease; pointer-events:none;
+    transform:scaleX(-1); /* 거울처럼 보이게(셀피 반전) */
+  }
+
+  .caption{
+    position:absolute; left:14px; bottom:12px; z-index:5;
+    background:rgba(0,0,0,.55); color:#fff; font-size:12px; line-height:1.3;
+    padding:6px 11px; border-radius:999px; letter-spacing:.2px;
+    pointer-events:none;
+  }
+
+  #startOverlay{
+    position:absolute; inset:0; z-index:10; background:rgba(14,14,14,.86);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#FCF7E5;
+    text-align:center; padding:24px;
+  }
+  #startOverlay button{
+    font-size:18px; font-weight:700; padding:14px 30px; border-radius:999px; border:none;
+    background:var(--card); color:var(--ink); cursor:pointer;
+  }
+  #startOverlay p{font-size:13px; opacity:.8; max-width:360px; margin:0}
+  #camError{
+    position:absolute; left:14px; top:12px; z-index:6; display:none;
+    background:rgba(180,40,20,.75); color:#fff; font-size:11.5px; padding:6px 10px; border-radius:8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage-wrap">
+  <div class="stage">
+    <div class="frame" id="frame">
+      <video id="bgVideo" src="assets/idle.mp4" poster="assets/idle_poster.jpg"
+             autoplay muted loop playsinline webkit-playsinline></video>
+      <video id="camVideo" muted playsinline webkit-playsinline></video>
+    </div>
+  </div>
+  <div class="caption">카메라 화면은 저장되지 않아요</div>
+  <div id="camError">카메라 · 얼굴인식을 시작하지 못했어요 (콘솔 확인 필요)</div>
+
+  <div id="startOverlay">
+    <div style="font-size:22px;font-weight:700">진격의 오피스 — 시험판</div>
+    <p>탭하면 평소 화면(사무실 일하는 모습)이 돌아가다가, 손님 얼굴이 카메라에 가까이 오면 깜짝 반응이 재생돼요.
+       카메라 화면은 저장·전송되지 않고 이 화면 안에서만 바로 쓰여요.</p>
+    <button id="startBtn">탭해서 시작하기</button>
+  </div>
+</div>
+
+<script type="module">
+// ===== 진격의 오피스 — 아이패드 웹앱 시험판 =====
+// 얼굴 인식: Google MediaPipe Face Detection (@mediapipe/tasks-vision), 전부 브라우저(WASM) 안에서만 돎.
+// CDN 버전은 임의로 고른 숫자가 아니라, 구글 공식 mediapipe-samples-web 저장소(package.json)에
+// 실제로 쓰고 있는 버전(1.2.3)을 확인하고 그대로 고정했어요. (2026-11-16 확인)
+import { FilesetResolver, FaceDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
+
+const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+
+// ---- 발동 기준값 (현장에서 눈으로 보며 다시 맞춰야 하는 시작값) ----
+const THRESH = 0.38;          // 감지된 얼굴 가로폭 / 카메라 프레임 가로폭 — 0.35~0.40 중 시작값
+const DEBOUNCE_MS = 400;      // 이만큼 계속 기준을 넘어야 발동(손이 휙 지나가는 오작동 방지)
+const COOLDOWN_MS = 6000;     // 반응이 끝난 뒤, 같은 사람이 그대로 서있어도 바로 또 터지지 않게 쉬는 시간
+const REACTION_FALLBACK_MS = 12000; // reaction.mp4 실제 길이(~10.6초)보다 넉넉히 — ended 이벤트가 안 뜰 때 대비
+
+const bgVideo = document.getElementById('bgVideo');
+const camVideo = document.getElementById('camVideo');
+const startOverlay = document.getElementById('startOverlay');
+const startBtn = document.getElementById('startBtn');
+const camError = document.getElementById('camError');
+
+let state = 'idle';           // idle | triggered | cooldown  (watching 은 idle 안에 포함)
+let aboveSince = null;
+let detector = null;
+let fallbackTimer = null;
+
+async function initDetector(){
+  const vision = await FilesetResolver.forVisionTasks(WASM_BASE);
+  detector = await FaceDetector.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: MODEL_URL },
+    runningMode: 'VIDEO',
+    minDetectionConfidence: 0.5,
+  });
+}
+
+async function startCamera(){
+  // 카메라 프레임은 어디에도 저장·전송하지 않음 — srcObject로 화면에 바로 띄우고,
+  // 얼굴 인식도 메모리 안 videoFrame만 보고 즉시 버림(녹화·캡처 코드 없음).
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+  camVideo.srcObject = stream;
+  await camVideo.play();
+}
+
+function loop(){
+  if (detector && camVideo.readyState >= 2 && state === 'idle'){
+    let result;
+    try { result = detector.detectForVideo(camVideo, performance.now()); }
+    catch(e){ result = null; }
+    if (result) handleDetections(result.detections || []);
+  }
+  requestAnimationFrame(loop);
+}
+
+function handleDetections(dets){
+  let maxRatio = 0;
+  for (const d of dets){
+    const bw = d.boundingBox ? d.boundingBox.width : 0;
+    const vw = camVideo.videoWidth || 1;
+    const ratio = bw / vw;
+    if (ratio > maxRatio) maxRatio = ratio;
+  }
+  const now = performance.now();
+  if (maxRatio >= THRESH){
+    if (aboveSince === null) aboveSince = now;
+    if (now - aboveSince >= DEBOUNCE_MS){
+      aboveSince = null;
+      trigger();
+    }
+  } else {
+    aboveSince = null;
+  }
+}
+
+function trigger(){
+  if (state !== 'idle') return;
+  state = 'triggered';
+  camVideo.style.opacity = '1';
+  bgVideo.loop = false;
+  bgVideo.src = 'assets/reaction.mp4';
+  bgVideo.poster = 'assets/reaction_poster.jpg';
+  bgVideo.load();
+  bgVideo.play().catch(()=>{});
+
+  const onEnded = () => { cleanup(); backToIdle(); };
+  function cleanup(){
+    bgVideo.removeEventListener('ended', onEnded);
+    if (fallbackTimer){ clearTimeout(fallbackTimer); fallbackTimer = null; }
+  }
+  bgVideo.addEventListener('ended', onEnded);
+  fallbackTimer = setTimeout(() => { cleanup(); backToIdle(); }, REACTION_FALLBACK_MS);
+}
+
+function backToIdle(){
+  camVideo.style.opacity = '0';
+  bgVideo.loop = true;
+  bgVideo.src = 'assets/idle.mp4';
+  bgVideo.poster = 'assets/idle_poster.jpg';
+  bgVideo.load();
+  bgVideo.play().catch(()=>{});
+  state = 'cooldown';
+  setTimeout(() => { state = 'idle'; }, COOLDOWN_MS);
+}
+
+startBtn.addEventListener('click', async () => {
+  startOverlay.style.display = 'none';
+  bgVideo.play().catch(()=>{});
+  try {
+    await startCamera();
+    await initDetector();
+    loop();
+  } catch(e){
+    console.error('카메라 · 얼굴인식 시작 실패:', e);
+    camError.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
