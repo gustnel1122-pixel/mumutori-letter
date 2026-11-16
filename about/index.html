@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="무무토리 컴퍼니 소개 — 씨앗 친구 일곱이 꾸리는 작은 상점이자 회사입니다.">
+<title>무무토리 컴퍼니 소개</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F4DC92;--ink:#682301;--card:#FCF7E5;--brown:#7C4223;--caramel:#9F5528}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-text-size-adjust:100%}
+  .jua{font-family:'Jua',sans-serif}
+  main{max-width:420px;margin:0 auto;padding:28px 18px 40px}
+  section{margin-bottom:34px}
+  .hero{text-align:center}
+  .hero img{width:120px;height:120px;object-fit:contain;margin-bottom:10px}
+  .hero h1{font-size:22px;margin:4px 0}
+  .hero p{font-size:15px;line-height:1.6;margin:6px 0}
+  .tagline{font-size:16px;font-weight:700;margin-top:10px}
+  h2.jua{font-size:19px;margin:0 0 10px}
+  .story-card{background:var(--card);border-radius:18px;padding:18px 16px;font-size:14.5px;line-height:1.75}
+  .char-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .char-card{background:var(--card);border-radius:16px;padding:14px 10px;text-align:center}
+  .char-card.wide{grid-column:1 / span 2}
+  .char-card img{width:64px;height:64px;object-fit:contain;margin-bottom:6px}
+  .char-name{font-size:15px;margin:2px 0}
+  .char-job{display:inline-block;font-size:11.5px;background:var(--brown);color:var(--card);border-radius:999px;padding:3px 10px;margin:2px 0 6px}
+  .char-line{font-size:12.5px;line-height:1.5;color:var(--ink)}
+  .can-do{background:var(--card);border-radius:18px;padding:16px;font-size:14.5px;line-height:1.7}
+  .can-do a{color:var(--caramel);font-weight:700;text-decoration:underline}
+  .cta{display:flex;flex-direction:column;gap:12px;align-items:center;margin-top:10px}
+  .btn{display:block;width:100%;max-width:300px;text-align:center;padding:15px 20px;border-radius:999px;background:var(--ink);color:var(--card);text-decoration:none;font-weight:700;font-size:16px}
+  .btn.small{background:transparent;border:2px solid var(--ink);color:var(--ink);padding:9px 20px;font-size:13px;max-width:220px}
+  footer{text-align:center;font-size:11px;color:var(--brown);opacity:.8;padding-bottom:10px}
+</style>
+</head>
+<body>
+<main>
+
+<section class="hero">
+  <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_dotori_1792928242218.webp" alt="도토리 무무토리">
+  <h1 class="jua">씨앗 친구들이 모인 작은 상점</h1>
+  <p class="tagline jua">전하고 싶은 마음이 있는 날, 무무토리.</p>
+</section>
+
+<section>
+  <h2 class="jua">무무토리 컴퍼니 이야기</h2>
+  <div class="story-card">
+    마음은 씨앗이에요. 주머니 속에 있을 땐 작은 씨앗이지만, 전하면 누군가의 하루에서 싹이 터요.<br><br>
+    무무토리는 씨앗 친구 일곱이 꾸리는 작은 회사 '씨앗 컴퍼니'예요. 낮에는 소품상점, 밤에는 편지와 상자를 싸는 회사죠.<br><br>
+    손님이 맡긴 마음을 편지와 작은 소품에 담아, 받는 사람의 하루에 심어 드려요.
+  </div>
+</section>
+
+<section>
+  <h2 class="jua">일하는 친구들</h2>
+  <div class="char-grid">
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_dotori_1792928242218.webp" alt="도토리 무무토리">
+      <div class="char-name jua">도토리 무무토리</div>
+      <div class="char-job jua">대표 / 인쇄 편지</div>
+      <div class="char-line">편지 한 통에 밤새 단어를 고르는, 다정한 대표</div>
+    </div>
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_chickpea_1792928244229.webp" alt="병아리콩">
+      <div class="char-name jua">병아리콩</div>
+      <div class="char-job jua">편지 작가 / 마음 설문</div>
+      <div class="char-line">남의 사연에 먼저 우는, 문장엔 누구보다 진지한 작가</div>
+    </div>
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_chestnut_1792928272853.webp" alt="밤">
+      <div class="char-name jua">밤</div>
+      <div class="char-job jua">물류 / 밤 근무</div>
+      <div class="char-line">밤에 일해서 늘 졸린, 그런데 상자 하나 안 빠뜨리는 친구</div>
+    </div>
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_peanut_1792928274365.webp" alt="땅콩">
+      <div class="char-name jua">땅콩</div>
+      <div class="char-job jua">MD / 상품 품평</div>
+      <div class="char-line">겉은 딱딱 속은 고소, "괜찮네" 하면 진짜 괜찮은 물건</div>
+    </div>
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_peas_1792928275878.webp" alt="완두콩 삼형제">
+      <div class="char-name jua">완두콩 삼형제</div>
+      <div class="char-job jua">콘텐츠 팀</div>
+      <div class="char-line">한 꼬투리에서 같이 튀어나온 세 알, 셋이 모여야 한 문장</div>
+    </div>
+    <div class="char-card">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_sunflower_1792928280436.webp" alt="해바라기씨">
+      <div class="char-name jua">해바라기씨</div>
+      <div class="char-job jua">마케팅 / 소식 이벤트</div>
+      <div class="char-line">해를 따라 고개 돌리듯 좋은 소식을 따라다니는 분위기 메이커</div>
+    </div>
+    <div class="char-card wide">
+      <img src="https://cdn.sixshop.io/sf-gateway/public/stores/mumutori/themes/d3_rice_1792928278922.webp" alt="쌀">
+      <div class="char-name jua">쌀</div>
+      <div class="char-job jua">매장지기 / 손님 맞이</div>
+      <div class="char-line">말은 작지만 손님 얼굴을 다 기억하는 따뜻한 한 알</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="jua">무무토리에서 할 수 있는 것</h2>
+  <div class="can-do">
+    🛍️ <a href="https://mumutori.com/">소품 구경하기</a> — 매장과 온라인에서 씨앗 친구들이 고른 소품을 만나요.<br><br>
+    ✉️ <a href="https://letter.mumutori.com/">타자기 편지 쓰기</a> — 마음을 담아 편지를 보내는 레터 서비스예요.
+  </div>
+</section>
+
+<section class="cta">
+  <a class="btn jua" href="https://mumutori.com/?utm_source=store_qr&utm_medium=table&utm_campaign=about">몰 구경하기</a>
+  <a class="btn small jua" href="https://pf.kakao.com/_lqpZX?utm_source=store_qr&utm_medium=table&utm_campaign=about">카카오 채널 추가</a>
+</section>
+
+</main>
+<footer>© 2026 Mumutori Company</footer>
+</body>
+</html>
