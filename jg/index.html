@@ -11,9 +11,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="진격의오피스">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
+<!-- 캐시 우회: 버전이 바뀔 때마다 이 숫자(아래 스크립트 VERSION과 동일)를 올려서
+     아이패드 홈 화면 아이콘이 옛 판을 들고 있지 않게 함 -->
+<link rel="apple-touch-icon" href="icons/icon-180.png?v=2026-11-17-1">
+<link rel="manifest" href="manifest.json?v=2026-11-17-1">
+<link rel="icon" href="icons/icon-192.png?v=2026-11-17-1">
 
 <style>
   :root{ --ink:#682301; --caramel:#9F5528; --card:#FCF7E5; }
@@ -33,6 +35,8 @@
 
   /* 화면에 실제로 보이는 건 이 캔버스 하나뿐 — 1층 카메라(손님 얼굴) 위에 2층 사무실(유리창 자리만 뚫림)을 매 프레임 합성 */
   #stageCanvas{position:absolute;inset:0;width:100%;height:100%;background:#000;display:block}
+  /* 숨은 조절 화면이 켜졌을 때만 보이는 감지 상자 오버레이(얼굴=초록, 몸=파랑) — 평소엔 안 보이고 계산 비용도 없음 */
+  #overlayCanvas{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none}
 
   /* 원본 영상 소스 — 화면에 직접 보이지 않고 캔버스로 그려 넣는 재료로만 씀(디코딩은 계속 돎) */
   .srcVideo{position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
@@ -58,6 +62,26 @@
     position:absolute; left:14px; top:12px; z-index:6; display:none;
     background:rgba(180,40,20,.75); color:#fff; font-size:11.5px; padding:6px 10px; border-radius:8px;
   }
+
+  /* 왼쪽 위 구석 — 눈에 보이지 않는 탭 영역(5번 연속 탭하면 조절 화면 켜짐/꺼짐) */
+  #cornerTap{position:fixed; left:0; top:0; width:72px; height:72px; z-index:20; background:transparent}
+
+  /* 숨은 조절 화면 — 사장님이 매장에서 직접 민감도를 맞출 때만 씀 */
+  #debugPanel{
+    position:absolute; right:10px; top:10px; z-index:15; display:none;
+    width:250px; max-height:calc(100% - 20px); overflow:auto;
+    background:rgba(10,10,10,.82); color:#eee; font-size:12px; line-height:1.5;
+    border-radius:10px; padding:12px 13px; -webkit-backdrop-filter:blur(2px);
+  }
+  #debugPanel h4{margin:0 0 6px; font-size:13px; color:#FCF7E5}
+  #debugPanel .row{display:flex; justify-content:space-between; margin:3px 0}
+  #debugPanel label{display:block; margin-top:10px; font-size:11.5px; opacity:.85}
+  #debugPanel input[type=range]{width:100%}
+  #debugPanel button{
+    margin-top:10px; width:100%; padding:8px; border:none; border-radius:8px;
+    background:var(--card); color:var(--ink); font-weight:700; font-size:12px; cursor:pointer;
+  }
+  #debugPanel .ver{opacity:.55; font-size:10.5px; margin-top:10px}
 </style>
 </head>
 <body>
@@ -66,11 +90,12 @@
   <div class="stage">
     <div class="frame" id="frame">
       <canvas id="stageCanvas" width="1280" height="720"></canvas>
+      <canvas id="overlayCanvas" width="1280" height="720"></canvas>
       <!-- 1층: 손님 얼굴 카메라(상시 재생) — 유리창 자리를 뚫어 놓은 2층 사무실 영상 밑에 항상 깔려 있음 -->
       <video id="camVideo" class="srcVideo" muted playsinline webkit-playsinline></video>
       <!-- 2층: 사무실(평소: idle_key.mp4 / 반응: reaction_key.mp4) — 유리창 자리는 초록(#00FF00)으로 렌더되어 있고
            브라우저에서 그 초록만 실시간으로 투명 처리해 밑의 카메라가 비쳐 보이게 함 -->
-      <video id="bgVideo" class="srcVideo" src="assets/idle_key.mp4" poster="assets/idle_key_poster.jpg"
+      <video id="bgVideo" class="srcVideo" src="assets/idle_key.mp4?v=2026-11-17-1" poster="assets/idle_key_poster.jpg?v=2026-11-17-1"
              autoplay muted loop playsinline webkit-playsinline></video>
     </div>
   </div>
@@ -83,30 +108,74 @@
        카메라 화면은 저장·전송되지 않고 이 화면 안에서만 바로 쓰여요.</p>
     <button id="startBtn">탭해서 시작하기</button>
   </div>
+
+  <!-- 왼쪽 위 구석 5번 연속 탭 → 숨은 조절 화면 -->
+  <div id="cornerTap"></div>
+
+  <div id="debugPanel">
+    <h4>숨은 조절 화면</h4>
+    <div class="row"><span>얼굴 비율</span><span id="dbgFaceRatio">-</span></div>
+    <div class="row"><span>몸 높이 비율</span><span id="dbgBodyRatio">-</span></div>
+    <div class="row"><span>초당 감지</span><span id="dbgFps">-</span></div>
+    <div class="row"><span>얼굴 가속</span><span id="dbgFaceDelegate">-</span></div>
+    <div class="row"><span>몸 가속</span><span id="dbgBodyDelegate">-</span></div>
+
+    <label>감도(얼굴 크기 기준) <span id="threshVal">0.15</span></label>
+    <input type="range" id="threshSlider" min="0.08" max="0.40" step="0.01" value="0.15">
+
+    <label>확신도 <span id="confVal">0.30</span></label>
+    <input type="range" id="confSlider" min="0.2" max="0.7" step="0.01" value="0.3">
+
+    <button id="resetBtn">기본값으로</button>
+    <div class="ver">버전 2026-11-17-1</div>
+  </div>
 </div>
 
 <script type="module">
-// ===== 진격의 오피스 — 아이패드 웹앱 시험판 =====
-// 얼굴 인식: Google MediaPipe Face Detection (@mediapipe/tasks-vision), 전부 브라우저(WASM) 안에서만 돎.
+// ===== 진격의 오피스 — 아이패드 웹앱 시험판 (인식률 개선판) =====
+// 얼굴 인식: Google MediaPipe Face Detection, 몸(사람) 인식: MediaPipe Object Detection.
+// 둘 다 @mediapipe/tasks-vision, 전부 브라우저(WASM/WebGL) 안에서만 돎 — 서버 전송 없음.
 // CDN 버전은 임의로 고른 숫자가 아니라, 구글 공식 mediapipe-samples-web 저장소(package.json)에
-// 실제로 쓰고 있는 버전(1.2.3)을 확인하고 그대로 고정했어요. (2026-11-16 확인)
-import { FilesetResolver, FaceDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
+// 실제로 쓰고 있는 버전(1.2.3)을 확인하고 그대로 고정했어요. (2026-11-16 확인, 이번 개선에서도 그대로 유지)
+import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
+
+const VERSION = '2026-11-17-1';
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
-const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+// 얼굴: blaze_face_short_range(기존과 동일 모델) 그대로 씀.
+// 참고: 구글 공식 mediapipe-models 저장소에 blaze_face_full_range도 실제로 있는 것을 WebFetch로
+// HEAD 확인했음(200, 1,083,786B, storage.googleapis.com/mediapipe-models/face_detector/blaze_face_full_range/float16/1/blaze_face_full_range.tflite,
+// 2026-11-17 확인). 하지만 크롬 가짜 카메라로 직접 재 보니 full_range 모델은 실제 얼굴 크기와 무관하게
+// 박스 폭이 항상 카메라 프레임의 4~6%만큼으로 작게 나와(이 페이지의 가로폭 비율 기준 설계와 안 맞음),
+// "가까우면 큰 박스"라는 전제가 깨져서 쓰지 않기로 했음(기준값을 처음부터 다시 설계해야 해서 시간상 보류).
+// 그래서 4번 항목은 지시대로 "가운데 확대 보조 검사" 방식으로 구현함(아래 loop()의 홀/짝 프레임 분기).
+const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+// 몸(사람): efficientdet_lite0 — 같은 저장소에서 존재 확인(200, float16, 7,254,339B). (2026-11-17 확인)
+const BODY_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite";
 
-// ---- 발동 기준값 (현장에서 눈으로 보며 다시 맞춰야 하는 시작값) ----
-const THRESH = 0.38;          // 감지된 얼굴 가로폭 / 카메라 프레임 가로폭 — 0.35~0.40 중 시작값
-const DEBOUNCE_MS = 400;      // 이만큼 계속 기준을 넘어야 발동(손이 휙 지나가는 오작동 방지)
-const COOLDOWN_MS = 6000;     // 반응이 끝난 뒤, 같은 사람이 그대로 서있어도 바로 또 터지지 않게 쉬는 시간
-const REACTION_FALLBACK_MS = 12000; // reaction_key.mp4 실제 길이(~10.6초)보다 넉넉히 — ended 이벤트가 안 뜰 때 대비
+// ---- 발동 기준값 (숨은 조절 화면 슬라이더로 매장에서 바로 바꿀 수 있음) ----
+const DEFAULT_THRESH = 0.15;     // 감지된 얼굴 가로폭 / 카메라 프레임 가로폭 — 시작값(전: 0.38)
+const DEFAULT_CONF = 0.3;        // 얼굴 인식 확신도(minDetectionConfidence) — 시작값(전: 0.5)
+const THRESH_MIN = 0.08, THRESH_MAX = 0.40;
+const CONF_MIN = 0.2, CONF_MAX = 0.7;
+let THRESH = DEFAULT_THRESH;
+let FACE_CONF = DEFAULT_CONF;
 
-// ---- 유리창 실시간 합성(크로마키) 기준값 ----
-// 2층(사무실) 영상은 유리창 자리를 초록(#00FF00)으로 렌더해 뒀음 — 매 프레임 그 초록만 투명으로 바꿔
-// 1층 카메라가 비쳐 보이게 함. KEY_LO~KEY_HI 사이에서 서서히 투명해지도록(가장자리 부드럽게, 딱 잘린 티 안 나게).
+// 흔들림 견디기: "0.4초 연속" 대신 "최근 6번 감지 중 3번 이상" — 한 프레임 놓쳐도 처음부터 다시 세지 않음
+const HISTORY_LEN = 6;
+const HISTORY_TRIGGER = 3;
+let faceHistory = [];
+
+// 몸(사람) 감지 — 얼굴을 못 찾아도(옆얼굴·고개 숙임 등) 몸 상자가 크면 발동
+const BODY_SCORE_THRESH = 0.4;         // ObjectDetector 자체 scoreThreshold와 동일 값(이중 확인)
+const BODY_HEIGHT_RATIO_THRESH = 0.45; // 몸 상자 높이 / 카메라 프레임 높이
+const BODY_CHECK_EVERY_N_FRAMES = 3;   // 아이패드 부담 줄이기: 얼굴은 매 프레임, 몸은 3프레임마다
+
+const COOLDOWN_MS = 6000;     // 그대로 둠
+const REACTION_FALLBACK_MS = 12000; // 그대로 둠
+
+// ---- 유리창 실시간 합성(크로마키) 기준값 — 이번 개선에서 손대지 않음 ----
 const KEY_LO = 40, KEY_HI = 95;
-// 합성(크로마키 다시 계산)은 최대 30fps로 제한 — 아이패드 사파리에서 60fps CPU 픽셀 처리를 못 미더워서 둔 안전장치.
-// 카메라 자체는 이 제한 없이 매 프레임(화면 주사율만큼, 보통 60Hz) 그려서 움직임은 매끄럽게 보이게 함.
 const KEY_FPS_CAP = 30;
 const KEY_INTERVAL_MS = 1000 / KEY_FPS_CAP;
 
@@ -115,6 +184,26 @@ const camVideo = document.getElementById('camVideo');
 const stageCanvas = document.getElementById('stageCanvas');
 const ctx = stageCanvas.getContext('2d', { alpha: false });
 const CW = stageCanvas.width, CH = stageCanvas.height;
+
+const overlayCanvas = document.getElementById('overlayCanvas');
+const overlayCtx = overlayCanvas.getContext('2d');
+
+// 가운데 확대 보조 검사: 홀수 프레임은 카메라 전체 화면, 짝수 프레임은 가운데 60%만 잘라 확대해서
+// 같은 얼굴 모델에 다시 넣어 봄 — 조금 먼 얼굴도 화면에서 차지하는 비율이 커져서 잡히기 쉬워짐.
+const CROP_RATIO = 0.6; // 가운데 60%만 씀(가로·세로 각각)
+const cropCanvas = document.createElement('canvas');
+const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+let cropCanvasSized = false;
+// 카메라 실제 가로세로 비율을 알고 난 뒤 딱 그 비율로 cropCanvas 크기를 잡음(한 번만) —
+// 고정된 16:9 캔버스에 억지로 욱여넣으면 비율이 눌려서 박스가 길쭉하게 틀어지는 문제가 있었음(시험 중 발견).
+function ensureCropCanvasSized(){
+  if (cropCanvasSized) return;
+  const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+  if (!vw || !vh) return;
+  cropCanvas.width = Math.round(vw * CROP_RATIO);
+  cropCanvas.height = Math.round(vh * CROP_RATIO);
+  cropCanvasSized = true;
+}
 
 // 오프스크린 캔버스 2장: keySrc(2층 원본 프레임) → keyed(초록 뺀 결과, 다음 카메라 프레임 위에 얹힐 때까지 재사용)
 const keySrc = document.createElement('canvas'); keySrc.width = CW; keySrc.height = CH;
@@ -126,40 +215,127 @@ const startOverlay = document.getElementById('startOverlay');
 const startBtn = document.getElementById('startBtn');
 const camError = document.getElementById('camError');
 
-let state = 'idle';           // idle | triggered | cooldown  (watching 은 idle 안에 포함)
-let aboveSince = null;
-let detector = null;
+// ---- 숨은 조절 화면 ----
+const debugPanel = document.getElementById('debugPanel');
+const cornerTap = document.getElementById('cornerTap');
+const threshSlider = document.getElementById('threshSlider');
+const confSlider = document.getElementById('confSlider');
+const threshVal = document.getElementById('threshVal');
+const confVal = document.getElementById('confVal');
+const resetBtn = document.getElementById('resetBtn');
+const dbgFaceRatio = document.getElementById('dbgFaceRatio');
+const dbgBodyRatio = document.getElementById('dbgBodyRatio');
+const dbgFps = document.getElementById('dbgFps');
+const dbgFaceDelegate = document.getElementById('dbgFaceDelegate');
+const dbgBodyDelegate = document.getElementById('dbgBodyDelegate');
+
+// localStorage는 숫자/불값만 저장(카메라 화면·사진은 절대 저장하지 않음). try/catch로 감싸서 막히면 그냥 기본값 사용.
+const LS_KEYS = { panel: 'jg_panel_open', thresh: 'jg_thresh', conf: 'jg_conf' };
+function lsGet(key, fallback){
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : (v === 'true' ? true : (v === 'false' ? false : fallback));
+  } catch(e){ return fallback; }
+}
+function lsSet(key, value){
+  try { localStorage.setItem(key, String(value)); } catch(e){ /* 저장 안 되면 그냥 무시 */ }
+}
+
+let state = 'idle';           // idle | triggered | cooldown
+let detector = null;          // 얼굴
+let bodyDetector = null;      // 몸(사람) — 모델이 없거나 초기화 실패하면 null로 남고 기능만 꺼짐
+let faceDelegate = '-';
+let bodyDelegate = '-';
 let fallbackTimer = null;
 let lastKeyTime = -Infinity;
+let frameCount = 0;
+let panelOpen = false;
 
-async function initDetector(){
+// 디버그 표시용 최신 값
+let lastFaceRatio = 0, lastBodyRatio = 0;
+let lastFaceBoxes = [], lastBodyBoxes = [];
+let detCountWindow = []; // 최근 1초 안의 감지 실행 타임스탬프(얼굴+몸 합산) — 초당 감지 횟수 표시용
+
+// ---- GPU 우선, 실패하면 CPU로 자동 전환 ----
+async function createWithDelegate(createFn, label){
+  try {
+    const d = await createFn('GPU');
+    return { d, delegate: 'GPU' };
+  } catch(e){
+    console.warn(label + ' GPU 딜리게이트 실패 → CPU로 전환:', e);
+    const d = await createFn('CPU');
+    return { d, delegate: 'CPU' };
+  }
+}
+
+async function initDetectors(){
   const vision = await FilesetResolver.forVisionTasks(WASM_BASE);
-  detector = await FaceDetector.createFromOptions(vision, {
-    baseOptions: { modelAssetPath: MODEL_URL },
+
+  const face = await createWithDelegate((delegate) => FaceDetector.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
     runningMode: 'VIDEO',
-    minDetectionConfidence: 0.5,
-  });
+    minDetectionConfidence: FACE_CONF,
+  }), '얼굴 인식');
+  detector = face.d;
+  faceDelegate = face.delegate;
+
+  try {
+    const body = await createWithDelegate((delegate) => ObjectDetector.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: BODY_MODEL_URL, delegate },
+      runningMode: 'VIDEO',
+      maxResults: 5,
+      scoreThreshold: BODY_SCORE_THRESH,
+      categoryAllowlist: ['person'],
+    }), '몸 인식');
+    bodyDetector = body.d;
+    bodyDelegate = body.delegate;
+  } catch(e){
+    console.warn('몸 인식기(ObjectDetector) 초기화 실패 — 몸 감지 없이 얼굴 인식만으로 진행:', e);
+    bodyDetector = null;
+    bodyDelegate = 'off';
+  }
+  updateDebugDelegates();
 }
 
 async function startCamera(){
   // 카메라 프레임은 어디에도 저장·전송하지 않음 — srcObject로 캔버스에 바로 그려 넣고,
-  // 얼굴 인식도 메모리 안 videoFrame만 보고 즉시 버림(녹화·캡처 코드 없음).
+  // 얼굴·몸 인식도 메모리 안 videoFrame만 보고 즉시 버림(녹화·캡처 코드 없음).
   const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
   camVideo.srcObject = stream;
   await camVideo.play();
 }
 
 // 카메라 프레임을 "거울처럼" 캔버스 전체에 cover(꽉 채우기)로 그림
-function drawCameraCover(){
+function camCoverGeometry(){
   const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
-  if (!vw || !vh) return;
+  if (!vw || !vh) return null;
   const scale = Math.max(CW / vw, CH / vh);
   const dw = vw * scale, dh = vh * scale;
   const dx = (CW - dw) / 2, dy = (CH - dh) / 2;
+  return { vw, vh, scale, dw, dh, dx, dy };
+}
+
+function drawCameraCover(){
+  const g = camCoverGeometry();
+  if (!g) return;
   ctx.save();
   ctx.translate(CW, 0); ctx.scale(-1, 1); // 좌우 반전(셀피 거울)
-  ctx.drawImage(camVideo, CW - dx - dw, dy, dw, dh);
+  ctx.drawImage(camVideo, CW - g.dx - g.dw, g.dy, g.dw, g.dh);
   ctx.restore();
+}
+
+// 카메라 원본 픽셀 좌표의 박스(원점 vx,vy, 크기 bw,bh)를 거울 반전+cover된 화면 좌표로 바꿔줌
+// (조절 화면의 감지 상자 표시가 실제로 보이는 얼굴·몸 위치에 겹치도록)
+function mapBoxToScreen(box){
+  const g = camCoverGeometry();
+  if (!g) return null;
+  const x = g.dx + g.dw - (box.originX + box.width) * g.scale;
+  const y = g.dy + box.originY * g.scale;
+  const w = box.width * g.scale;
+  const h = box.height * g.scale;
+  return { x, y, w, h };
 }
 
 // 2층(사무실) 영상을 오프스크린에 그대로 그린 뒤, 초록(유리창 자리)만 투명으로 바꿔 keyed 캔버스에 저장
@@ -194,35 +370,144 @@ function renderLoop(ts){
     recomputeKeyedLayer();
   }
   ctx.drawImage(keyed, 0, 0, CW, CH); // 캐시된(최근 계산된) 키잉 결과를 매 프레임 그 위에 얹음 — 카메라는 항상 매끄럽게 움직임
+  if (panelOpen) drawOverlay();
+}
+
+function drawOverlay(){
+  overlayCtx.clearRect(0, 0, CW, CH);
+  overlayCtx.lineWidth = 3;
+  overlayCtx.font = '20px system-ui';
+  overlayCtx.strokeStyle = '#2ecc40';
+  for (const box of lastFaceBoxes){
+    const s = mapBoxToScreen(box);
+    if (!s) continue;
+    overlayCtx.strokeRect(s.x, s.y, s.w, s.h);
+  }
+  overlayCtx.strokeStyle = '#1e8fff';
+  for (const box of lastBodyBoxes){
+    const s = mapBoxToScreen(box);
+    if (!s) continue;
+    overlayCtx.strokeRect(s.x, s.y, s.w, s.h);
+  }
+}
+
+function noteDetectionTick(){
+  const now = performance.now();
+  detCountWindow.push(now);
+  while (detCountWindow.length && now - detCountWindow[0] > 1000) detCountWindow.shift();
+  if (panelOpen) dbgFps.textContent = detCountWindow.length + '회/초';
+}
+
+// 홀수 프레임: 카메라 전체 화면을 그대로 얼굴 모델에 넣음.
+// 짝수 프레임: 가운데 60%만 잘라 cropCanvas(640x360)에 확대해서 넣고, 결과 박스 좌표를
+// 다시 "카메라 전체 화면" 기준으로 환산함 — 그래야 THRESH(가로 비율) 계산이 두 경우 모두 똑같이 맞음.
+function runFaceDetection(){
+  const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+  const useCrop = (frameCount % 2 === 0) && vw && vh;
+  let result = null;
+  try {
+    if (useCrop){
+      ensureCropCanvasSized();
+      const cropW = vw * CROP_RATIO, cropH = vh * CROP_RATIO;
+      const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2;
+      cropCtx.drawImage(camVideo, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
+      result = detector.detectForVideo(cropCanvas, performance.now());
+      if (result && result.detections){
+        const sx = cropW / cropCanvas.width, sy = cropH / cropCanvas.height;
+        for (const d of result.detections){
+          if (!d.boundingBox) continue;
+          const bb = d.boundingBox;
+          d.boundingBox = {
+            originX: cropX + bb.originX * sx,
+            originY: cropY + bb.originY * sy,
+            width: bb.width * sx,
+            height: bb.height * sy,
+            angle: bb.angle,
+          };
+        }
+      }
+    } else {
+      result = detector.detectForVideo(camVideo, performance.now());
+    }
+  } catch(e){ result = null; }
+  return result;
 }
 
 function loop(){
-  if (detector && camVideo.readyState >= 2 && state === 'idle'){
-    let result;
-    try { result = detector.detectForVideo(camVideo, performance.now()); }
-    catch(e){ result = null; }
-    if (result) handleDetections(result.detections || []);
+  frameCount++;
+  if (state === 'idle'){
+    if (detector && camVideo.readyState >= 2){
+      const result = runFaceDetection();
+      noteDetectionTick();
+      if (result) handleFaceDetections(result.detections || []);
+    }
+    if (bodyDetector && camVideo.readyState >= 2 && frameCount % BODY_CHECK_EVERY_N_FRAMES === 0){
+      let result;
+      try { result = bodyDetector.detectForVideo(camVideo, performance.now()); }
+      catch(e){ result = null; }
+      noteDetectionTick();
+      if (result) handleBodyDetections(result.detections || []);
+    }
   }
+  if (panelOpen){
+    dbgFaceRatio.textContent = lastFaceRatio.toFixed(2);
+    dbgBodyRatio.textContent = lastBodyRatio.toFixed(2);
+  }
+  // 시험 자동화용 숫자 상태만 노출(화면·사진 저장 아님) — 매장 배포본에도 있어도 무해하지만
+  // 값만 읽는 용도. 녹화·캡처·전송 코드는 없음.
+  window.__jgDebug = {
+    state, lastFaceRatio, lastBodyRatio, THRESH, FACE_CONF,
+    faceDelegate, bodyDelegate, panelOpen, detPerSec: detCountWindow.length, version: VERSION,
+    faceBoxCount: lastFaceBoxes.length, faceBox0: lastFaceBoxes[0] || null,
+    bodyBoxCount: lastBodyBoxes.length, bodyBox0: lastBodyBoxes[0] || null,
+    camW: camVideo.videoWidth, camH: camVideo.videoHeight,
+  };
   requestAnimationFrame(loop);
 }
 
-function handleDetections(dets){
+function handleFaceDetections(dets){
   let maxRatio = 0;
+  const boxes = [];
   for (const d of dets){
-    const bw = d.boundingBox ? d.boundingBox.width : 0;
+    const bb = d.boundingBox;
+    if (!bb) continue;
+    boxes.push(bb);
     const vw = camVideo.videoWidth || 1;
-    const ratio = bw / vw;
+    const ratio = bb.width / vw;
     if (ratio > maxRatio) maxRatio = ratio;
   }
-  const now = performance.now();
-  if (maxRatio >= THRESH){
-    if (aboveSince === null) aboveSince = now;
-    if (now - aboveSince >= DEBOUNCE_MS){
-      aboveSince = null;
-      trigger();
-    }
-  } else {
-    aboveSince = null;
+  lastFaceRatio = maxRatio;
+  lastFaceBoxes = boxes;
+
+  // 흔들림 견디기: 최근 6번 감지 중 3번 이상 기준을 넘으면 발동(한 프레임 놓쳐도 처음부터 다시 세지 않음)
+  faceHistory.push(maxRatio >= THRESH);
+  if (faceHistory.length > HISTORY_LEN) faceHistory.shift();
+  const aboveCount = faceHistory.reduce((a,b) => a + (b ? 1 : 0), 0);
+  if (aboveCount >= HISTORY_TRIGGER){
+    faceHistory = [];
+    trigger();
+  }
+}
+
+function handleBodyDetections(dets){
+  let maxHeightRatio = 0;
+  const boxes = [];
+  for (const d of dets){
+    const bb = d.boundingBox;
+    if (!bb) continue;
+    const isPerson = !d.categories || d.categories.some(c => c.categoryName === 'person' && c.score >= BODY_SCORE_THRESH);
+    if (!isPerson) continue;
+    boxes.push(bb);
+    const vh = camVideo.videoHeight || 1;
+    const ratio = bb.height / vh;
+    if (ratio > maxHeightRatio) maxHeightRatio = ratio;
+  }
+  lastBodyRatio = maxHeightRatio;
+  lastBodyBoxes = boxes;
+
+  // 얼굴을 못 찾아도(옆얼굴·고개 숙임·마스크 등) 몸 상자가 화면의 0.45 이상이면 바로 발동
+  if (maxHeightRatio >= BODY_HEIGHT_RATIO_THRESH){
+    trigger();
   }
 }
 
@@ -230,8 +515,8 @@ function trigger(){
   if (state !== 'idle') return;
   state = 'triggered';
   bgVideo.loop = false;
-  bgVideo.src = 'assets/reaction_key.mp4';
-  bgVideo.poster = 'assets/reaction_key_poster.jpg';
+  bgVideo.src = 'assets/reaction_key.mp4?v=' + VERSION;
+  bgVideo.poster = 'assets/reaction_key_poster.jpg?v=' + VERSION;
   bgVideo.load();
   bgVideo.play().catch(()=>{});
 
@@ -246,13 +531,70 @@ function trigger(){
 
 function backToIdle(){
   bgVideo.loop = true;
-  bgVideo.src = 'assets/idle_key.mp4';
-  bgVideo.poster = 'assets/idle_key_poster.jpg';
+  bgVideo.src = 'assets/idle_key.mp4?v=' + VERSION;
+  bgVideo.poster = 'assets/idle_key_poster.jpg?v=' + VERSION;
   bgVideo.load();
   bgVideo.play().catch(()=>{});
   state = 'cooldown';
+  faceHistory = [];
   setTimeout(() => { state = 'idle'; }, COOLDOWN_MS);
 }
+
+// ---- 숨은 조절 화면: 왼쪽 위 구석 5번 연속 탭 ----
+let tapTimes = [];
+function onCornerTap(){
+  const now = performance.now();
+  tapTimes.push(now);
+  tapTimes = tapTimes.filter(t => now - t <= 2000);
+  if (tapTimes.length >= 5){
+    tapTimes = [];
+    setPanelOpen(!panelOpen);
+  }
+}
+cornerTap.addEventListener('click', onCornerTap);
+cornerTap.addEventListener('touchend', (e) => { e.preventDefault(); onCornerTap(); });
+
+function setPanelOpen(open){
+  panelOpen = open;
+  debugPanel.style.display = open ? 'block' : 'none';
+  overlayCanvas.style.display = open ? 'block' : 'none';
+  lsSet(LS_KEYS.panel, open);
+}
+
+function updateDebugDelegates(){
+  dbgFaceDelegate.textContent = faceDelegate;
+  dbgBodyDelegate.textContent = bodyDelegate;
+}
+
+function applyThresh(v){
+  THRESH = Math.min(THRESH_MAX, Math.max(THRESH_MIN, v));
+  threshSlider.value = THRESH;
+  threshVal.textContent = THRESH.toFixed(2);
+  lsSet(LS_KEYS.thresh, THRESH);
+}
+function applyConf(v){
+  FACE_CONF = Math.min(CONF_MAX, Math.max(CONF_MIN, v));
+  confSlider.value = FACE_CONF;
+  confVal.textContent = FACE_CONF.toFixed(2);
+  lsSet(LS_KEYS.conf, FACE_CONF);
+  if (detector && detector.setOptions){
+    detector.setOptions({ minDetectionConfidence: FACE_CONF }).catch(()=>{});
+  }
+}
+
+threshSlider.addEventListener('input', (e) => applyThresh(Number(e.target.value)));
+confSlider.addEventListener('input', (e) => applyConf(Number(e.target.value)));
+resetBtn.addEventListener('click', () => { applyThresh(DEFAULT_THRESH); applyConf(DEFAULT_CONF); });
+
+// 새로고침 뒤에도 조절 화면 상태·슬라이더 값 유지(숫자만 저장, 카메라 화면·사진은 저장하지 않음)
+(function restoreFromStorage(){
+  THRESH = Math.min(THRESH_MAX, Math.max(THRESH_MIN, lsGet(LS_KEYS.thresh, DEFAULT_THRESH)));
+  FACE_CONF = Math.min(CONF_MAX, Math.max(CONF_MIN, lsGet(LS_KEYS.conf, DEFAULT_CONF)));
+  threshSlider.value = THRESH; threshVal.textContent = THRESH.toFixed(2);
+  confSlider.value = FACE_CONF; confVal.textContent = FACE_CONF.toFixed(2);
+  const wasOpen = lsGet(LS_KEYS.panel, false) === true;
+  setPanelOpen(wasOpen);
+})();
 
 startBtn.addEventListener('click', async () => {
   startOverlay.style.display = 'none';
@@ -260,10 +602,10 @@ startBtn.addEventListener('click', async () => {
   requestAnimationFrame(renderLoop); // 카메라가 아직 없어도 사무실 쪽은 바로 그리기 시작(까맣게 비지 않게)
   try {
     await startCamera();
-    await initDetector();
+    await initDetectors();
     loop();
   } catch(e){
-    console.error('카메라 · 얼굴인식 시작 실패:', e);
+    console.error('카메라 · 얼굴/몸 인식 시작 실패:', e);
     camError.style.display = 'block';
   }
 });
