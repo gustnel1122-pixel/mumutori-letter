@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="무무토리 매장 전시용 — 진격의 오피스 3D 시험판 (비공개, 테스트 전용)">
+<meta name="robots" content="noindex">
+<title>진격의 오피스 — 3D 시험판 (비공개)</title>
+
+<style>
+  :root{ --ink:#682301; --caramel:#9F5528; --card:#FCF7E5; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0e0e0e;overflow:hidden;
+    font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+
+  #stageWrap{position:fixed;inset:0;background:#0e0e0e}
+  #glCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  .srcVideo{position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+
+  #fpsBox{
+    position:absolute; right:10px; bottom:10px; z-index:5;
+    background:rgba(0,0,0,.55); color:#9f6; font-size:13px; font-weight:700;
+    padding:5px 10px; border-radius:8px; pointer-events:none; font-variant-numeric:tabular-nums;
+  }
+  .caption{
+    position:absolute; left:14px; bottom:12px; z-index:5;
+    background:rgba(0,0,0,.55); color:#fff; font-size:11px; line-height:1.3;
+    padding:5px 10px; border-radius:999px; letter-spacing:.2px; pointer-events:none;
+  }
+
+  #startOverlay{
+    position:absolute; inset:0; z-index:10; background:rgba(14,14,14,.86);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#FCF7E5;
+    text-align:center; padding:24px;
+  }
+  #startOverlay button{
+    font-size:18px; font-weight:700; padding:14px 30px; border-radius:999px; border:none;
+    background:var(--card); color:var(--ink); cursor:pointer;
+  }
+  #startOverlay p{font-size:13px; opacity:.8; max-width:380px; margin:0}
+  #loadingMsg{font-size:13px; opacity:.7}
+  #camError{
+    position:absolute; left:14px; top:12px; z-index:6; display:none;
+    background:rgba(180,40,20,.75); color:#fff; font-size:11.5px; padding:6px 10px; border-radius:8px;
+  }
+
+  #cornerTap{position:fixed; left:0; top:0; width:72px; height:72px; z-index:20; background:transparent}
+
+  #debugPanel{
+    position:absolute; right:10px; top:10px; z-index:15; display:none;
+    width:250px; max-height:calc(100% - 20px); overflow:auto;
+    background:rgba(10,10,10,.82); color:#eee; font-size:12px; line-height:1.5;
+    border-radius:10px; padding:12px 13px; -webkit-backdrop-filter:blur(2px);
+  }
+  #debugPanel h4{margin:0 0 6px; font-size:13px; color:#FCF7E5}
+  #debugPanel .row{display:flex; justify-content:space-between; margin:3px 0; gap:8px}
+  #debugPanel label{display:block; margin-top:10px; font-size:11.5px; opacity:.85}
+  #countBtns{display:flex; gap:6px; margin-top:6px}
+  #countBtns button{
+    flex:1; padding:7px 0; border:1px solid rgba(255,255,255,.25); border-radius:7px;
+    background:rgba(255,255,255,.08); color:#eee; font-size:12px; cursor:pointer;
+  }
+  #countBtns button.active{background:var(--card); color:var(--ink); font-weight:700; border-color:var(--card)}
+  #debugPanel .ver{opacity:.55; font-size:10.5px; margin-top:10px}
+</style>
+</head>
+<body>
+
+<div id="stageWrap">
+  <canvas id="glCanvas"></canvas>
+  <!-- 감지용 카메라(화면에 보이지 않음, MediaPipe 입력 재료로만 씀) -->
+  <video id="camVideo" class="srcVideo" muted playsinline webkit-playsinline></video>
+
+  <div id="fpsBox">FPS -</div>
+  <div class="caption">3D 시험판 · noindex · 카메라 화면은 저장되지 않아요</div>
+  <div id="camError">카메라 · 얼굴인식을 시작하지 못했어요 (3D 장면은 그대로 동작, 레벨은 항상 0)</div>
+
+  <div id="startOverlay">
+    <div style="font-size:22px;font-weight:700">진격의 오피스 — 3D 시험판</div>
+    <p>안에서 사는 친구들을 3D로 띄워 보는 비공개 테스트 페이지예요. 탭하면 카메라 얼굴 인식이 시작돼요(저장·전송 없음).
+       왼쪽 위 구석을 5번 빠르게 탭하면 숨은 조절 화면이 나와요.</p>
+    <div id="loadingMsg"></div>
+    <button id="startBtn">탭해서 시작하기</button>
+  </div>
+
+  <div id="cornerTap"></div>
+
+  <div id="debugPanel">
+    <h4>숨은 조절 화면 — 3D 시험판</h4>
+    <div class="row"><span>FPS</span><span id="dbgFps">-</span></div>
+    <div class="row"><span>감지 횟수(목표 7회/초)</span><span id="dbgDetFps">-</span></div>
+    <div class="row"><span>얼굴 비율</span><span id="dbgFaceRatio">-</span></div>
+    <div class="row"><span>몸 높이 비율</span><span id="dbgBodyRatio">-</span></div>
+    <div class="row"><span>현재 레벨</span><span id="dbgLevel">0</span></div>
+    <div class="row"><span>얼굴 가속</span><span id="dbgFaceDelegate">-</span></div>
+    <div class="row"><span>삼각형 수</span><span id="dbgTris">-</span></div>
+
+    <label><input type="checkbox" id="bodyToggle"> 몸 감지 사용(무거움·기본 꺼짐)</label>
+
+    <label>친구 수</label>
+    <div id="countBtns">
+      <button data-n="2">2</button>
+      <button data-n="3">3</button>
+      <button data-n="5">5</button>
+      <button data-n="7">7</button>
+    </div>
+
+    <div class="ver">버전 2026-11-18-1 · three.js r160 · GLB 7종 11/16판</div>
+  </div>
+</div>
+
+<!-- three.js r160 고정 — importmap으로 "three" 전용 경로 지정(examples/jsm 모듈의 bare import 해석용) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+// 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
+import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
+
+const VERSION = '2026-11-18-1';
+
+// ===================================================================================
+// §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
+//    pixelRatio=1 고정 · 안티앨리어싱 끔 · 실시간 그림자 없음(발밑 동그란 그림자로 흉내) ·
+//    재질은 MeshLambertMaterial까지만(PBR 금지) · 같은 모델은 clone()만 사용.
+// ===================================================================================
+
+// ---- 얼굴/몸 인식 설정 (jg/index.html과 동일 패턴 재사용) ----
+function isIOSWebKit(){
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+const IS_IOS_WEBKIT = isIOSWebKit();
+function isAndroidChrome(){
+  const ua = navigator.userAgent || '';
+  if (!/Android/.test(ua)) return false;
+  if (/SamsungBrowser|MiuiBrowser|HeyTapBrowser|NAVER|Instagram|FBAN|FBAV|wv\)/.test(ua)) return false;
+  return /Chrome\//.test(ua);
+}
+const IS_ANDROID_CHROME = isAndroidChrome();
+const FORCE_CPU_DELEGATE = IS_IOS_WEBKIT;
+
+const DETECT_FPS = 7;
+const DETECT_INTERVAL_MS = Math.round(1000 / DETECT_FPS);
+const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
+const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+const BODY_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite";
+
+// 레벨 문턱값 — jg/계획.md §1 그대로: 레벨1=0.15(기존 THRESH), 레벨2=0.28, 레벨3 몸비율=0.70(기존 0.45보다 보수적으로 올림)
+const LEVEL1_FACE_THRESH = 0.15;
+const LEVEL2_FACE_THRESH = 0.28;
+const LEVEL3_BODY_THRESH = 0.70;
+// 제 판단(2026-11-18): 계획서 §1은 레벨3을 몸 감지(기본 꺼짐) 전용으로 뒀는데, 그러면 몸 감지를
+// 켜지 않는 매장 기본값에서는 "도망" 반응이 영원히 안 나옴. 몸 감지를 안 켜도 얼굴이 화면을 매우
+// 많이 채우면(= 카메라에 바짝 붙음) 레벨3이 켜지도록 얼굴비율 보조 문턱을 추가함(사장님이 다르게
+// 정하면 바꾸면 됨).
+const LEVEL3_FACE_THRESH = 0.55;
+const BODY_SCORE_THRESH = 0.4;
+const BODY_CHECK_EVERY_N_FRAMES = 3;
+
+// 흔들림 견디기(최근 N번 중 M번) — 레벨 올릴 때/내릴 때 모두 적용해 깜빡임 방지
+const HISTORY_LEN = 6;
+const HISTORY_TRIGGER = 3;
+let levelHistory = []; // 최근 판정된 레벨값(0~3) 기록
+
+let bodyEnabled = false; // 기본 꺼짐(지시사항 그대로)
+let cropEnabled = false;
+
+const camVideo = document.getElementById('camVideo');
+const startOverlay = document.getElementById('startOverlay');
+const startBtn = document.getElementById('startBtn');
+const loadingMsg = document.getElementById('loadingMsg');
+const camError = document.getElementById('camError');
+
+let detector = null, bodyDetector = null, visionCache = null, bodyInitPromise = null;
+let faceDelegate = '-';
+let frameCount = 0;
+let lastFaceRatio = 0, lastBodyRatio = 0;
+let detCountWindow = [];
+let detectTimer = null, detectBusy = false;
+let panelOpen = false;
+
+let currentLevel = 0; // 0 없음 · 1 올려다보기 · 2 씨앗던지기 · 3 도망/숨기
+
+async function createWithDelegate(createFn, label, forceCPU){
+  if (forceCPU){ const d = await createFn('CPU'); return { d, delegate: 'CPU' }; }
+  try { const d = await createFn('GPU'); return { d, delegate: 'GPU' }; }
+  catch(e){ console.warn(label + ' GPU 실패 → CPU:', e); const d = await createFn('CPU'); return { d, delegate: 'CPU' }; }
+}
+
+async function initDetectors(){
+  visionCache = await FilesetResolver.forVisionTasks(WASM_BASE);
+  const face = await createWithDelegate((delegate) => FaceDetector.createFromOptions(visionCache, {
+    baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
+    runningMode: 'VIDEO', minDetectionConfidence: 0.3,
+  }), '얼굴 인식', FORCE_CPU_DELEGATE);
+  detector = face.d; faceDelegate = face.delegate;
+  if (panelOpen) document.getElementById('dbgFaceDelegate').textContent = faceDelegate;
+  if (bodyEnabled) await ensureBodyDetector();
+}
+async function ensureBodyDetector(){
+  if (bodyDetector || bodyInitPromise) return bodyInitPromise;
+  if (!visionCache) return null;
+  bodyInitPromise = (async () => {
+    try {
+      const body = await createWithDelegate((delegate) => ObjectDetector.createFromOptions(visionCache, {
+        baseOptions: { modelAssetPath: BODY_MODEL_URL, delegate },
+        runningMode: 'VIDEO', maxResults: 5, scoreThreshold: BODY_SCORE_THRESH, categoryAllowlist: ['person'],
+      }), '몸 인식', FORCE_CPU_DELEGATE);
+      bodyDetector = body.d;
+    } catch(e){ console.warn('몸 인식기 초기화 실패:', e); bodyDetector = null; }
+  })();
+  return bodyInitPromise;
+}
+async function startCamera(){
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false,
+  });
+  camVideo.srcObject = stream;
+  await camVideo.play();
+}
+
+function noteDetectionTick(){
+  const now = performance.now();
+  detCountWindow.push(now);
+  while (detCountWindow.length && now - detCountWindow[0] > 1000) detCountWindow.shift();
+  if (panelOpen) document.getElementById('dbgDetFps').textContent = detCountWindow.length + '회/초';
+}
+
+function handleFaceDetections(dets){
+  let maxRatio = 0;
+  for (const d of dets){
+    const bb = d.boundingBox; if (!bb) continue;
+    const vw = camVideo.videoWidth || 1;
+    const ratio = bb.width / vw;
+    if (ratio > maxRatio) maxRatio = ratio;
+  }
+  lastFaceRatio = maxRatio;
+}
+function handleBodyDetections(dets){
+  let maxHeightRatio = 0;
+  for (const d of dets){
+    const bb = d.boundingBox; if (!bb) continue;
+    const isPerson = !d.categories || d.categories.some(c => c.categoryName === 'person' && c.score >= BODY_SCORE_THRESH);
+    if (!isPerson) continue;
+    const vh = camVideo.videoHeight || 1;
+    const ratio = bb.height / vh;
+    if (ratio > maxHeightRatio) maxHeightRatio = ratio;
+  }
+  lastBodyRatio = maxHeightRatio;
+}
+
+// 이번 틱의 "순간 레벨" 판정 → 흔들림 견디기 거쳐 currentLevel 갱신
+function computeRawLevel(){
+  let lvl = 0;
+  if (lastFaceRatio >= LEVEL2_FACE_THRESH) lvl = 2;
+  else if (lastFaceRatio >= LEVEL1_FACE_THRESH) lvl = 1;
+  if (lastFaceRatio >= LEVEL3_FACE_THRESH) lvl = 3;
+  if (bodyEnabled && lastBodyRatio >= LEVEL3_BODY_THRESH) lvl = 3;
+  return lvl;
+}
+function updateLevel(){
+  const raw = computeRawLevel();
+  levelHistory.push(raw);
+  if (levelHistory.length > HISTORY_LEN) levelHistory.shift();
+  // 최근 기록 중 가장 많이 나온 값(동률이면 더 큰 레벨 우선 — 반응은 과감하게, 복귀는 조건 맞을 때만)
+  const counts = [0,0,0,0];
+  for (const v of levelHistory) counts[v]++;
+  let best = 0;
+  for (let i = 3; i >= 0; i--){ if (counts[i] >= HISTORY_TRIGGER){ best = i; break; } }
+  // 레벨을 올릴 땐 과반 전이면 바로 반응(현재값이 최근 1~2번에서 이미 나왔으면 즉시 반영해 "즉각 반응"처럼 보이게)
+  if (raw > currentLevel && counts[raw] >= 2) currentLevel = raw;
+  else currentLevel = best;
+  if (panelOpen){
+    document.getElementById('dbgLevel').textContent = currentLevel;
+    document.getElementById('dbgFaceRatio').textContent = lastFaceRatio.toFixed(2);
+    document.getElementById('dbgBodyRatio').textContent = lastBodyRatio.toFixed(2);
+  }
+  window.__jg3dDebug = {
+    version: VERSION, level: currentLevel, faceRatio: lastFaceRatio, bodyRatio: lastBodyRatio,
+    faceDelegate, bodyEnabled, friendCount, fps: lastFpsShown, detPerSec: detCountWindow.length,
+    isIOSWebKit: IS_IOS_WEBKIT, isAndroidChrome: IS_ANDROID_CHROME,
+  };
+}
+
+function runDetectTick(){
+  if (detectBusy){ scheduleDetectLoop(); return; }
+  detectBusy = true;
+  try {
+    frameCount++;
+    if (detector && camVideo.readyState >= 2){
+      let result = null;
+      try { result = detector.detectForVideo(camVideo, performance.now()); } catch(e){ result = null; }
+      noteDetectionTick();
+      if (result) handleFaceDetections(result.detections || []);
+    }
+    if (bodyEnabled && bodyDetector && camVideo.readyState >= 2 && frameCount % BODY_CHECK_EVERY_N_FRAMES === 0){
+      let result = null;
+      try { result = bodyDetector.detectForVideo(camVideo, performance.now()); } catch(e){ result = null; }
+      noteDetectionTick();
+      if (result) handleBodyDetections(result.detections || []);
+    }
+    updateLevel();
+  } finally { detectBusy = false; }
+  scheduleDetectLoop();
+}
+function scheduleDetectLoop(){ detectTimer = setTimeout(runDetectTick, DETECT_INTERVAL_MS); }
+
+// ===================================================================================
+// §1. three.js 장면 — 사무실 한 칸 + 친구들
+// ===================================================================================
+const canvas = document.getElementById('glCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'default' });
+renderer.setPixelRatio(1); // LG 울트라탭 예산 — 디바이스 픽셀비 무시
+renderer.shadowMap.enabled = false; // 실시간 그림자 없음
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x201812);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.55, 5.2);
+camera.lookAt(0, 0.75, 0);
+
+// 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순하게)
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dirLight = new THREE.DirectionalLight(0xfff2de, 0.55);
+dirLight.position.set(2, 4, 3);
+dirLight.castShadow = false;
+scene.add(dirLight);
+
+// ---- 사무실 한 칸(단순 도형, 전부 MeshLambertMaterial) ----
+const floorMat = new THREE.MeshLambertMaterial({ color: 0x8a5a33 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 14), floorMat);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+const wallMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), wallMat);
+backWall.position.set(0, 3, -4.6);
+scene.add(backWall);
+
+const sideWallMat = new THREE.MeshLambertMaterial({ color: 0xEFE2C2 });
+const sideWallL = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), sideWallMat);
+sideWallL.position.set(-8, 3, 0);
+sideWallL.rotation.y = Math.PI/2;
+scene.add(sideWallL);
+
+// 유리창(손님이 나타나는 자리 — 장식용, 카메라 영상을 입히지 않음. 1단계 2D판과 달리 3D는 메쉬 렌더링만)
+const windowMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA, transparent:true, opacity:0.55 });
+const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.4), windowMat);
+windowPane.position.set(0, 2.1, -4.55);
+scene.add(windowPane);
+const windowFrameMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
+const windowFrame = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 2.7), windowFrameMat);
+windowFrame.position.set(0, 2.1, -4.62);
+scene.add(windowFrame);
+
+// ---- 씨앗 바주카(새 소품 — 단순 원통, 복잡한 디자인 금지, 정본 색상 계열) ----
+const bazookaGroup = new THREE.Group();
+const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
+const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
+shelf.position.set(2.6, 1.3, -4.2);
+scene.add(shelf);
+const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
+const bazookaBody = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.6, 10), bazookaBodyMat);
+bazookaBody.rotation.z = Math.PI/2;
+bazookaBody.position.set(0, 0.12, 0);
+bazookaGroup.add(bazookaBody);
+const bazookaCapMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
+const bazookaCap = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.08, 10), bazookaCapMat);
+bazookaCap.rotation.z = Math.PI/2;
+bazookaCap.position.set(-0.3, 0.12, 0);
+bazookaGroup.add(bazookaCap);
+bazookaGroup.position.copy(shelf.position);
+bazookaGroup.rotation.y = -0.5; // 창 쪽을 향함
+scene.add(bazookaGroup);
+let bazookaAimT = 0;      // 레벨2 동안 누적 시간
+let bazookaNextFire = 0;  // 다음 발사 예정 시각(ms, performance.now 기준)
+
+// ---- 발밑 동그란 그림자(실시간 그림자 대신 — 그림으로 흉내) ----
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.35, depthWrite:false });
+function makeShadow(){
+  const m = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), shadowMat);
+  m.rotation.x = -Math.PI/2;
+  m.position.y = 0.01;
+  return m;
+}
+
+// ---- 씨앗 투사체 풀(동시 최대 5개 — jg/계획.md §4-1 예산) ----
+const SEED_POOL_SIZE = 5;
+const seedMat = new THREE.MeshBasicMaterial({ color: 0xDCC07A });
+const seedGeo = new THREE.SphereGeometry(0.05, 8, 6);
+const seedPool = [];
+for (let i = 0; i < SEED_POOL_SIZE; i++){
+  const mesh = new THREE.Mesh(seedGeo, seedMat);
+  mesh.visible = false;
+  scene.add(mesh);
+  seedPool.push({ mesh, active:false, start:new THREE.Vector3(), vel:new THREE.Vector3(), t0:0, dur:0.8 });
+}
+const GRAVITY = 5.5;
+const TARGET_POINT = new THREE.Vector3(0, 1.3, 5.0); // 유리창 쪽(=손님) 목표점
+function fireSeed(fromPos, big){
+  const slot = seedPool.find(s => !s.active);
+  if (!slot) return false;
+  slot.active = true;
+  slot.t0 = performance.now()/1000;
+  slot.dur = 0.75 + Math.random()*0.15;
+  slot.start.copy(fromPos);
+  const target = TARGET_POINT.clone().add(new THREE.Vector3((Math.random()-0.5)*1.2, (Math.random()-0.5)*0.5, 0));
+  const T = slot.dur;
+  slot.vel.set(
+    (target.x - fromPos.x)/T,
+    (target.y - fromPos.y)/T + 0.5*GRAVITY*T,
+    (target.z - fromPos.z)/T
+  );
+  slot.mesh.visible = true;
+  slot.mesh.scale.setScalar(big ? 1.8 : 1);
+  slot.mesh.position.copy(fromPos);
+  return true;
+}
+function updateSeeds(nowSec){
+  for (const s of seedPool){
+    if (!s.active) continue;
+    const t = nowSec - s.t0;
+    if (t >= s.dur){ s.active = false; s.mesh.visible = false; continue; }
+    s.mesh.position.set(
+      s.start.x + s.vel.x*t,
+      s.start.y + s.vel.y*t - 0.5*GRAVITY*t*t,
+      s.start.z + s.vel.z*t
+    );
+  }
+}
+
+// ===================================================================================
+// §2. 캐릭터 — GLB 로드(뼈대 없음) → 정규화(발이 바닥에, 키 1.0 기준) → clone()만 재사용
+// ===================================================================================
+// 캐릭터 정본 제약(정본 §6-2·§6-3): 몸=머리(목 없음)·짧은 팔(손가락 없음)·입 유무 캐릭터별 다름(§0 계획서 참고).
+// 다른 회사 캐릭터 요소 없음 — 공식 3D 모델 그대로, AI로 다시 그리지 않음.
+const FRIEND_DEFS = {
+  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  hideType:'scale', seedColor:0xDCC07A },
+  bam:        { file:'bam.glb',        name:'밤',         canThrow:true,  hideType:'move',  seedColor:0x7A4A2A },
+  ddangkong:  { file:'ddangkong.glb',  name:'땅콩',       canThrow:true,  hideType:'scale', seedColor:0xD9B36C },
+  byeongari:  { file:'byeongari.glb',  name:'병아리콩',   canThrow:true,  hideType:'scale', seedColor:0xE8DE9A },
+  wandukong3: { file:'wandukong3.glb', name:'완두콩삼형제', canThrow:true, hideType:'scale', seedColor:0x6FA050 },
+  haebaragi:  { file:'haebaragi.glb',  name:'해바라기씨', canThrow:false, hideType:'scale', seedColor:0xE8C23A },
+  ssal:       { file:'ssal.glb',       name:'쌀',         canThrow:true,  hideType:'scale', seedColor:0xF2EEDD },
+};
+// 2명→3명→5명→7명으로 늘어날 때 순서(시작은 반드시 도토리·밤 2명)
+const FRIEND_ORDER = ['dotori','bam','ddangkong','byeongari','wandukong3','haebaragi','ssal'];
+
+const TARGET_HEIGHT = 0.95; // 정규화 기준 키(단위: three.js 월드 유닛)
+const loader = new GLTFLoader();
+const templates = {}; // key -> normalized wrapper Object3D(템플릿, 화면에 직접 추가 안 함)
+
+function toLightMaterial(orig){
+  // PBR(MeshStandardMaterial 등) 금지 — Lambert로 치환(그림자 없음 + 가벼움), 색/텍스처는 보존
+  if (orig.isMeshLambertMaterial || orig.isMeshBasicMaterial) return orig;
+  const m = new THREE.MeshLambertMaterial({
+    map: orig.map || null,
+    color: orig.color ? orig.color.clone() : new THREE.Color(0xffffff),
+    transparent: !!orig.transparent,
+    opacity: orig.opacity !== undefined ? orig.opacity : 1,
+    alphaTest: orig.alphaTest || 0,
+    side: orig.side !== undefined ? orig.side : THREE.FrontSide,
+  });
+  return m;
+}
+
+function normalizeAndLightenModel(root){
+  root.traverse(obj => {
+    if (obj.isMesh){
+      obj.castShadow = false; obj.receiveShadow = false; // 실시간 그림자 전면 비활성(성능 예산)
+      if (Array.isArray(obj.material)) obj.material = obj.material.map(toLightMaterial);
+      else obj.material = toLightMaterial(obj.material);
+    }
+  });
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const scale = size.y > 0.0001 ? (TARGET_HEIGHT / size.y) : 1;
+  const wrapper = new THREE.Group();
+  root.position.set(-center.x, -box.min.y, -center.z);
+  wrapper.add(root);
+  wrapper.scale.setScalar(scale);
+  return wrapper;
+}
+
+async function loadFriendTemplate(key){
+  const def = FRIEND_DEFS[key];
+  const url = 'models/' + def.file;
+  const gltf = await loader.loadAsync(url);
+  const wrapper = normalizeAndLightenModel(gltf.scene);
+  templates[key] = wrapper;
+}
+async function loadAllTemplates(){
+  let done = 0;
+  for (const key of FRIEND_ORDER){
+    loadingMsg.textContent = '3D 모델 불러오는 중… (' + (done+1) + '/' + FRIEND_ORDER.length + ')';
+    await loadFriendTemplate(key);
+    done++;
+  }
+  loadingMsg.textContent = '';
+}
+
+// ---- 캐릭터 액터 ----
+const actors = []; // 현재 장면에 떠 있는 친구들
+let friendCount = 2;
+
+function deskPositionFor(index, total){
+  const spacing = 1.9;
+  const startX = -((total - 1) * spacing) / 2;
+  return new THREE.Vector3(startX + index*spacing, 0, -1.6);
+}
+
+function buildDeskAndChair(pos){
+  const g = new THREE.Group();
+  const deskMat = new THREE.MeshLambertMaterial({ color: 0x7A4A2A });
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.42, 0.42), deskMat);
+  desk.position.set(0, 0.21, -0.35);
+  g.add(desk);
+  g.position.copy(pos);
+  return g;
+}
+
+function createActor(key, index, total){
+  const def = FRIEND_DEFS[key];
+  const tmpl = templates[key];
+  const model = tmpl.clone(true); // 같은 지오메트리/재질 참조 — 가벼운 clone
+  const wrapper = new THREE.Group();
+  wrapper.add(model);
+  const deskPos = deskPositionFor(index, total);
+  wrapper.position.copy(deskPos);
+  wrapper.rotation.y = Math.PI; // 기본은 책상(안쪽)을 보고 있음(손님 반대쪽)
+  scene.add(wrapper);
+  scene.add(buildDeskAndChair(deskPos));
+  const shadow = makeShadow();
+  shadow.position.x = deskPos.x; shadow.position.z = deskPos.z;
+  scene.add(shadow);
+
+  return {
+    key, def, wrapper, model, shadow, deskPos,
+    baseRotY: Math.PI,
+    phase: Math.random()*Math.PI*2,
+    // 레벨0 유틸리티 AI
+    needs: { work: Math.random()*2, rest: Math.random(), chat: Math.random() },
+    action: 'working',
+    actionT: 0,
+    nextTickAt: 1 + Math.random()*2,
+    partnerIndex: null,
+    throwCooldown: Math.random()*0.6,
+    // 전이용 임시 스케일/오프셋(레벨 변할 때 lerp)
+    hideAmt: 0, // 0=평소 1=완전히 숨음
+    lookAmt: 0, // 0=평소 1=완전히 돌아봄
+  };
+}
+
+function clearActors(){
+  for (const a of actors){
+    scene.remove(a.wrapper);
+    scene.remove(a.shadow);
+  }
+  // 책상도 다시 그리므로 친구 배치용 오브젝트 전부 지움(바닥/벽/바주카/유리창 제외)
+  const toRemove = [];
+  scene.traverse(o => { if (o.userData && o.userData.isDesk) toRemove.push(o); });
+  for (const o of toRemove) scene.remove(o);
+  actors.length = 0;
+}
+
+function setFriendCount(n){
+  friendCount = n;
+  clearActors();
+  const keys = FRIEND_ORDER.slice(0, n);
+  keys.forEach((key, i) => {
+    const actor = createActor(key, i, keys.length);
+    actors.push(actor);
+  });
+  // 관계도(정본 §4 기반) — 가능하면 서로 말걸 상대 지정(단순 다음 인덱스와 짝)
+  actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
+  // 카메라를 친구 수에 맞춰 조금 뒤로
+  camera.position.z = 4.6 + Math.max(0, keys.length-2)*0.45;
+  camera.position.y = 1.5 + Math.max(0, keys.length-2)*0.04;
+  camera.lookAt(0, 0.75, -0.5);
+  document.querySelectorAll('#countBtns button').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.n) === n);
+  });
+}
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onResize);
+
+// ===================================================================================
+// §3. 애니메이션 — 뼈대 없이 몸 전체 변형만(스케일/회전/위치). 새 뼈대 애니메이션 절대 안 만듦.
+// ===================================================================================
+function applyWorkingBounce(a, t){
+  const bob = Math.abs(Math.sin(t*9 + a.phase)) * 0.025;
+  a.wrapper.position.y = a.deskPos.y + bob;
+  a.wrapper.rotation.z = Math.sin(t*9 + a.phase) * 0.03;
+}
+function applyCarrying(a, t){
+  const hop = Math.abs(Math.sin(t*6 + a.phase)) * 0.06;
+  a.wrapper.position.y = a.deskPos.y + hop;
+  a.wrapper.position.x = a.deskPos.x + Math.sin(t*2 + a.phase) * 0.35;
+}
+function applyDozing(a, t){
+  a.wrapper.rotation.z = Math.sin(t*0.6 + a.phase) * 0.16;
+  a.wrapper.position.y = a.deskPos.y;
+}
+function applyChatting(a, t, partner){
+  const yaw = partner ? Math.atan2(partner.deskPos.x - a.deskPos.x, partner.deskPos.z - a.deskPos.z) : 0;
+  const targetYaw = Math.PI + yaw*0.35;
+  a.wrapper.rotation.y += (targetYaw - a.wrapper.rotation.y) * 0.08;
+  a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*4 + a.phase)) * 0.02;
+}
+function applyLookup(a, t){
+  // 레벨1: 전원 손님(카메라) 쪽 — 책상 반대 방향(+z)으로 몸을 돌림(목이 따로 없어 몸 전체 회전으로 표현)
+  a.wrapper.rotation.y += (0 - a.wrapper.rotation.y) * 0.1; // 0 rad = +z(카메라) 방향
+  a.wrapper.rotation.x += (-0.08 - a.wrapper.rotation.x) * 0.1; // 살짝 뒤로 젖혀 "올려다보기"
+  a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*2 + a.phase)) * 0.015;
+}
+function applyThrowing(a, t, nowSec){
+  if (!a.def.canThrow){
+    // 해바라기씨: 태연하게 구경 — 느긋한 좌우 둘러보기만
+    a.wrapper.rotation.y = Math.sin(t*0.8)*0.25;
+    a.wrapper.rotation.x = -0.05;
+    a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*1.5 + a.phase)) * 0.012;
+    return;
+  }
+  a.wrapper.rotation.y += (0 - a.wrapper.rotation.y) * 0.15;
+  const cyclePos = (t*1.3 + a.phase) % (Math.PI*2);
+  const lean = Math.max(0, Math.sin(cyclePos)); // 앞으로 기울였다 튕김
+  a.wrapper.rotation.x = -0.1 - lean*0.35;
+  a.wrapper.position.y = a.deskPos.y + lean*0.04;
+  a.throwCooldown -= (t - (a._lastT||t)); a._lastT = t;
+  if (a.throwCooldown <= 0 && lean > 0.85){
+    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.5;
+    if (fireSeed(chestPos, false)) a.throwCooldown = 1.0 + Math.random()*0.5;
+  }
+}
+function applyFleeing(a, t, dt){
+  a.hideAmt = Math.min(1, a.hideAmt + dt*3.2);
+  // 부르르 떨기
+  const jitter = (Math.random()-0.5) * 0.02 * a.hideAmt;
+  if (a.def.hideType === 'scale'){
+    const s = 1 - a.hideAmt*0.72;
+    a.wrapper.scale.set(1 + a.hideAmt*0.15, Math.max(0.22, s), 1 + a.hideAmt*0.15);
+    a.wrapper.position.y = a.deskPos.y - a.hideAmt*0.05 + jitter;
+    a.wrapper.position.x = a.deskPos.x + jitter;
+  } else { // move — 상자 뒤로 이동
+    a.wrapper.position.z = a.deskPos.z - a.hideAmt*0.9;
+    a.wrapper.position.x = a.deskPos.x + jitter;
+    a.wrapper.scale.set(1, Math.max(0.55, 1-a.hideAmt*0.45), 1);
+  }
+}
+function applyReturnToNormal(a, dt){
+  a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
+  if (a.hideAmt > 0.01){
+    if (a.def.hideType === 'scale'){
+      const s = 1 - a.hideAmt*0.72;
+      a.wrapper.scale.set(1 + a.hideAmt*0.15, Math.max(0.22, s), 1 + a.hideAmt*0.15);
+    } else {
+      a.wrapper.position.z = a.deskPos.z - a.hideAmt*0.9;
+      a.wrapper.scale.set(1, Math.max(0.55, 1-a.hideAmt*0.45), 1);
+    }
+  } else {
+    a.wrapper.scale.set(1,1,1);
+    a.wrapper.position.copy(a.deskPos);
+  }
+}
+
+function tickUtilityAI(a, dt, t){
+  a.nextTickAt -= dt;
+  if (a.nextTickAt <= 0){
+    a.needs.work += 0.6 + Math.random()*0.4;
+    a.needs.rest += a.needs.work > 3 ? 0.9 : 0.3;
+    const partner = actors[a.partnerIndex];
+    a.needs.chat += (partner && partner.action === 'working') ? 0.5 : 0.1;
+    const scored = [
+      { k:'working', v:a.needs.work + Math.random()*0.4 },
+      { k:'carrying', v:a.needs.work*0.5 + Math.random()*0.6 },
+      { k:'dozing', v:a.needs.rest + Math.random()*0.3 },
+      { k:'chatting', v:a.needs.chat + Math.random()*0.3 },
+    ];
+    scored.sort((x,y)=>y.v-x.v);
+    a.action = scored[0].k;
+    if (a.action === 'working') a.needs.work = 0;
+    if (a.action === 'dozing') a.needs.rest = 0;
+    if (a.action === 'chatting') a.needs.chat = 0;
+    a.actionT = 0;
+    a.nextTickAt = 3 + Math.random()*3;
+  }
+  a.actionT += dt;
+  switch(a.action){
+    case 'carrying': applyCarrying(a, t); break;
+    case 'dozing': applyDozing(a, t); break;
+    case 'chatting': applyChatting(a, t, actors[a.partnerIndex]); break;
+    default: applyWorkingBounce(a, t);
+  }
+}
+
+function updateBazooka(dt, nowSec, level){
+  if (level >= 2){
+    bazookaAimT = Math.min(1, bazookaAimT + dt*2.2);
+    if (nowSec*1000 >= bazookaNextFire){
+      bazookaNextFire = nowSec*1000 + 1300 + Math.random()*600;
+      const tip = new THREE.Vector3(2.2, 1.42, -4.2);
+      fireSeed(tip, true);
+      bazookaGroup.rotation.z = -0.25; // 반동
+    }
+  } else {
+    bazookaAimT = Math.max(0, bazookaAimT - dt*2.5);
+    bazookaNextFire = 0;
+  }
+  bazookaGroup.rotation.x = -bazookaAimT*0.35;
+  bazookaGroup.rotation.z += (0 - bazookaGroup.rotation.z) * 0.1; // 반동 복귀
+}
+
+let clock = new THREE.Clock();
+let lastFpsShown = 0;
+let fpsEMA = 60, fpsAccum = 0, fpsFrames = 0, fpsLastUpdate = 0;
+const fpsBox = document.getElementById('fpsBox');
+const dbgFpsEl = document.getElementById('dbgFps');
+const dbgTrisEl = document.getElementById('dbgTris');
+
+function renderLoop(){
+  requestAnimationFrame(renderLoop);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  const nowSec = performance.now()/1000;
+
+  for (const a of actors){
+    if (currentLevel === 0){
+      applyReturnToNormal(a, dt);
+      if (a.hideAmt <= 0.01) tickUtilityAI(a, dt, t);
+    } else if (currentLevel === 1){
+      a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
+      applyLookup(a, t);
+    } else if (currentLevel === 2){
+      a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
+      applyThrowing(a, t, nowSec);
+    } else {
+      applyFleeing(a, t, dt);
+    }
+    a.shadow.scale.setScalar(Math.max(0.3, 1 - Math.abs(a.wrapper.position.y - a.deskPos.y)*3));
+  }
+  updateBazooka(dt, nowSec, currentLevel);
+  updateSeeds(nowSec);
+
+  renderer.render(scene, camera);
+
+  // FPS 표시(250ms마다 갱신 — 매 프레임 DOM 갱신은 낭비)
+  fpsFrames++; fpsAccum += dt;
+  if (fpsAccum >= 0.25){
+    const fps = fpsFrames / fpsAccum;
+    fpsEMA = fpsEMA*0.5 + fps*0.5;
+    lastFpsShown = Math.round(fpsEMA);
+    fpsBox.textContent = 'FPS ' + lastFpsShown;
+    if (panelOpen){
+      dbgFpsEl.textContent = String(lastFpsShown);
+      let tris = 0;
+      scene.traverse(o => { if (o.isMesh && o.geometry && o.geometry.index) tris += o.geometry.index.count/3; });
+      dbgTrisEl.textContent = Math.round(tris);
+    }
+    fpsAccum = 0; fpsFrames = 0;
+  }
+}
+
+// ---- 숨은 조절 화면: 왼쪽 위 구석 5번 연속 탭(jg/index.html과 동일 패턴) ----
+const debugPanel = document.getElementById('debugPanel');
+const cornerTap = document.getElementById('cornerTap');
+let tapTimes = [];
+function onCornerTap(){
+  const now = performance.now();
+  tapTimes.push(now);
+  tapTimes = tapTimes.filter(tt => now - tt <= 2000);
+  if (tapTimes.length >= 5){ tapTimes = []; setPanelOpen(!panelOpen); }
+}
+cornerTap.addEventListener('click', onCornerTap);
+cornerTap.addEventListener('touchend', (e) => { e.preventDefault(); onCornerTap(); });
+function setPanelOpen(open){
+  panelOpen = open;
+  debugPanel.style.display = open ? 'block' : 'none';
+  if (open) document.getElementById('dbgFaceDelegate').textContent = faceDelegate;
+}
+document.getElementById('bodyToggle').addEventListener('change', (e) => {
+  bodyEnabled = e.target.checked;
+  if (bodyEnabled) ensureBodyDetector();
+});
+document.querySelectorAll('#countBtns button').forEach(btn => {
+  btn.addEventListener('click', () => setFriendCount(Number(btn.dataset.n)));
+});
+// 시험 자동화용 훅(Playwright) — 사장님 손가락이 아니라 스크립트로 친구 수를 바꿔 FPS를 잴 때만 씀.
+// 숨은 조절 화면 버튼과 똑같은 함수를 그대로 부르는 것뿐이라 동작 차이 없음.
+window.__jgSetFriendCount = setFriendCount;
+
+// ===================================================================================
+// §4. 시작
+// ===================================================================================
+onResize();
+renderLoop(); // 카메라 준비 전에도 장면은 바로 그려짐(까맣게 비지 않게)
+
+(async () => {
+  loadingMsg.textContent = '3D 모델 불러오는 중…';
+  await loadAllTemplates();
+  setFriendCount(2); // 시작은 친구 2명(도토리·밤)만
+  loadingMsg.textContent = '';
+})();
+
+startBtn.addEventListener('click', async () => {
+  startOverlay.style.display = 'none';
+  try {
+    await startCamera();
+    await initDetectors();
+    scheduleDetectLoop();
+  } catch(e){
+    console.error('카메라 · 얼굴 인식 시작 실패:', e);
+    camError.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
