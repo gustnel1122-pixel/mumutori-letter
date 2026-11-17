@@ -106,7 +106,7 @@
       <button data-n="7">7</button>
     </div>
 
-    <div class="ver">버전 2026-11-18-1 · three.js r160 · GLB 7종 11/16판</div>
+    <div class="ver">버전 2026-11-18-2 · three.js r160 · GLB 7종 11/16판 · v2(구도·정면·소품·씨앗·숨기 수정)</div>
   </div>
 </div>
 
@@ -126,7 +126,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-18-1';
+const VERSION = '2026-11-18-2';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
@@ -328,9 +328,11 @@ renderer.shadowMap.enabled = false; // 실시간 그림자 없음
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x201812);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
-camera.position.set(0, 1.55, 5.2);
-camera.lookAt(0, 0.75, 0);
+// 책상 줄의 깊이(z) — 전부 이 값을 기준으로 배치(수정 1·2: 손님 쪽을 보게, 구도를 가깝게)
+const ROW_Z = -1.6;
+const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 0.95, ROW_Z + 2.6);
+camera.lookAt(0, 0.55, ROW_Z);
 
 // 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순하게)
 scene.add(new THREE.AmbientLight(0xffffff, 0.85));
@@ -366,11 +368,21 @@ const windowFrame = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 2.7), windowFram
 windowFrame.position.set(0, 2.1, -4.62);
 scene.add(windowFrame);
 
+// ---- 수정 3: 사무실이 텅 비어 보이던 문제 — 벽에 작은 액자 하나(간단한 도형, 복잡한 그림 없음) ----
+const frameOuterMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
+const frameOuter = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.72), frameOuterMat);
+frameOuter.position.set(-3.6, 2.5, -4.58);
+scene.add(frameOuter);
+const frameInnerMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
+const frameInner = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.56), frameInnerMat);
+frameInner.position.set(-3.6, 2.5, -4.565);
+scene.add(frameInner);
+
 // ---- 씨앗 바주카(새 소품 — 단순 원통, 복잡한 디자인 금지, 정본 색상 계열) ----
 const bazookaGroup = new THREE.Group();
 const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
 const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
-shelf.position.set(2.6, 1.3, -4.2);
+shelf.position.set(3.6, 1.05, ROW_Z - 0.7); // 구도를 가깝게 바꾼 뒤(수정 2) 캐릭터 줄 가까이로 옮김(너무 멀면 거의 안 보임)
 scene.add(shelf);
 const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
 const bazookaBody = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.6, 10), bazookaBodyMat);
@@ -398,26 +410,36 @@ function makeShadow(){
 }
 
 // ---- 씨앗 투사체 풀(동시 최대 5개 — jg/계획.md §4-1 예산) ----
+// 수정 4: 전엔 노란 납작한 공이 카메라 코앞까지 날아가 "커다란 원판"처럼 부풀어 보였음(원근 때문에
+// 카메라 가까이 갈수록 뭐든 커 보이는 게 당연한데, 목표점이 카메라 거의 바로 앞이라 그 효과가 심했음).
+// → ① 씨앗 생김새를 도토리 알 같은 길쭉한 타원(캡슐)으로, 색도 갈색/연갈색 계열로 바꾸고
+//   ② 목표점을 "카메라 코앞"이 아니라 카메라보다 한참 앞(= 상상 속 유리창 자리)에서 멈추게 하고
+//   ③ 도착 직전(마지막 20%)에 커지는 대신 작아지며 톡 사라지게(화면에 붙는 작은 자국처럼) 처리.
 const SEED_POOL_SIZE = 5;
-const seedMat = new THREE.MeshBasicMaterial({ color: 0xDCC07A });
-const seedGeo = new THREE.SphereGeometry(0.05, 8, 6);
+const seedMat = new THREE.MeshBasicMaterial({ color: 0xC8955F, transparent: true, opacity: 1 });
+const seedGeo = new THREE.CapsuleGeometry(0.028, 0.05, 2, 6); // 작은 도토리 알 같은 타원(캡슐)
 const seedPool = [];
 for (let i = 0; i < SEED_POOL_SIZE; i++){
-  const mesh = new THREE.Mesh(seedGeo, seedMat);
+  const mesh = new THREE.Mesh(seedGeo, seedMat.clone());
   mesh.visible = false;
   scene.add(mesh);
-  seedPool.push({ mesh, active:false, start:new THREE.Vector3(), vel:new THREE.Vector3(), t0:0, dur:0.8 });
+  seedPool.push({ mesh, active:false, start:new THREE.Vector3(), vel:new THREE.Vector3(), t0:0, dur:0.8, baseScale:1 });
 }
 const GRAVITY = 5.5;
-const TARGET_POINT = new THREE.Vector3(0, 1.3, 5.0); // 유리창 쪽(=손님) 목표점
+// 목표점은 카메라 위치에 따라 매번 다시 계산(인원수 따라 카메라 거리가 바뀌므로) — 카메라보다
+// 1.4유닛 앞(=캐릭터 쪽)에서 멈추게 해서 "카메라 코앞에서 부풀어 보이는" 문제를 원천적으로 막음.
+function currentSeedTarget(){
+  return new THREE.Vector3(0, 0.95, camera.position.z - 1.4);
+}
 function fireSeed(fromPos, big){
   const slot = seedPool.find(s => !s.active);
   if (!slot) return false;
   slot.active = true;
   slot.t0 = performance.now()/1000;
-  slot.dur = 0.75 + Math.random()*0.15;
+  slot.dur = 0.65 + Math.random()*0.12;
   slot.start.copy(fromPos);
-  const target = TARGET_POINT.clone().add(new THREE.Vector3((Math.random()-0.5)*1.2, (Math.random()-0.5)*0.5, 0));
+  const targetPoint = currentSeedTarget();
+  const target = targetPoint.clone().add(new THREE.Vector3((Math.random()-0.5)*1.0, (Math.random()-0.5)*0.4, 0));
   const T = slot.dur;
   slot.vel.set(
     (target.x - fromPos.x)/T,
@@ -425,7 +447,9 @@ function fireSeed(fromPos, big){
     (target.z - fromPos.z)/T
   );
   slot.mesh.visible = true;
-  slot.mesh.scale.setScalar(big ? 1.8 : 1);
+  slot.baseScale = big ? 1.7 : 1;
+  slot.mesh.scale.setScalar(slot.baseScale);
+  slot.mesh.material.opacity = 1;
   slot.mesh.position.copy(fromPos);
   return true;
 }
@@ -439,6 +463,13 @@ function updateSeeds(nowSec){
       s.start.y + s.vel.y*t - 0.5*GRAVITY*t*t,
       s.start.z + s.vel.z*t
     );
+    // 도착 직전(마지막 20%)엔 커지는 대신 작아지며 톡 사라짐(화면에 작게 붙는 자국 느낌)
+    const frac = t / s.dur;
+    if (frac > 0.8){
+      const fade = 1 - (frac - 0.8) / 0.2; // 1→0
+      s.mesh.scale.setScalar(s.baseScale * Math.max(0.05, fade));
+      s.mesh.material.opacity = fade;
+    }
   }
 }
 
@@ -448,7 +479,7 @@ function updateSeeds(nowSec){
 // 캐릭터 정본 제약(정본 §6-2·§6-3): 몸=머리(목 없음)·짧은 팔(손가락 없음)·입 유무 캐릭터별 다름(§0 계획서 참고).
 // 다른 회사 캐릭터 요소 없음 — 공식 3D 모델 그대로, AI로 다시 그리지 않음.
 const FRIEND_DEFS = {
-  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  hideType:'scale', seedColor:0xDCC07A },
+  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  hideType:'scale', seedColor:0xDCC07A, duckMul:0.4 },
   bam:        { file:'bam.glb',        name:'밤',         canThrow:true,  hideType:'move',  seedColor:0x7A4A2A },
   ddangkong:  { file:'ddangkong.glb',  name:'땅콩',       canThrow:true,  hideType:'scale', seedColor:0xD9B36C },
   byeongari:  { file:'byeongari.glb',  name:'병아리콩',   canThrow:true,  hideType:'scale', seedColor:0xE8DE9A },
@@ -517,19 +548,68 @@ async function loadAllTemplates(){
 const actors = []; // 현재 장면에 떠 있는 친구들
 let friendCount = 2;
 
+// 수정 2: 인원수가 늘어도 화면에 적당히 꽉 차 보이게 — 사람이 많을수록 책상 간격을 살짝 좁힘
+function spacingFor(total){
+  return THREE.MathUtils.clamp(2.2 - 0.16*total, 1.0, 1.9);
+}
 function deskPositionFor(index, total){
-  const spacing = 1.9;
+  const spacing = spacingFor(total);
   const startX = -((total - 1) * spacing) / 2;
-  return new THREE.Vector3(startX + index*spacing, 0, -1.6);
+  return new THREE.Vector3(startX + index*spacing, 0, ROW_Z);
 }
 
-function buildDeskAndChair(pos){
+// 책상 앞판 높이(수정 5 "눈만 빼꼼"의 기준선으로도 씀) — 캐릭터 키(0.95) 중 아래쪽만 가려주는 높이
+// (주의: 박스 중심이 아니라 "책상 윗면" 높이 — 박스 생성 때 height=DESK_TOP_Y, center y=DESK_TOP_Y/2로 맞춤)
+const DESK_TOP_Y = 0.34;
+const DESK_FRONT_OFFSET = 0.4; // 수정 1: 책상을 캐릭터보다 카메라 쪽(+z)에 둬서 "책상 앞에 앉아 손님을 보는" 구도로
+
+const deskAccMats = {
+  wood: new THREE.MeshLambertMaterial({ color: 0x7A4A2A }),
+  frame: new THREE.MeshLambertMaterial({ color: 0x682301 }),
+  cream: new THREE.MeshLambertMaterial({ color: 0xFCF7E5 }),
+  dark: new THREE.MeshLambertMaterial({ color: 0x3a2c22 }),
+  leaf: new THREE.MeshLambertMaterial({ color: 0x6FA050 }),
+  pot: new THREE.MeshLambertMaterial({ color: 0x9F5528 }),
+};
+// 수정 3: 사무실이 텅 비어 보이던 문제 — 책상마다 돌아가며 모니터·서류더미·머그·화분 중 하나(또는 없음)만
+// 얹어서 "일하는 느낌"을 살리되, 면 수는 가볍게 유지(desk당 소품 1개 이하, 다 합쳐도 수백 면 수준).
+const DESK_ACCESSORIES = ['monitor', 'papers', null, 'mug', 'plant', null, 'papers'];
+function addDeskAccessory(g, type){
+  if (!type) return;
+  if (type === 'monitor'){
+    const frameM = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.19, 0.02), deskAccMats.frame);
+    const screenM = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.01), deskAccMats.cream);
+    frameM.position.set(-0.12, DESK_TOP_Y + 0.11, 0.08);
+    screenM.position.set(-0.12, DESK_TOP_Y + 0.11, 0.095);
+    g.add(frameM, screenM);
+  } else if (type === 'papers'){
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.12), deskAccMats.cream);
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.02, 0.11), deskAccMats.cream);
+    p1.position.set(0.14, DESK_TOP_Y + 0.01, 0.06);
+    p2.position.set(0.145, DESK_TOP_Y + 0.035, 0.065);
+    p2.rotation.y = 0.15;
+    g.add(p1, p2);
+  } else if (type === 'mug'){
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.06, 8), deskAccMats.dark);
+    mug.position.set(0.16, DESK_TOP_Y + 0.03, 0.1);
+    g.add(mug);
+  } else if (type === 'plant'){
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.05, 8), deskAccMats.pot);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 5), deskAccMats.leaf);
+    pot.position.set(-0.15, DESK_TOP_Y + 0.025, 0.09);
+    leaf.position.set(-0.15, DESK_TOP_Y + 0.08, 0.09);
+    g.add(pot, leaf);
+  }
+}
+
+function buildDeskAndChair(pos, accType){
   const g = new THREE.Group();
   g.userData.isDesk = true; // setFriendCount()가 바뀔 때 clearActors()가 이걸로 찾아서 지움(버그 수정: 전엔 표식이 없어 안 지워졌음)
-  const deskMat = new THREE.MeshLambertMaterial({ color: 0x7A4A2A });
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.42, 0.42), deskMat);
-  desk.position.set(0, 0.21, -0.35);
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.86, DESK_TOP_Y, 0.42), deskAccMats.wood);
+  // 수정 1: 책상을 캐릭터 앞(카메라 쪽, +z)에 둠 — 전엔 -0.35(캐릭터 뒤)였음
+  desk.position.set(0, DESK_TOP_Y/2, DESK_FRONT_OFFSET);
   g.add(desk);
+  addDeskAccessory(g, accType);
   g.position.copy(pos);
   return g;
 }
@@ -541,17 +621,20 @@ function createActor(key, index, total){
   const wrapper = new THREE.Group();
   wrapper.add(model);
   const deskPos = deskPositionFor(index, total);
+  // 수정 1: 평소에도 손님(화면/카메라) 쪽을 보게 함(전엔 Math.PI로 책상=안쪽을 보고 있어 뒤통수만 보였음).
+  // 전원이 똑같이 정면만 보면 어색해서 캐릭터마다 아주 살짝(3/4 각도 정도) 다르게 틀어 둠.
+  const idleYaw = (Math.random() - 0.5) * 0.5;
   wrapper.position.copy(deskPos);
-  wrapper.rotation.y = Math.PI; // 기본은 책상(안쪽)을 보고 있음(손님 반대쪽)
+  wrapper.rotation.y = idleYaw;
   scene.add(wrapper);
-  scene.add(buildDeskAndChair(deskPos));
+  const accType = DESK_ACCESSORIES[index % DESK_ACCESSORIES.length];
+  scene.add(buildDeskAndChair(deskPos, accType));
   const shadow = makeShadow();
   shadow.position.x = deskPos.x; shadow.position.z = deskPos.z;
   scene.add(shadow);
 
   return {
-    key, def, wrapper, model, shadow, deskPos,
-    baseRotY: Math.PI,
+    key, def, wrapper, model, shadow, deskPos, idleYaw,
     phase: Math.random()*Math.PI*2,
     // 레벨0 유틸리티 AI
     needs: { work: Math.random()*2, rest: Math.random(), chat: Math.random() },
@@ -561,8 +644,7 @@ function createActor(key, index, total){
     partnerIndex: null,
     throwCooldown: Math.random()*0.6,
     // 전이용 임시 스케일/오프셋(레벨 변할 때 lerp)
-    hideAmt: 0, // 0=평소 1=완전히 숨음
-    lookAmt: 0, // 0=평소 1=완전히 돌아봄
+    hideAmt: 0, // 0=평소 1=완전히 숨음(수정 5: 책상 뒤로 내려가 눈만 빼꼼 — §3 애니메이션 참고)
   };
 }
 
@@ -588,13 +670,28 @@ function setFriendCount(n){
   });
   // 관계도(정본 §4 기반) — 가능하면 서로 말걸 상대 지정(단순 다음 인덱스와 짝)
   actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
-  // 카메라를 친구 수에 맞춰 조금 뒤로
-  camera.position.z = 4.6 + Math.max(0, keys.length-2)*0.45;
-  camera.position.y = 1.5 + Math.max(0, keys.length-2)*0.04;
-  camera.lookAt(0, 0.75, -0.5);
+  updateCameraFraming(keys.length);
   document.querySelectorAll('#countBtns button').forEach(b => {
     b.classList.toggle('active', Number(b.dataset.n) === n);
   });
+}
+
+// 수정 2: 구도 — 전엔 바닥이 화면 아래 절반, 친구는 화면 높이의 1/10밖에 안 됐음.
+// 카메라를 훨씬 가깝고 낮게(캐릭터 눈높이 근처) 두고, 인원수가 늘면 화각(FOV)을 넓혀서
+// (거리를 덜 늘려도) 다 같이 화면에 들어오게 함 — 2명이든 7명이든 "적당히 꽉 차" 보이는 게 목표.
+function updateCameraFraming(n){
+  const fov = THREE.MathUtils.clamp(42 + (n-2)*4.6, 42, 68);
+  camera.fov = fov;
+  const spacing = spacingFor(n);
+  const halfWidth = ((n-1)*spacing)/2 + 0.55; // 캐릭터+책상 폭 여유
+  const halfVFOV = THREE.MathUtils.degToRad(fov/2);
+  const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
+  const distForWidth = halfWidth / Math.tan(halfHFOV);
+  const distForHeight = (0.95/0.4) / (2*Math.tan(halfVFOV)); // 캐릭터가 화면 높이의 1/3 이상(여유 있게 0.4 기준) 되도록
+  const dist = Math.max(distForWidth, distForHeight, 1.8);
+  camera.position.set(0, 0.82, ROW_Z + dist);
+  camera.lookAt(0, 0.48, ROW_Z);
+  camera.updateProjectionMatrix();
 }
 
 function onResize(){
@@ -607,23 +704,29 @@ window.addEventListener('resize', onResize);
 // ===================================================================================
 // §3. 애니메이션 — 뼈대 없이 몸 전체 변형만(스케일/회전/위치). 새 뼈대 애니메이션 절대 안 만듦.
 // ===================================================================================
+// 수정 1: 평소에도 손님(카메라) 쪽을 보고 있어야 하므로, 아래 네 함수 모두 rotation.y를
+// a.idleYaw(캐릭터마다 살짝 다른 정면 각도) 쪽으로 서서히 당겨 둠(레벨1+ 가 되면 applyLookup/
+// applyThrowing이 0(정면)으로 덮어씀 — 그래서 "고개를 든다"는 느낌이 남).
 function applyWorkingBounce(a, t){
   const bob = Math.abs(Math.sin(t*9 + a.phase)) * 0.025;
   a.wrapper.position.y = a.deskPos.y + bob;
   a.wrapper.rotation.z = Math.sin(t*9 + a.phase) * 0.03;
+  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
 }
 function applyCarrying(a, t){
   const hop = Math.abs(Math.sin(t*6 + a.phase)) * 0.06;
   a.wrapper.position.y = a.deskPos.y + hop;
   a.wrapper.position.x = a.deskPos.x + Math.sin(t*2 + a.phase) * 0.35;
+  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
 }
 function applyDozing(a, t){
   a.wrapper.rotation.z = Math.sin(t*0.6 + a.phase) * 0.16;
   a.wrapper.position.y = a.deskPos.y;
+  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
 }
 function applyChatting(a, t, partner){
   const yaw = partner ? Math.atan2(partner.deskPos.x - a.deskPos.x, partner.deskPos.z - a.deskPos.z) : 0;
-  const targetYaw = Math.PI + yaw*0.35;
+  const targetYaw = a.idleYaw + yaw*0.35;
   a.wrapper.rotation.y += (targetYaw - a.wrapper.rotation.y) * 0.08;
   a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*4 + a.phase)) * 0.02;
 }
@@ -648,39 +751,39 @@ function applyThrowing(a, t, nowSec){
   a.wrapper.position.y = a.deskPos.y + lean*0.04;
   a.throwCooldown -= (t - (a._lastT||t)); a._lastT = t;
   if (a.throwCooldown <= 0 && lean > 0.85){
-    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.5;
+    // 책상 앞판(DESK_TOP_Y*2 ≈ 0.72 높이)보다 확실히 위에서 던져야 책상에 가려 안 보이는 문제가 없음
+    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.8;
     if (fireSeed(chestPos, false)) a.throwCooldown = 1.0 + Math.random()*0.5;
   }
 }
+// 수정 5: 전엔 그냥 갈색 상자처럼 납작하게 눌려서 어색했음 → 책상이 이미 캐릭터 앞(카메라 쪽)에
+// 있으니(수정 1) 그 뒤로 몸을 내려서 책상에 가려지고 눈(머리 위쪽)만 빼꼼 보이게 바꿈.
+// 납작 눌리는 스케일 변형은 아주 조금만(지시사항 그대로) 남겨 둠.
+// 책상이 카메라와 더 가까워서(수정 1) 원근 때문에 책상 윗변이 실제 높이차보다 더 높게 보임 —
+// 세계 좌표로는 머리가 책상보다 조금만 높아도 화면에선 가려 보여서, 숨김 깊이를 넉넉히 작게 잡음.
+const DUCK_DEPTH = 0.12; // 완전히 숨었을 때 내려가는 양 — 평소 서 있을 때 이미 책상이 64%쯤 가리므로
+// (count7 구도 확인) 조금만 더 내려가도 "눈만 빼꼼"이 됨 — 너무 많이 내리면 통째로 안 보임(실측 후 조정)
 function applyFleeing(a, t, dt){
   a.hideAmt = Math.min(1, a.hideAmt + dt*3.2);
-  // 부르르 떨기
-  const jitter = (Math.random()-0.5) * 0.02 * a.hideAmt;
-  if (a.def.hideType === 'scale'){
-    const s = 1 - a.hideAmt*0.72;
-    a.wrapper.scale.set(1 + a.hideAmt*0.15, Math.max(0.22, s), 1 + a.hideAmt*0.15);
-    a.wrapper.position.y = a.deskPos.y - a.hideAmt*0.05 + jitter;
-    a.wrapper.position.x = a.deskPos.x + jitter;
-  } else { // move — 상자 뒤로 이동
-    a.wrapper.position.z = a.deskPos.z - a.hideAmt*0.9;
-    a.wrapper.position.x = a.deskPos.x + jitter;
-    a.wrapper.scale.set(1, Math.max(0.55, 1-a.hideAmt*0.45), 1);
-  }
+  const duck = DUCK_DEPTH * (a.def.duckMul || 1) * (0.92 + (a.phase % 1) * 0.16); // 모자/머리 모양 따라(도토리는 모자가 높아 덜 숙임) + 아주 살짝 변주
+  const jitter = (Math.random()-0.5) * 0.015 * a.hideAmt; // 부르르 떨기(아주 작게)
+  a.wrapper.position.y = a.deskPos.y - a.hideAmt*duck;
+  a.wrapper.position.x = a.deskPos.x + jitter;
+  const s = 1 - a.hideAmt*0.12; // "납작 눌림"은 아주 조금만
+  a.wrapper.scale.set(1, s, 1);
+  // 버그 수정: 레벨2(던지기)의 앞으로 기운 회전(rotation.x)이 그대로 남아 옆으로 쓰러진 것처럼
+  // 보이던 문제 — 숨을 때는 몸을 똑바로 세움(살짝 남은 흔들림만 rotation.z로 작게).
+  a.wrapper.rotation.x += (0 - a.wrapper.rotation.x) * 0.25;
+  a.wrapper.rotation.z = jitter * 2;
 }
 function applyReturnToNormal(a, dt){
-  a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
-  if (a.hideAmt > 0.01){
-    if (a.def.hideType === 'scale'){
-      const s = 1 - a.hideAmt*0.72;
-      a.wrapper.scale.set(1 + a.hideAmt*0.15, Math.max(0.22, s), 1 + a.hideAmt*0.15);
-    } else {
-      a.wrapper.position.z = a.deskPos.z - a.hideAmt*0.9;
-      a.wrapper.scale.set(1, Math.max(0.55, 1-a.hideAmt*0.45), 1);
-    }
-  } else {
-    a.wrapper.scale.set(1,1,1);
-    a.wrapper.position.copy(a.deskPos);
-  }
+  a.hideAmt = Math.max(0, a.hideAmt - dt*2.4);
+  const duck = DUCK_DEPTH * (0.92 + (a.phase % 1) * 0.16);
+  a.wrapper.position.y = a.deskPos.y - a.hideAmt*duck;
+  a.wrapper.position.x = a.deskPos.x;
+  a.wrapper.scale.set(1, 1 - a.hideAmt*0.12, 1);
+  a.wrapper.rotation.x += (0 - a.wrapper.rotation.x) * 0.25;
+  a.wrapper.rotation.z += (0 - a.wrapper.rotation.z) * 0.25;
 }
 
 function tickUtilityAI(a, dt, t){
@@ -718,7 +821,7 @@ function updateBazooka(dt, nowSec, level){
     bazookaAimT = Math.min(1, bazookaAimT + dt*2.2);
     if (nowSec*1000 >= bazookaNextFire){
       bazookaNextFire = nowSec*1000 + 1300 + Math.random()*600;
-      const tip = new THREE.Vector3(2.2, 1.42, -4.2);
+      const tip = new THREE.Vector3(3.3, 1.17, ROW_Z - 0.7);
       fireSeed(tip, true);
       bazookaGroup.rotation.z = -0.25; // 반동
     }
