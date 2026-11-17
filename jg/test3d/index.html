@@ -326,7 +326,7 @@ renderer.setPixelRatio(1); // LG 울트라탭 예산 — 디바이스 픽셀비 
 renderer.shadowMap.enabled = false; // 실시간 그림자 없음
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x201812);
+scene.background = new THREE.Color(0xF3E9D2); // 수정(총괄 2차): 화면이 어둡고 탁해 보임 — 크림 계열 밝은 톤으로
 
 // 책상 줄의 깊이(z) — 전부 이 값을 기준으로 배치(수정 1·2: 손님 쪽을 보게, 구도를 가깝게)
 const ROW_Z = -1.6;
@@ -335,14 +335,15 @@ camera.position.set(0, 0.95, ROW_Z + 2.6);
 camera.lookAt(0, 0.55, ROW_Z);
 
 // 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순하게)
-scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-const dirLight = new THREE.DirectionalLight(0xfff2de, 0.55);
+// 수정(총괄 2차): 화면이 어둡고 탁해 보임 → 조명을 더 밝고 따뜻하게
+scene.add(new THREE.AmbientLight(0xfff6e8, 1.15));
+const dirLight = new THREE.DirectionalLight(0xfff0d8, 0.75);
 dirLight.position.set(2, 4, 3);
 dirLight.castShadow = false;
 scene.add(dirLight);
 
 // ---- 사무실 한 칸(단순 도형, 전부 MeshLambertMaterial) ----
-const floorMat = new THREE.MeshLambertMaterial({ color: 0x8a5a33 });
+const floorMat = new THREE.MeshLambertMaterial({ color: 0xD9B183 }); // 수정(총괄 2차): 연한 나무색으로(전엔 너무 어두운 갈색)
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 14), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
@@ -560,11 +561,11 @@ function deskPositionFor(index, total){
 
 // 책상 앞판 높이(수정 5 "눈만 빼꼼"의 기준선으로도 씀) — 캐릭터 키(0.95) 중 아래쪽만 가려주는 높이
 // (주의: 박스 중심이 아니라 "책상 윗면" 높이 — 박스 생성 때 height=DESK_TOP_Y, center y=DESK_TOP_Y/2로 맞춤)
-const DESK_TOP_Y = 0.34;
+const DESK_TOP_Y = 0.32; // 캐릭터 키(0.95)의 아래 1/3 지점(0.317) — 총괄 2차 피드백: 전엔 눈 아래가 다 가려졌음
 const DESK_FRONT_OFFSET = 0.4; // 수정 1: 책상을 캐릭터보다 카메라 쪽(+z)에 둬서 "책상 앞에 앉아 손님을 보는" 구도로
 
 const deskAccMats = {
-  wood: new THREE.MeshLambertMaterial({ color: 0x7A4A2A }),
+  wood: new THREE.MeshLambertMaterial({ color: 0x9F5528 }), // 정본 캐러멜색(--caramel) 그대로, 전보다 밝게
   frame: new THREE.MeshLambertMaterial({ color: 0x682301 }),
   cream: new THREE.MeshLambertMaterial({ color: 0xFCF7E5 }),
   dark: new THREE.MeshLambertMaterial({ color: 0x3a2c22 }),
@@ -689,8 +690,10 @@ function updateCameraFraming(n){
   const distForWidth = halfWidth / Math.tan(halfHFOV);
   const distForHeight = (0.95/0.4) / (2*Math.tan(halfVFOV)); // 캐릭터가 화면 높이의 1/3 이상(여유 있게 0.4 기준) 되도록
   const dist = Math.max(distForWidth, distForHeight, 1.8);
-  camera.position.set(0, 0.82, ROW_Z + dist);
-  camera.lookAt(0, 0.48, ROW_Z);
+  // 수정(총괄 2차 피드백): 바닥이 화면 아래 절반을 차지함 — 내려다보는 각도(피치)를 거의 없애서
+  // (카메라 높이와 바라보는 지점 높이를 거의 같게) 지평선을 화면 가운데 가깝게 올려 바닥 비율을 줄임.
+  camera.position.set(0, 0.64, ROW_Z + dist);
+  camera.lookAt(0, 0.84, ROW_Z);
   camera.updateProjectionMatrix();
 }
 
