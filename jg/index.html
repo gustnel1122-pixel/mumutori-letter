@@ -13,9 +13,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <!-- 캐시 우회: 버전이 바뀔 때마다 이 숫자(아래 스크립트 VERSION과 동일)를 올려서
      아이패드 홈 화면 아이콘이 옛 판을 들고 있지 않게 함 -->
-<link rel="apple-touch-icon" href="icons/icon-180.png?v=2026-11-17-2">
-<link rel="manifest" href="manifest.json?v=2026-11-17-2">
-<link rel="icon" href="icons/icon-192.png?v=2026-11-17-2">
+<link rel="apple-touch-icon" href="icons/icon-180.png?v=2026-11-17-3">
+<link rel="manifest" href="manifest.json?v=2026-11-17-3">
+<link rel="icon" href="icons/icon-192.png?v=2026-11-17-3">
 
 <style>
   :root{ --ink:#682301; --caramel:#9F5528; --card:#FCF7E5; }
@@ -95,7 +95,7 @@
       <video id="camVideo" class="srcVideo" muted playsinline webkit-playsinline></video>
       <!-- 2층: 사무실(평소: idle_key.mp4 / 반응: reaction_key.mp4) — 유리창 자리는 초록(#00FF00)으로 렌더되어 있고
            브라우저에서 그 초록만 실시간으로 투명 처리해 밑의 카메라가 비쳐 보이게 함 -->
-      <video id="bgVideo" class="srcVideo" src="assets/idle_key.mp4?v=2026-11-17-2" poster="assets/idle_key_poster.jpg?v=2026-11-17-2"
+      <video id="bgVideo" class="srcVideo" src="assets/idle_key.mp4?v=2026-11-17-3" poster="assets/idle_key_poster.jpg?v=2026-11-17-3"
              autoplay muted loop playsinline webkit-playsinline></video>
     </div>
   </div>
@@ -120,6 +120,7 @@
     <div class="row"><span>얼굴 가속</span><span id="dbgFaceDelegate">-</span></div>
     <div class="row"><span>몸 가속</span><span id="dbgBodyDelegate">-</span></div>
     <div class="row"><span>iOS Safari 감지(CPU 강제)</span><span id="dbgIsIOS">-</span></div>
+    <div class="row"><span>안드로이드 크롬 감지(GPU·몸 감지 기본 켜짐)</span><span id="dbgIsAndroid">-</span></div>
 
     <label><input type="checkbox" id="bodyToggle"> 몸 감지 사용(무거움·기본 꺼짐, 켜면 그때 모델을 내려받음)</label>
     <label><input type="checkbox" id="cropToggle"> 가운데 확대 재검사 사용(기본 꺼짐)</label>
@@ -131,7 +132,7 @@
     <input type="range" id="confSlider" min="0.2" max="0.7" step="0.01" value="0.3">
 
     <button id="resetBtn">기본값으로</button>
-    <div class="ver">버전 2026-11-17-2 · 가벼운 판(lite)</div>
+    <div class="ver">버전 2026-11-17-3 · 아이패드=가벼운 판(lite) · 안드로이드 크롬=원래 성능판</div>
   </div>
 </div>
 
@@ -143,7 +144,7 @@
 // 실제로 쓰고 있는 버전(1.2.3)을 확인하고 그대로 고정했어요. (2026-11-16 확인, 이번 개선에서도 그대로 유지)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-17-2';
+const VERSION = '2026-11-17-3';
 
 // ---- 아이패드 사파리 크래시(2026-11-17 매장 시험 중 "문제가 반복적으로 발생했습니다" 강제 종료) 긴급 대응 ----
 // 몸 감지 + GPU 딜리게이트 + 매 프레임 감지 + 가운데 확대 재검사를 한꺼번에 돌리면 아이패드 사파리(WebKit)가
@@ -156,6 +157,20 @@ function isIOSWebKit(){
   return false;
 }
 const IS_IOS_WEBKIT = isIOSWebKit();
+
+// ---- 안드로이드 갤럭시 탭 버전(2026-11-17 22:11 사장님 지시) ----
+// 위 아이패드 경량화(lite)는 절대 건드리지 않음(크래시 재발 위험). 안드로이드 크롬일 때만
+// "원래대로"(GPU 가속 우선 시도 + 몸 감지 기본 켜짐)로 돌리는 분기를 따로 둠.
+function isAndroidChrome(){
+  const ua = navigator.userAgent || '';
+  if (!/Android/.test(ua)) return false;
+  // 삼성 인터넷·웨일·웹뷰 등 "Chrome"이 아닌 안드로이드 브라우저는 제외 — 진짜 크롬에서만 성능을 올림
+  if (/SamsungBrowser|MiuiBrowser|HeyTapBrowser|NAVER|Instagram|FBAN|FBAV|wv\)/.test(ua)) return false;
+  return /Chrome\//.test(ua);
+}
+const IS_ANDROID_CHROME = isAndroidChrome();
+// 아이패드 사파리만 CPU 강제, 안드로이드 크롬(과 그 밖의 브라우저)은 GPU 가속을 먼저 시도함(원래대로).
+const FORCE_CPU_DELEGATE = IS_IOS_WEBKIT;
 
 // 감지 빈도 제한 — requestAnimationFrame(매 프레임, 아이패드 ProMotion이면 초당 최대 120회)으로 돌리지 않고
 // setTimeout으로 초당 6~8회만 돌림. 감지 자체는 동기 함수라 겹쳐 돌 일이 없지만, 혹시를 대비해 busy 가드도 둠.
@@ -192,7 +207,8 @@ let faceHistory = [];
 const BODY_SCORE_THRESH = 0.4;         // ObjectDetector 자체 scoreThreshold와 동일 값(이중 확인)
 const BODY_HEIGHT_RATIO_THRESH = 0.45; // 몸 상자 높이 / 카메라 프레임 높이
 const BODY_CHECK_EVERY_N_FRAMES = 3;   // 몸 감지를 켰을 때도 감지 틱의 1/3만 — 아이패드 부담 더 줄이기
-const DEFAULT_BODY_ENABLED = false;    // 기본 꺼짐(사장님이 조절 화면에서 켬)
+// 기본값: 아이패드 사파리(등 그 밖 기기)는 꺼짐(경량판 유지) · 안드로이드 크롬은 켜짐(원래대로, 2026-11-17 갤럭시 탭 버전)
+const DEFAULT_BODY_ENABLED = IS_ANDROID_CHROME;
 const DEFAULT_CROP_ENABLED = false;    // 가운데 확대 재검사도 기본 꺼짐
 // 두 토글은 일부러 localStorage에 저장하지 않음 — 아이패드가 매일 새로 켜지거나 새로고침될 때
 // 항상 "가벼운 판"으로 시작하게 하기 위함(매장에서 깜빡하고 안 끄는 일 방지).
@@ -257,6 +273,7 @@ const dbgFps = document.getElementById('dbgFps');
 const dbgFaceDelegate = document.getElementById('dbgFaceDelegate');
 const dbgBodyDelegate = document.getElementById('dbgBodyDelegate');
 const dbgIsIOS = document.getElementById('dbgIsIOS');
+const dbgIsAndroid = document.getElementById('dbgIsAndroid');
 const bodyToggle = document.getElementById('bodyToggle');
 const cropToggle = document.getElementById('cropToggle');
 
@@ -318,7 +335,7 @@ async function initDetectors(){
     baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
     runningMode: 'VIDEO',
     minDetectionConfidence: FACE_CONF,
-  }), '얼굴 인식', IS_IOS_WEBKIT);
+  }), '얼굴 인식', FORCE_CPU_DELEGATE);
   detector = face.d;
   faceDelegate = face.delegate;
   updateDebugDelegates();
@@ -339,7 +356,7 @@ async function ensureBodyDetector(){
         maxResults: 5,
         scoreThreshold: BODY_SCORE_THRESH,
         categoryAllowlist: ['person'],
-      }), '몸 인식', IS_IOS_WEBKIT);
+      }), '몸 인식', FORCE_CPU_DELEGATE);
       bodyDetector = body.d;
       bodyDelegate = body.delegate;
     } catch(e){
@@ -525,6 +542,7 @@ function runDetectTick(){
       bodyBoxCount: lastBodyBoxes.length, bodyBox0: lastBodyBoxes[0] || null,
       camW: camVideo.videoWidth, camH: camVideo.videoHeight,
       lite: true, bodyEnabled, cropEnabled, detectFpsTarget: DETECT_FPS, isIOSWebKit: IS_IOS_WEBKIT,
+      isAndroidChrome: IS_ANDROID_CHROME,
     };
   } finally {
     detectBusy = false;
@@ -635,6 +653,7 @@ function updateDebugDelegates(){
   dbgFaceDelegate.textContent = faceDelegate;
   dbgBodyDelegate.textContent = bodyDelegate;
   dbgIsIOS.textContent = IS_IOS_WEBKIT ? '예(CPU 강제)' : '아니오';
+  dbgIsAndroid.textContent = IS_ANDROID_CHROME ? '예(GPU 우선·몸 감지 기본 켜짐)' : '아니오';
 }
 
 function applyThresh(v){
@@ -679,8 +698,37 @@ cropToggle.addEventListener('change', (e) => { cropEnabled = e.target.checked; }
   setPanelOpen(wasOpen);
 })();
 
+// ---- 전체화면·화면 꺼짐 방지(2026-11-17 갤럭시 탭 버전) ----
+// 매장에 세워 둔 태블릿이라 주소창·상태바가 보이면 안 되고(전체화면), 사람이 안 지나가는 동안에도
+// 화면이 꺼지면 안 됨(Wake Lock). 둘 다 "시작하기" 버튼 클릭(사용자 동작) 안에서 요청해야 브라우저가 허용함.
+// 지원 안 하는 브라우저(구형 iOS 등)에서는 그냥 조용히 무시 — 체험 자체는 그대로 동작함.
+let wakeLockObj = null;
+async function acquireWakeLock(){
+  try {
+    if ('wakeLock' in navigator){
+      wakeLockObj = await navigator.wakeLock.request('screen');
+      wakeLockObj.addEventListener('release', () => { wakeLockObj = null; });
+    }
+  } catch(e){ console.warn('화면 꺼짐 방지(Wake Lock) 요청 실패 — 무시하고 계속 진행:', e); }
+}
+// 다른 앱으로 전환했다가 돌아오면(visibilitychange) Wake Lock이 풀려 있으므로 다시 요청
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !wakeLockObj) acquireWakeLock();
+});
+function requestFullscreenSafe(){
+  try {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (!req) return;
+    const p = req.call(el);
+    if (p && p.catch) p.catch(() => { /* 사용자가 막았거나 지원 안 함 — 무시 */ });
+  } catch(e){ /* 전체화면 API가 없거나 막히면 그냥 무시(체험에는 치명적이지 않음) */ }
+}
+
 startBtn.addEventListener('click', async () => {
   startOverlay.style.display = 'none';
+  requestFullscreenSafe();
+  acquireWakeLock();
   bgVideo.play().catch(()=>{});
   requestAnimationFrame(renderLoop); // 카메라가 아직 없어도 사무실 쪽은 바로 그리기 시작(까맣게 비지 않게)
   try {
