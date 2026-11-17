@@ -120,7 +120,7 @@
     <div class="row"><span>얼굴 가속</span><span id="dbgFaceDelegate">-</span></div>
     <div class="row"><span>몸 가속</span><span id="dbgBodyDelegate">-</span></div>
     <div class="row"><span>iOS Safari 감지(CPU 강제)</span><span id="dbgIsIOS">-</span></div>
-    <div class="row"><span>안드로이드 크롬 감지(GPU·몸 감지 기본 켜짐)</span><span id="dbgIsAndroid">-</span></div>
+    <div class="row"><span>안드로이드 크롬 감지(GPU 우선, 몸 감지는 기본 꺼짐)</span><span id="dbgIsAndroid">-</span></div>
 
     <label><input type="checkbox" id="bodyToggle"> 몸 감지 사용(무거움·기본 꺼짐, 켜면 그때 모델을 내려받음)</label>
     <label><input type="checkbox" id="cropToggle"> 가운데 확대 재검사 사용(기본 꺼짐)</label>
@@ -144,7 +144,7 @@
 // 실제로 쓰고 있는 버전(1.2.3)을 확인하고 그대로 고정했어요. (2026-11-16 확인, 이번 개선에서도 그대로 유지)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-17-3';
+const VERSION = '2026-11-17-4';
 
 // ---- 아이패드 사파리 크래시(2026-11-17 매장 시험 중 "문제가 반복적으로 발생했습니다" 강제 종료) 긴급 대응 ----
 // 몸 감지 + GPU 딜리게이트 + 매 프레임 감지 + 가운데 확대 재검사를 한꺼번에 돌리면 아이패드 사파리(WebKit)가
@@ -207,8 +207,9 @@ let faceHistory = [];
 const BODY_SCORE_THRESH = 0.4;         // ObjectDetector 자체 scoreThreshold와 동일 값(이중 확인)
 const BODY_HEIGHT_RATIO_THRESH = 0.45; // 몸 상자 높이 / 카메라 프레임 높이
 const BODY_CHECK_EVERY_N_FRAMES = 3;   // 몸 감지를 켰을 때도 감지 틱의 1/3만 — 아이패드 부담 더 줄이기
-// 기본값: 아이패드 사파리(등 그 밖 기기)는 꺼짐(경량판 유지) · 안드로이드 크롬은 켜짐(원래대로, 2026-11-17 갤럭시 탭 버전)
-const DEFAULT_BODY_ENABLED = IS_ANDROID_CHROME;
+// 2026-11-17 23:00 사장님: 실제 기기는 "LG 울트라탭 10A30Q"(스냅드래곤 680·램4GB, 갤럭시탭 S급보다 약함)
+// → 안드로이드여도 몸 감지는 기본 꺼짐 유지, 숨은 조절 화면에서 켤 때만 사용(보수적 기본값).
+const DEFAULT_BODY_ENABLED = false;
 const DEFAULT_CROP_ENABLED = false;    // 가운데 확대 재검사도 기본 꺼짐
 // 두 토글은 일부러 localStorage에 저장하지 않음 — 아이패드가 매일 새로 켜지거나 새로고침될 때
 // 항상 "가벼운 판"으로 시작하게 하기 위함(매장에서 깜빡하고 안 끄는 일 방지).
@@ -653,7 +654,7 @@ function updateDebugDelegates(){
   dbgFaceDelegate.textContent = faceDelegate;
   dbgBodyDelegate.textContent = bodyDelegate;
   dbgIsIOS.textContent = IS_IOS_WEBKIT ? '예(CPU 강제)' : '아니오';
-  dbgIsAndroid.textContent = IS_ANDROID_CHROME ? '예(GPU 우선·몸 감지 기본 켜짐)' : '아니오';
+  dbgIsAndroid.textContent = IS_ANDROID_CHROME ? '예(GPU 우선, 몸 감지는 기본 꺼짐)' : '아니오';
 }
 
 function applyThresh(v){
