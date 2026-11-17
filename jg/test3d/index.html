@@ -525,6 +525,7 @@ function deskPositionFor(index, total){
 
 function buildDeskAndChair(pos){
   const g = new THREE.Group();
+  g.userData.isDesk = true; // setFriendCount()가 바뀔 때 clearActors()가 이걸로 찾아서 지움(버그 수정: 전엔 표식이 없어 안 지워졌음)
   const deskMat = new THREE.MeshLambertMaterial({ color: 0x7A4A2A });
   const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.42, 0.42), deskMat);
   desk.position.set(0, 0.21, -0.35);
