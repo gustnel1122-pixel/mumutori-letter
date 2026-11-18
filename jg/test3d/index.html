@@ -123,7 +123,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-18-4 · three.js r160 · GLB 7종 11/16판 · v4(전판 사무실·실제 이동·두뇌 보기)</div>
+    <div class="ver">버전 2026-11-18-5 · three.js r160 · GLB 7종 11/16판 · v5(구도·방향·색·전경소품 — 전판처럼)</div>
   </div>
 </div>
 
@@ -143,7 +143,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-18-4';
+const VERSION = '2026-11-18-5';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
@@ -348,8 +348,8 @@ scene.background = new THREE.Color(0xBFE3EA); // 전판처럼 창 너머 밝은 
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
 
 // 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순) — 전판처럼 밝은 낮 조명
-scene.add(new THREE.AmbientLight(0xffffff, 1.25));
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+scene.add(new THREE.AmbientLight(0xffffff, 1.65)); // v5: 렌더 결과가 생각보다 어둡게 나와서(색상관리 감쇠) 더 올림
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
 dirLight.position.set(2, 5, 4);
 dirLight.castShadow = false;
 scene.add(dirLight);
@@ -357,18 +357,18 @@ const fillLight = new THREE.DirectionalLight(0xeaf6fb, 0.35); // 창에서 들�
 fillLight.position.set(-1, 3, -3);
 scene.add(fillLight);
 
-// ---- 전판처럼: 연회색 바닥 ----
-const floorMat = new THREE.MeshLambertMaterial({ color: 0xE1E1DC });
+// ---- 전판처럼: 밝은 연회색 바닥(은은한 반짝임 — 이 한 군데만 Phong으로 아주 약한 반사光) ----
+const floorMat = new THREE.MeshPhongMaterial({ color: 0xE9E9EA, specular: 0x999999, shininess: 18 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
-// ---- 뒷벽 = 거의 전체가 큰 창(밝은 하늘색), 위아래 살짝만 벽 ----
-const wallMat = new THREE.MeshLambertMaterial({ color: 0xF4F3EF });
+// ---- 뒷벽 = 거의 전체가 큰 창(밝은 하늘색, 거의 흰빛), 위아래 살짝만 벽 ----
+const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
 const backWallTop = new THREE.Mesh(new THREE.PlaneGeometry(40, 1.1), wallMat);
 backWallTop.position.set(0, 5.05, -9);
 scene.add(backWallTop);
-const windowMat = new THREE.MeshLambertMaterial({ color: 0xCDEAF3 });
+const windowMat = new THREE.MeshLambertMaterial({ color: 0xEEF5FB }); // v5: 렌더 감쇠 보정 — 코드값보다 밝게
 const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(40, 8), windowMat);
 bigWindow.position.set(0, 1.0, -9.02);
 scene.add(bigWindow);
@@ -387,7 +387,7 @@ function buildPlant(x, z, scale){
   const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.34, 10), potMat);
   pot.position.y = 0.17;
   g.add(pot);
-  const leafMat = new THREE.MeshLambertMaterial({ color: 0x5FA85A });
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x3FAE4A }); // 총괄 피드백: 선명한 초록
   for (let i = 0; i < 5; i++){
     const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), leafMat);
     const ang = (i/5)*Math.PI*2;
@@ -399,22 +399,36 @@ function buildPlant(x, z, scale){
   g.scale.setScalar(scale);
   scene.add(g);
 }
-buildPlant(-6.6, -2.2, 1.15);
-buildPlant(6.4, -3.0, 1.0);
-buildPlant(-5.0, -5.8, 0.9);
+buildPlant(-2.65, -0.25, 0.85); // v5: 좁아진 자리 배치에 맞춰 가까이로
+buildPlant(3.05, -0.85, 0.8);
+buildPlant(-2.25, -1.65, 0.65);
 
-// ---- 전판 특징: 맨 앞에 보이는 빈 의자 등받이(카메라=손님이 서 있는 자리 바로 앞) ----
-const foreChairMat = new THREE.MeshLambertMaterial({ color: 0x33343a });
-const foreChairBack = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.95, 0.14), foreChairMat);
-foreChairBack.position.set(-2.6, 0.6, 2.35);
-foreChairBack.rotation.y = 0.28;
+// ---- 전판 특징: 왼쪽 아래 구석에 살짝만 걸친 의자 등받이(메시 느낌 — 반투명·작게) ----
+// 총괄 피드백: 전엔 화면 1/6을 훨씬 넘는 큰 검은 네모라 "화면 고장"처럼 보였음 → 훨씬 작고
+// 반투명(메시 소재 느낌)하게, 구석에 살짝만 걸치도록 위치도 더 가깝고 왼쪽으로.
+const foreChairMat = new THREE.MeshLambertMaterial({ color: 0x4a4b52, transparent:true, opacity:0.5 });
+const foreChairBack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.05), foreChairMat);
 scene.add(foreChairBack);
+// 카메라 기준 상대 위치로 매번 다시 둠(인원수마다 카메라 거리가 달라도 항상 왼쪽 아래 구석에만
+// 살짝 걸치게) — updateCameraFraming() 끝에서 updateForeChair()를 호출.
+function updateForeChair(){
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+  const pos = camera.position.clone()
+    .addScaledVector(forward, 1.35)
+    .addScaledVector(right, -0.62)
+    .add(new THREE.Vector3(0, -0.62, 0));
+  foreChairBack.position.copy(pos);
+  const yaw = Math.atan2(forward.x, forward.z);
+  foreChairBack.rotation.y = yaw + 0.5;
+}
 
 // ---- 씨앗 바주카(새 소품 — 단순 원통, 정본 색상 계열), 코너 선반 위 ----
 const bazookaGroup = new THREE.Group();
 const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
 const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
-const BAZOOKA_POS = new THREE.Vector3(5.1, 0.95, -2.0);
+const BAZOOKA_POS = new THREE.Vector3(2.95, 0.72, -0.95); // v5: 좁아진 자리 배치에 맞춰 가까이로
 shelf.position.copy(BAZOOKA_POS);
 scene.add(shelf);
 const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
@@ -434,7 +448,7 @@ let bazookaAimT = 0;
 let bazookaNextFire = 0;
 
 // ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
-const COFFEE_SPOT = new THREE.Vector3(-4.3, 0, -3.6);
+const COFFEE_SPOT = new THREE.Vector3(-2.35, 0, -1.65); // v5: 좁아진 자리 배치에 맞춰 가까이로
 (function buildCoffeeCorner(){
   const tableMat = new THREE.MeshLambertMaterial({ color: 0xF2F0EC });
   const table = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), tableMat);
@@ -644,30 +658,33 @@ async function loadAllTemplates(){
 // ---- 전판처럼 흩어진 책상 배치(일렬 아님 — 앞뒤로 서로 다른 깊이) ----
 // yaw: dir=(sin(yaw),0,cos(yaw)) 기준 캐릭터가 "바라보는" 방향(=자기 모니터 쪽). 0이면 카메라 정면이라
 // 전부 카메라보다 멀리/옆을 보도록(3/4~완전 옆모습) 일부러 0 근처 값을 피해서 골랐음.
+// 총괄 v5 피드백: 전엔 친구들이 등을 보였음(흩어진 깊이를 만드느라 0 근처 각도를 일부러 피했었는데
+// 그게 "등 보임" 문제였음) → 이제 yaw를 0(카메라 쪽) 근처로 두되 캐릭터마다 조금씩 다르게(3/4 정면).
+// 또한 자리 간격 자체를 훨씬 좁혀서(전판처럼 다닥다닥) 카메라가 가깝게 들어가도 7명이 다 잡히게 함.
 const LAYOUT_SLOTS = [
-  { dx:-2.6, dz:-0.4, yaw: 2.15 }, // 도토리
-  { dx:-1.1, dz:-1.9, yaw:-2.05 }, // 밤
-  { dx: 0.9, dz:-0.5, yaw: 2.65 }, // 땅콩
-  { dx: 2.5, dz:-1.7, yaw:-1.78 }, // 병아리콩
-  { dx:-2.2, dz:-3.1, yaw: 2.95 }, // 완두콩삼형제
-  { dx: 1.5, dz:-3.3, yaw:-2.55 }, // 해바라기씨
-  { dx: 3.6, dz:-0.5, yaw: 2.05 }, // 쌀
+  { dx:-1.61, dz:-0.17, yaw: 0.35 }, // 도토리
+  { dx:-0.68, dz:-0.80, yaw:-0.42 }, // 밤
+  { dx: 0.56, dz:-0.21, yaw: 0.50 }, // 땅콩
+  { dx: 1.55, dz:-0.71, yaw:-0.30 }, // 병아리콩
+  { dx:-1.36, dz:-1.30, yaw: 0.28 }, // 완두콩삼형제
+  { dx: 0.93, dz:-1.39, yaw:-0.55 }, // 해바라기씨
+  { dx: 2.23, dz:-0.21, yaw: 0.40 }, // 쌀
 ];
 
-const DESK_TOP_Y = 0.42;       // 흰 책상 윗면 높이(전판 비례 — 캐릭터 키의 절반 아래쪽)
-const DESK_FRONT = 0.42;       // 책상(모니터 쪽)은 캐릭터가 "바라보는" 방향으로 이만큼 앞에
-const CHAIR_BACK = 0.34;       // 검은 의자 등받이는 반대쪽(카메라 쪽)으로 이만큼
+const DESK_TOP_Y = 0.24;       // 흰 책상 윗면 높이 — 총괄 피드백: 전경 소품이 키의 1/3(≈0.32) 이하여야 함
+const DESK_BEHIND = 0.4;       // 책상·모니터는 캐릭터가 바라보는 반대쪽(=카메라에서 더 먼 쪽)에 둠(이제 카메라 쪽을 보므로)
+const CHAIR_BACK = 0.16;       // 검은 의자는 캐릭터 바로 뒤(작게) — 몸에 거의 가려짐
 
 const deskMats = {
-  desk: new THREE.MeshLambertMaterial({ color: 0xF2F0EC }),
-  monFrame: new THREE.MeshLambertMaterial({ color: 0x8C8C88 }),
+  desk: new THREE.MeshLambertMaterial({ color: 0xF7F6F2 }),
+  monFrame: new THREE.MeshLambertMaterial({ color: 0xD6D6D2 }), // 총괄 피드백: 모니터는 연회색으로(검정 금지)
   monScreen: null, // 캐릭터별로 따로(깜빡임 각자 제어)
-  keyboard: new THREE.MeshLambertMaterial({ color: 0xDCDCD6 }),
-  pencup: new THREE.MeshLambertMaterial({ color: 0xC9C9C2 }),
+  keyboard: new THREE.MeshLambertMaterial({ color: 0xE8E8E4 }),
+  pencup: new THREE.MeshLambertMaterial({ color: 0xDADAD6 }),
   pen: new THREE.MeshLambertMaterial({ color: 0x682301 }),
   chair: new THREE.MeshLambertMaterial({ color: 0x2E2F34 }),
   mug: new THREE.MeshLambertMaterial({ color: 0x3a2c22 }),
-  leaf: new THREE.MeshLambertMaterial({ color: 0x5FA85A }),
+  leaf: new THREE.MeshLambertMaterial({ color: 0x3FAE4A }), // 총괄 피드백: 화분은 선명한 초록으로
   pot: new THREE.MeshLambertMaterial({ color: 0xFFFFFF }),
 };
 
@@ -678,21 +695,24 @@ const BONUS_PROP = [null, 'mug', null, 'plant', null, 'mug', null];
 function buildDeskForSlot(pos, yaw, bonus){
   const g = new THREE.Group();
   g.userData.isDesk = true;
-  const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  const back = dir.clone().multiplyScalar(-1);
+  const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); // 캐릭터가 바라보는 방향(이제 카메라 쪽에 가까움)
+  const back = dir.clone().multiplyScalar(-1);                    // 책상·모니터 쪽(카메라에서 더 먼 쪽)
+  const sideVec0 = new THREE.Vector3(dir.z, 0, -dir.x);
 
-  // 흰 책상(모니터 쪽, 캐릭터가 바라보는 방향)
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, DESK_TOP_Y, 0.4), deskMats.desk);
-  desk.position.copy(pos).addScaledVector(dir, DESK_FRONT);
+  // 흰 책상 — 총괄 v5 피드백: 이제 캐릭터가 카메라 쪽을 보므로, 책상은 "바라보는 반대쪽"(더 먼 쪽)에
+  // 둬서 얼굴을 가리지 않게 함 + 옆으로 살짝 치우쳐 바로 등 뒤가 아니라 "비스듬히 옆"에 보이게 함.
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.5, DESK_TOP_Y, 0.36), deskMats.desk);
+  desk.position.copy(pos).addScaledVector(back, DESK_BEHIND).addScaledVector(sideVec0, 0.16);
   desk.position.y = DESK_TOP_Y/2;
   desk.rotation.y = yaw;
   g.add(desk);
 
-  // 모니터(회색 틀 + 화면 — 화면은 캐릭터별로 다른 재질 인스턴스라 따로 깜빡일 수 있음)
-  const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.02), deskMats.monFrame);
+  // 모니터(연회색 틀 + 화면 — 화면은 캐릭터별로 다른 재질 인스턴스라 따로 깜빡일 수 있음)
+  // 총괄 v5 피드백: 전경 소품이 얼굴을 가리는 비율이 너무 컸음 → 더 작게
+  const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.015), deskMats.monFrame);
   const monScreenMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA });
-  const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.15, 0.01), monScreenMat);
-  const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.05), deskMats.monFrame);
+  const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.165, 0.105, 0.01), monScreenMat);
+  const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.06, 0.04), deskMats.monFrame);
   const monBase = desk.position.clone().addScaledVector(dir, 0.08);
   const monFront = monBase.clone().addScaledVector(dir, -0.012); // 화면을 틀보다 캐릭터 쪽으로 살짝 더 — z-fighting(겹쳐서 까맣게 보이던 버그) 방지
   monFrame.position.set(monBase.x, DESK_TOP_Y + 0.14, monBase.z);
@@ -736,13 +756,13 @@ function buildDeskForSlot(pos, yaw, bonus){
     g.add(pot, leaf);
   }
 
-  // 검은 사무용 의자(등받이) — 캐릭터가 바라보는 반대쪽(카메라에 더 가까운 쪽)
-  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.07), deskMats.chair);
-  const chairSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 10), deskMats.chair);
+  // 검은 사무용 의자 — 작게(총괄 피드백), 캐릭터 바로 뒤라 몸에 많이 가려짐(책상보다 카메라 쪽)
+  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.3, 0.06), deskMats.chair);
+  const chairSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.05, 10), deskMats.chair);
   const chairPos = pos.clone().addScaledVector(back, CHAIR_BACK);
-  chairBack.position.set(chairPos.x, 0.62, chairPos.z);
+  chairBack.position.set(chairPos.x, 0.44, chairPos.z);
   chairBack.rotation.y = yaw;
-  chairSeat.position.set(pos.x, 0.32, pos.z);
+  chairSeat.position.set(pos.x, 0.22, pos.z);
   g.add(chairBack, chairSeat);
 
   g.userData.monScreenMat = monScreenMat;
@@ -830,24 +850,29 @@ function setFriendCount(n){
   });
 }
 
-// ---- 구도: 전판처럼 살짝 위에서 내려다보는 각도로, 흩어진 책상 전체가 들어오게 ----
+// ---- 구도: 총괄 v5 피드백 — 전엔 친구가 화면의 1/10, 바닥이 절반을 차지했음.
+// 기준 사진(①번)처럼 친구가 화면 높이의 1/4~1/3이 되도록 카메라를 훨씬 가깝고 낮게,
+// 내려다보는 각도도 거의 없애서(10도 정도만) 바닥 비율을 줄임.
 function updateCameraFraming(n){
   const slots = LAYOUT_SLOTS.slice(0, n);
   let cx = 0, cz = 0;
   for (const s of slots){ cx += s.dx; cz += s.dz; }
   cx /= slots.length; cz /= slots.length;
-  let maxR = 1.0;
+  let maxR = 0.6;
   for (const s of slots){ maxR = Math.max(maxR, Math.hypot(s.dx-cx, s.dz-cz)); }
-  const fov = THREE.MathUtils.clamp(36 + (n-2)*2.6, 36, 52);
+  const fov = THREE.MathUtils.clamp(32 + (n-2)*2.0, 32, 44);
   camera.fov = fov;
   camera.updateProjectionMatrix();
   const halfVFOV = THREE.MathUtils.degToRad(fov/2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const dist = (maxR + 1.8) / Math.tan(Math.min(halfVFOV, halfHFOV));
-  const PITCH = THREE.MathUtils.degToRad(23); // 전판처럼 살짝 위에서 내려다보는 각도
-  camera.position.set(cx, 2.0 + dist*Math.sin(PITCH)*0.25, cz + dist*Math.cos(PITCH));
-  camera.lookAt(cx, 0.55, cz - 0.6);
+  const distForWidth = (maxR + 0.9) / Math.tan(halfHFOV);
+  const distForHeight = (0.95/0.3) / (2*Math.tan(halfVFOV)); // 캐릭터가 화면 높이의 약 30%가 되도록
+  const dist = Math.max(distForWidth, distForHeight, 1.6);
+  const PITCH = THREE.MathUtils.degToRad(10); // 앉은 사람 눈높이 정도 — 거의 안 내려다봄(바닥 비율 축소)
+  camera.position.set(cx, 1.05 + dist*Math.sin(PITCH), cz + dist*Math.cos(PITCH));
+  camera.lookAt(cx, 0.6, cz - 0.3);
   camera.updateProjectionMatrix();
+  updateForeChair();
 }
 
 function onResize(){
