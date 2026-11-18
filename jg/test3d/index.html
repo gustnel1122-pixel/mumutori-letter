@@ -49,8 +49,8 @@
 
   #debugPanel{
     position:absolute; right:10px; top:10px; z-index:15; display:none;
-    width:250px; max-height:calc(100% - 20px); overflow:auto;
-    background:rgba(10,10,10,.82); color:#eee; font-size:12px; line-height:1.5;
+    width:280px; max-height:calc(100% - 20px); overflow:auto;
+    background:rgba(10,10,10,.85); color:#eee; font-size:12px; line-height:1.5;
     border-radius:10px; padding:12px 13px; -webkit-backdrop-filter:blur(2px);
   }
   #debugPanel h4{margin:0 0 6px; font-size:13px; color:#FCF7E5}
@@ -63,6 +63,18 @@
   }
   #countBtns button.active{background:var(--card); color:var(--ink); font-weight:700; border-color:var(--card)}
   #debugPanel .ver{opacity:.55; font-size:10.5px; margin-top:10px}
+
+  /* "두뇌 보기" — 친구마다 지금 하는 일 + 욕구 막대(사장님 "두뇌가 어디 있냐" 질문에 바로 보여주는 창) */
+  #brainView{margin-top:8px; border-top:1px solid rgba(255,255,255,.15); padding-top:8px}
+  #brainView h4{margin:0 0 6px}
+  .brainRow{margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed rgba(255,255,255,.12)}
+  .brainRow .bName{font-weight:700; color:#FCF7E5; font-size:12px}
+  .brainRow .bAction{opacity:.85; font-size:11px; margin-left:4px}
+  .brainBars{display:flex; flex-direction:column; gap:2px; margin-top:3px}
+  .brainBar{display:flex; align-items:center; gap:4px; font-size:9.5px; opacity:.9}
+  .brainBar .lbl{width:28px; flex:none}
+  .brainBar .track{flex:1; height:6px; background:rgba(255,255,255,.12); border-radius:3px; overflow:hidden}
+  .brainBar .fill{height:100%; background:#E8C23A}
 </style>
 </head>
 <body>
@@ -78,8 +90,8 @@
 
   <div id="startOverlay">
     <div style="font-size:22px;font-weight:700">진격의 오피스 — 3D 시험판</div>
-    <p>안에서 사는 친구들을 3D로 띄워 보는 비공개 테스트 페이지예요. 탭하면 카메라 얼굴 인식이 시작돼요(저장·전송 없음).
-       왼쪽 위 구석을 5번 빠르게 탭하면 숨은 조절 화면이 나와요.</p>
+    <p>안에서 사는 친구들이 각자 책상에서 일·수다·커피·낮잠 중이에요. 손님이 카메라에 다가오면 그 순간만 놀라서 돌아봐요.
+       왼쪽 위 구석을 5번 빠르게 탭하면 숨은 조절 화면(두뇌 보기 포함)이 나와요.</p>
     <div id="loadingMsg"></div>
     <button id="startBtn">탭해서 시작하기</button>
   </div>
@@ -106,7 +118,12 @@
       <button data-n="7">7</button>
     </div>
 
-    <div class="ver">버전 2026-11-18-2 · three.js r160 · GLB 7종 11/16판 · v2(구도·정면·소품·씨앗·숨기 수정)</div>
+    <div id="brainView">
+      <h4>🧠 두뇌 보기 — 친구마다 지금 하는 일</h4>
+      <div id="brainRows"></div>
+    </div>
+
+    <div class="ver">버전 2026-11-18-4 · three.js r160 · GLB 7종 11/16판 · v4(전판 사무실·실제 이동·두뇌 보기)</div>
   </div>
 </div>
 
@@ -126,15 +143,15 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-18-2';
+const VERSION = '2026-11-18-4';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
 //    pixelRatio=1 고정 · 안티앨리어싱 끔 · 실시간 그림자 없음(발밑 동그란 그림자로 흉내) ·
 //    재질은 MeshLambertMaterial까지만(PBR 금지) · 같은 모델은 clone()만 사용.
+//    (이 §0 블록은 v1~v3와 동일 — 얼굴/몸 인식 로직을 그대로 재사용)
 // ===================================================================================
 
-// ---- 얼굴/몸 인식 설정 (jg/index.html과 동일 패턴 재사용) ----
 function isIOSWebKit(){
   const ua = navigator.userAgent || '';
   if (/iPad|iPhone|iPod/.test(ua)) return true;
@@ -157,24 +174,18 @@ const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wa
 const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
 const BODY_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite";
 
-// 레벨 문턱값 — jg/계획.md §1 그대로: 레벨1=0.15(기존 THRESH), 레벨2=0.28, 레벨3 몸비율=0.70(기존 0.45보다 보수적으로 올림)
 const LEVEL1_FACE_THRESH = 0.15;
 const LEVEL2_FACE_THRESH = 0.28;
 const LEVEL3_BODY_THRESH = 0.70;
-// 제 판단(2026-11-18): 계획서 §1은 레벨3을 몸 감지(기본 꺼짐) 전용으로 뒀는데, 그러면 몸 감지를
-// 켜지 않는 매장 기본값에서는 "도망" 반응이 영원히 안 나옴. 몸 감지를 안 켜도 얼굴이 화면을 매우
-// 많이 채우면(= 카메라에 바짝 붙음) 레벨3이 켜지도록 얼굴비율 보조 문턱을 추가함(사장님이 다르게
-// 정하면 바꾸면 됨).
 const LEVEL3_FACE_THRESH = 0.55;
 const BODY_SCORE_THRESH = 0.4;
 const BODY_CHECK_EVERY_N_FRAMES = 3;
 
-// 흔들림 견디기(최근 N번 중 M번) — 레벨 올릴 때/내릴 때 모두 적용해 깜빡임 방지
 const HISTORY_LEN = 6;
 const HISTORY_TRIGGER = 3;
-let levelHistory = []; // 최근 판정된 레벨값(0~3) 기록
+let levelHistory = [];
 
-let bodyEnabled = false; // 기본 꺼짐(지시사항 그대로)
+let bodyEnabled = false;
 let cropEnabled = false;
 
 const camVideo = document.getElementById('camVideo');
@@ -191,7 +202,8 @@ let detCountWindow = [];
 let detectTimer = null, detectBusy = false;
 let panelOpen = false;
 
-let currentLevel = 0; // 0 없음 · 1 올려다보기 · 2 씨앗던지기 · 3 도망/숨기
+let currentLevel = 0; // 0 없음(평소 일함) · 1 올려다보기 · 2 씨앗던지기 · 3 도망/숨기
+let prevLevel = 0;    // 레벨이 0으로 "돌아온 순간"을 잡아 전원을 자기 자리로 되돌리는 데 씀(§3)
 
 async function createWithDelegate(createFn, label, forceCPU){
   if (forceCPU){ const d = await createFn('CPU'); return { d, delegate: 'CPU' }; }
@@ -261,7 +273,6 @@ function handleBodyDetections(dets){
   lastBodyRatio = maxHeightRatio;
 }
 
-// 이번 틱의 "순간 레벨" 판정 → 흔들림 견디기 거쳐 currentLevel 갱신
 function computeRawLevel(){
   let lvl = 0;
   if (lastFaceRatio >= LEVEL2_FACE_THRESH) lvl = 2;
@@ -274,14 +285,14 @@ function updateLevel(){
   const raw = computeRawLevel();
   levelHistory.push(raw);
   if (levelHistory.length > HISTORY_LEN) levelHistory.shift();
-  // 최근 기록 중 가장 많이 나온 값(동률이면 더 큰 레벨 우선 — 반응은 과감하게, 복귀는 조건 맞을 때만)
   const counts = [0,0,0,0];
   for (const v of levelHistory) counts[v]++;
   let best = 0;
   for (let i = 3; i >= 0; i--){ if (counts[i] >= HISTORY_TRIGGER){ best = i; break; } }
-  // 레벨을 올릴 땐 과반 전이면 바로 반응(현재값이 최근 1~2번에서 이미 나왔으면 즉시 반영해 "즉각 반응"처럼 보이게)
+  prevLevel = currentLevel;
   if (raw > currentLevel && counts[raw] >= 2) currentLevel = raw;
   else currentLevel = best;
+  if (prevLevel > 0 && currentLevel === 0) onReturnToIdle(); // §3: 사람이 멀어지면 전원 자기 자리로
   if (panelOpen){
     document.getElementById('dbgLevel').textContent = currentLevel;
     document.getElementById('dbgFaceRatio').textContent = lastFaceRatio.toFixed(2);
@@ -318,7 +329,13 @@ function runDetectTick(){
 function scheduleDetectLoop(){ detectTimer = setTimeout(runDetectTick, DETECT_INTERVAL_MS); }
 
 // ===================================================================================
-// §1. three.js 장면 — 사무실 한 칸 + 친구들
+// §1. three.js 장면 — "전판"(실제 매장 2D 영상·20261104_v8_장면6컷.jpg ①번)처럼 보이는 사무실
+//    자리에서 판단: (a) 3D로 전판 사무실을 다시 짓기 vs (b) 전판 배경 그림을 평면 텍스처로 깔기.
+//    → (a) 채택. 이유: 친구들이 책상마다 "흩어져" 서로 다른 깊이(z)에 있어야 하는데, 배경을 평면
+//    사진 한 장으로 깔면 캐릭터와 그림 속 책상의 앞뒤(가림) 관계가 깊이마다 안 맞아 어색해짐
+//    (예: 뒤쪽 책상 친구가 앞쪽 책상 "그림"보다 앞에 그려지는 모순). 3D 소품은 실제 깊이가 있어
+//    인원수가 바뀌어도 가림 관계가 항상 맞음. (b)안도 별도 장면으로 실제로 만들어 스크린샷
+//    비교판을 남김 — 결과 폴더의 compare_methods.png 참고.
 // ===================================================================================
 const canvas = document.getElementById('glCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'default' });
@@ -326,64 +343,79 @@ renderer.setPixelRatio(1); // LG 울트라탭 예산 — 디바이스 픽셀비 
 renderer.shadowMap.enabled = false; // 실시간 그림자 없음
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xF3E9D2); // 수정(총괄 2차): 화면이 어둡고 탁해 보임 — 크림 계열 밝은 톤으로
+scene.background = new THREE.Color(0xBFE3EA); // 전판처럼 창 너머 밝은 하늘색이 배경 기본값
 
-// 책상 줄의 깊이(z) — 전부 이 값을 기준으로 배치(수정 1·2: 손님 쪽을 보게, 구도를 가깝게)
-const ROW_Z = -1.6;
-const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 0.1, 100);
-camera.position.set(0, 0.95, ROW_Z + 2.6);
-camera.lookAt(0, 0.55, ROW_Z);
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
 
-// 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순하게)
-// 수정(총괄 2차): 화면이 어둡고 탁해 보임 → 조명을 더 밝고 따뜻하게
-scene.add(new THREE.AmbientLight(0xfff6e8, 1.15));
-const dirLight = new THREE.DirectionalLight(0xfff0d8, 0.75);
-dirLight.position.set(2, 4, 3);
+// 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순) — 전판처럼 밝은 낮 조명
+scene.add(new THREE.AmbientLight(0xffffff, 1.25));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+dirLight.position.set(2, 5, 4);
 dirLight.castShadow = false;
 scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0xeaf6fb, 0.35); // 창에서 들어오는 차가운 보조광(아주 약하게)
+fillLight.position.set(-1, 3, -3);
+scene.add(fillLight);
 
-// ---- 사무실 한 칸(단순 도형, 전부 MeshLambertMaterial) ----
-const floorMat = new THREE.MeshLambertMaterial({ color: 0xD9B183 }); // 수정(총괄 2차): 연한 나무색으로(전엔 너무 어두운 갈색)
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 14), floorMat);
+// ---- 전판처럼: 연회색 바닥 ----
+const floorMat = new THREE.MeshLambertMaterial({ color: 0xE1E1DC });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
-const wallMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), wallMat);
-backWall.position.set(0, 3, -4.6);
-scene.add(backWall);
+// ---- 뒷벽 = 거의 전체가 큰 창(밝은 하늘색), 위아래 살짝만 벽 ----
+const wallMat = new THREE.MeshLambertMaterial({ color: 0xF4F3EF });
+const backWallTop = new THREE.Mesh(new THREE.PlaneGeometry(40, 1.1), wallMat);
+backWallTop.position.set(0, 5.05, -9);
+scene.add(backWallTop);
+const windowMat = new THREE.MeshLambertMaterial({ color: 0xCDEAF3 });
+const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(40, 8), windowMat);
+bigWindow.position.set(0, 1.0, -9.02);
+scene.add(bigWindow);
+// 창틀(세로 분할 몇 개 — 복잡한 디자인 없이 단순 기둥)
+const muntinMat = new THREE.MeshLambertMaterial({ color: 0xCFCFC8 });
+for (let i = -3; i <= 3; i++){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 8, 0.1), muntinMat);
+  m.position.set(i*5.6, 1.0, -9.0);
+  scene.add(m);
+}
 
-const sideWallMat = new THREE.MeshLambertMaterial({ color: 0xEFE2C2 });
-const sideWallL = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), sideWallMat);
-sideWallL.position.set(-8, 3, 0);
-sideWallL.rotation.y = Math.PI/2;
-scene.add(sideWallL);
+// ---- 화분(양옆, 전판처럼) — 단순 도형 ----
+function buildPlant(x, z, scale){
+  const g = new THREE.Group();
+  const potMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.34, 10), potMat);
+  pot.position.y = 0.17;
+  g.add(pot);
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x5FA85A });
+  for (let i = 0; i < 5; i++){
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), leafMat);
+    const ang = (i/5)*Math.PI*2;
+    leaf.position.set(Math.cos(ang)*0.12, 0.55 + (i%2)*0.18, Math.sin(ang)*0.12);
+    leaf.scale.set(0.8, 1.4, 0.8);
+    g.add(leaf);
+  }
+  g.position.set(x, 0, z);
+  g.scale.setScalar(scale);
+  scene.add(g);
+}
+buildPlant(-6.6, -2.2, 1.15);
+buildPlant(6.4, -3.0, 1.0);
+buildPlant(-5.0, -5.8, 0.9);
 
-// 유리창(손님이 나타나는 자리 — 장식용, 카메라 영상을 입히지 않음. 1단계 2D판과 달리 3D는 메쉬 렌더링만)
-const windowMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA, transparent:true, opacity:0.55 });
-const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.4), windowMat);
-windowPane.position.set(0, 2.1, -4.55);
-scene.add(windowPane);
-const windowFrameMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
-const windowFrame = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 2.7), windowFrameMat);
-windowFrame.position.set(0, 2.1, -4.62);
-scene.add(windowFrame);
+// ---- 전판 특징: 맨 앞에 보이는 빈 의자 등받이(카메라=손님이 서 있는 자리 바로 앞) ----
+const foreChairMat = new THREE.MeshLambertMaterial({ color: 0x33343a });
+const foreChairBack = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.95, 0.14), foreChairMat);
+foreChairBack.position.set(-2.6, 0.6, 2.35);
+foreChairBack.rotation.y = 0.28;
+scene.add(foreChairBack);
 
-// ---- 수정 3: 사무실이 텅 비어 보이던 문제 — 벽에 작은 액자 하나(간단한 도형, 복잡한 그림 없음) ----
-const frameOuterMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
-const frameOuter = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.72), frameOuterMat);
-frameOuter.position.set(-3.6, 2.5, -4.58);
-scene.add(frameOuter);
-const frameInnerMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
-const frameInner = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.56), frameInnerMat);
-frameInner.position.set(-3.6, 2.5, -4.565);
-scene.add(frameInner);
-
-// ---- 씨앗 바주카(새 소품 — 단순 원통, 복잡한 디자인 금지, 정본 색상 계열) ----
+// ---- 씨앗 바주카(새 소품 — 단순 원통, 정본 색상 계열), 코너 선반 위 ----
 const bazookaGroup = new THREE.Group();
 const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
 const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
-shelf.position.set(3.6, 1.05, ROW_Z - 0.7); // 구도를 가깝게 바꾼 뒤(수정 2) 캐릭터 줄 가까이로 옮김(너무 멀면 거의 안 보임)
+const BAZOOKA_POS = new THREE.Vector3(5.1, 0.95, -2.0);
+shelf.position.copy(BAZOOKA_POS);
 scene.add(shelf);
 const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
 const bazookaBody = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.6, 10), bazookaBodyMat);
@@ -395,14 +427,29 @@ const bazookaCap = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.08,
 bazookaCap.rotation.z = Math.PI/2;
 bazookaCap.position.set(-0.3, 0.12, 0);
 bazookaGroup.add(bazookaCap);
-bazookaGroup.position.copy(shelf.position);
-bazookaGroup.rotation.y = -0.5; // 창 쪽을 향함
+bazookaGroup.position.copy(BAZOOKA_POS);
+bazookaGroup.rotation.y = 2.3;
 scene.add(bazookaGroup);
-let bazookaAimT = 0;      // 레벨2 동안 누적 시간
-let bazookaNextFire = 0;  // 다음 발사 예정 시각(ms, performance.now 기준)
+let bazookaAimT = 0;
+let bazookaNextFire = 0;
 
-// ---- 발밑 동그란 그림자(실시간 그림자 대신 — 그림으로 흉내) ----
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.35, depthWrite:false });
+// ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
+const COFFEE_SPOT = new THREE.Vector3(-4.3, 0, -3.6);
+(function buildCoffeeCorner(){
+  const tableMat = new THREE.MeshLambertMaterial({ color: 0xF2F0EC });
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), tableMat);
+  table.position.set(COFFEE_SPOT.x, 0.25, COFFEE_SPOT.z);
+  scene.add(table);
+  const mugMat = new THREE.MeshLambertMaterial({ color: 0x3a2c22 });
+  for (let i = 0; i < 2; i++){
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.08, 8), mugMat);
+    mug.position.set(COFFEE_SPOT.x + (i?0.12:-0.1), 0.54, COFFEE_SPOT.z + (i?0.05:-0.08));
+    scene.add(mug);
+  }
+})();
+
+// ---- 발밑 동그란 그림자(실시간 그림자 대신) ----
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.28, depthWrite:false });
 function makeShadow(){
   const m = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), shadowMat);
   m.rotation.x = -Math.PI/2;
@@ -411,14 +458,9 @@ function makeShadow(){
 }
 
 // ---- 씨앗 투사체 풀(동시 최대 5개 — jg/계획.md §4-1 예산) ----
-// 수정 4: 전엔 노란 납작한 공이 카메라 코앞까지 날아가 "커다란 원판"처럼 부풀어 보였음(원근 때문에
-// 카메라 가까이 갈수록 뭐든 커 보이는 게 당연한데, 목표점이 카메라 거의 바로 앞이라 그 효과가 심했음).
-// → ① 씨앗 생김새를 도토리 알 같은 길쭉한 타원(캡슐)으로, 색도 갈색/연갈색 계열로 바꾸고
-//   ② 목표점을 "카메라 코앞"이 아니라 카메라보다 한참 앞(= 상상 속 유리창 자리)에서 멈추게 하고
-//   ③ 도착 직전(마지막 20%)에 커지는 대신 작아지며 톡 사라지게(화면에 붙는 작은 자국처럼) 처리.
 const SEED_POOL_SIZE = 5;
 const seedMat = new THREE.MeshBasicMaterial({ color: 0xC8955F, transparent: true, opacity: 1 });
-const seedGeo = new THREE.CapsuleGeometry(0.028, 0.05, 2, 6); // 작은 도토리 알 같은 타원(캡슐)
+const seedGeo = new THREE.CapsuleGeometry(0.028, 0.05, 2, 6);
 const seedPool = [];
 for (let i = 0; i < SEED_POOL_SIZE; i++){
   const mesh = new THREE.Mesh(seedGeo, seedMat.clone());
@@ -427,10 +469,8 @@ for (let i = 0; i < SEED_POOL_SIZE; i++){
   seedPool.push({ mesh, active:false, start:new THREE.Vector3(), vel:new THREE.Vector3(), t0:0, dur:0.8, baseScale:1 });
 }
 const GRAVITY = 5.5;
-// 목표점은 카메라 위치에 따라 매번 다시 계산(인원수 따라 카메라 거리가 바뀌므로) — 카메라보다
-// 1.4유닛 앞(=캐릭터 쪽)에서 멈추게 해서 "카메라 코앞에서 부풀어 보이는" 문제를 원천적으로 막음.
 function currentSeedTarget(){
-  return new THREE.Vector3(0, 0.95, camera.position.z - 1.4);
+  return new THREE.Vector3(0, 1.1, camera.position.z - 1.6);
 }
 function fireSeed(fromPos, big){
   const slot = seedPool.find(s => !s.active);
@@ -440,7 +480,7 @@ function fireSeed(fromPos, big){
   slot.dur = 0.65 + Math.random()*0.12;
   slot.start.copy(fromPos);
   const targetPoint = currentSeedTarget();
-  const target = targetPoint.clone().add(new THREE.Vector3((Math.random()-0.5)*1.0, (Math.random()-0.5)*0.4, 0));
+  const target = targetPoint.clone().add(new THREE.Vector3((Math.random()-0.5)*1.4, (Math.random()-0.5)*0.4, 0));
   const T = slot.dur;
   slot.vel.set(
     (target.x - fromPos.x)/T,
@@ -464,39 +504,98 @@ function updateSeeds(nowSec){
       s.start.y + s.vel.y*t - 0.5*GRAVITY*t*t,
       s.start.z + s.vel.z*t
     );
-    // 도착 직전(마지막 20%)엔 커지는 대신 작아지며 톡 사라짐(화면에 작게 붙는 자국 느낌)
     const frac = t / s.dur;
     if (frac > 0.8){
-      const fade = 1 - (frac - 0.8) / 0.2; // 1→0
+      const fade = 1 - (frac - 0.8) / 0.2;
       s.mesh.scale.setScalar(s.baseScale * Math.max(0.05, fade));
       s.mesh.material.opacity = fade;
     }
   }
 }
 
+// ---- 떨어뜨린 서류(서류 나르기 도착 때 잠깐 보이는 작은 더미) ----
+const droppedPapers = [];
+const paperDropMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
+function spawnDroppedPapers(pos){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.1), paperDropMat.clone());
+  m.position.set(pos.x, 0.02, pos.z);
+  scene.add(m);
+  droppedPapers.push({ mesh:m, until: performance.now()/1000 + 2.2 });
+}
+function updateDroppedPapers(nowSec){
+  for (let i = droppedPapers.length-1; i >= 0; i--){
+    if (nowSec >= droppedPapers[i].until){
+      scene.remove(droppedPapers[i].mesh);
+      droppedPapers.splice(i,1);
+    }
+  }
+}
+
+// ---- 생각 아이콘(캔버스 스프라이트) — 친구가 고른 행동을 1~2초간 머리 위에 띄움 ----
+const iconTextureCache = {};
+function getIconTexture(emoji){
+  if (iconTextureCache[emoji]) return iconTextureCache[emoji];
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,64,64);
+  ctx.font = '42px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, 32, 34);
+  const tex = new THREE.CanvasTexture(cv);
+  iconTextureCache[emoji] = tex;
+  return tex;
+}
+function makeThoughtSprite(){
+  const mat = new THREE.SpriteMaterial({ map: null, transparent: true, depthTest: false });
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(0.34, 0.34, 1);
+  spr.visible = false;
+  scene.add(spr);
+  return spr;
+}
+const ACTION_ICON = { working:'⌨️', carrying:'📄', chatting:'💬', dozing:'💤', coffee:'☕' };
+const QUIRK_ICON  = { dotori:'✍️', ddangkong:'🔍', bam:'📦', byeongari:'🖋️', wandukong3:'📸', haebaragi:'🌻', ssal:'🍵' };
+function iconForActor(a){
+  if (a.action === 'quirk') return QUIRK_ICON[a.key] || '✨';
+  return ACTION_ICON[a.action] || '⌨️';
+}
+function updateThought(a){
+  const icon = iconForActor(a);
+  if (icon !== a.lastIcon){
+    a.lastIcon = icon;
+    a.thoughtSprite.material.map = getIconTexture(icon);
+    a.thoughtSprite.material.needsUpdate = true;
+  }
+  const show = a.actionT < 1.6 && currentLevel === 0;
+  a.thoughtSprite.visible = show;
+  if (show){
+    const fade = a.actionT > 1.3 ? Math.max(0, (1.6 - a.actionT) / 0.3) : 1;
+    a.thoughtSprite.material.opacity = fade;
+    a.thoughtSprite.position.set(a.wrapper.position.x, 1.15, a.wrapper.position.z);
+  }
+}
+
 // ===================================================================================
 // §2. 캐릭터 — GLB 로드(뼈대 없음) → 정규화(발이 바닥에, 키 1.0 기준) → clone()만 재사용
 // ===================================================================================
-// 캐릭터 정본 제약(정본 §6-2·§6-3): 몸=머리(목 없음)·짧은 팔(손가락 없음)·입 유무 캐릭터별 다름(§0 계획서 참고).
+// 캐릭터 정본 제약(정본 §6-2·§6-3): 몸=머리(목 없음)·짧은 팔(손가락 없음)·입 유무 캐릭터별 다름.
 // 다른 회사 캐릭터 요소 없음 — 공식 3D 모델 그대로, AI로 다시 그리지 않음.
 const FRIEND_DEFS = {
-  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  hideType:'scale', seedColor:0xDCC07A, duckMul:0.4 },
-  bam:        { file:'bam.glb',        name:'밤',         canThrow:true,  hideType:'move',  seedColor:0x7A4A2A },
-  ddangkong:  { file:'ddangkong.glb',  name:'땅콩',       canThrow:true,  hideType:'scale', seedColor:0xD9B36C },
-  byeongari:  { file:'byeongari.glb',  name:'병아리콩',   canThrow:true,  hideType:'scale', seedColor:0xE8DE9A },
-  wandukong3: { file:'wandukong3.glb', name:'완두콩삼형제', canThrow:true, hideType:'scale', seedColor:0x6FA050 },
-  haebaragi:  { file:'haebaragi.glb',  name:'해바라기씨', canThrow:false, hideType:'scale', seedColor:0xE8C23A },
-  ssal:       { file:'ssal.glb',       name:'쌀',         canThrow:true,  hideType:'scale', seedColor:0xF2EEDD },
+  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  duckMul:0.4 },
+  bam:        { file:'bam.glb',        name:'밤',         canThrow:true },
+  ddangkong:  { file:'ddangkong.glb',  name:'땅콩',       canThrow:true },
+  byeongari:  { file:'byeongari.glb',  name:'병아리콩',   canThrow:true },
+  wandukong3: { file:'wandukong3.glb', name:'완두콩삼형제', canThrow:true },
+  haebaragi:  { file:'haebaragi.glb',  name:'해바라기씨', canThrow:false },
+  ssal:       { file:'ssal.glb',       name:'쌀',         canThrow:true },
 };
-// 2명→3명→5명→7명으로 늘어날 때 순서(시작은 반드시 도토리·밤 2명)
 const FRIEND_ORDER = ['dotori','bam','ddangkong','byeongari','wandukong3','haebaragi','ssal'];
 
-const TARGET_HEIGHT = 0.95; // 정규화 기준 키(단위: three.js 월드 유닛)
+const TARGET_HEIGHT = 0.95;
 const loader = new GLTFLoader();
-const templates = {}; // key -> normalized wrapper Object3D(템플릿, 화면에 직접 추가 안 함)
+const templates = {};
 
 function toLightMaterial(orig){
-  // PBR(MeshStandardMaterial 등) 금지 — Lambert로 치환(그림자 없음 + 가벼움), 색/텍스처는 보존
   if (orig.isMeshLambertMaterial || orig.isMeshBasicMaterial) return orig;
   const m = new THREE.MeshLambertMaterial({
     map: orig.map || null,
@@ -508,11 +607,10 @@ function toLightMaterial(orig){
   });
   return m;
 }
-
 function normalizeAndLightenModel(root){
   root.traverse(obj => {
     if (obj.isMesh){
-      obj.castShadow = false; obj.receiveShadow = false; // 실시간 그림자 전면 비활성(성능 예산)
+      obj.castShadow = false; obj.receiveShadow = false;
       if (Array.isArray(obj.material)) obj.material = obj.material.map(toLightMaterial);
       else obj.material = toLightMaterial(obj.material);
     }
@@ -527,13 +625,11 @@ function normalizeAndLightenModel(root){
   wrapper.scale.setScalar(scale);
   return wrapper;
 }
-
 async function loadFriendTemplate(key){
   const def = FRIEND_DEFS[key];
   const url = 'models/' + def.file;
   const gltf = await loader.loadAsync(url);
-  const wrapper = normalizeAndLightenModel(gltf.scene);
-  templates[key] = wrapper;
+  templates[key] = normalizeAndLightenModel(gltf.scene);
 }
 async function loadAllTemplates(){
   let done = 0;
@@ -545,107 +641,159 @@ async function loadAllTemplates(){
   loadingMsg.textContent = '';
 }
 
-// ---- 캐릭터 액터 ----
-const actors = []; // 현재 장면에 떠 있는 친구들
-let friendCount = 2;
+// ---- 전판처럼 흩어진 책상 배치(일렬 아님 — 앞뒤로 서로 다른 깊이) ----
+// yaw: dir=(sin(yaw),0,cos(yaw)) 기준 캐릭터가 "바라보는" 방향(=자기 모니터 쪽). 0이면 카메라 정면이라
+// 전부 카메라보다 멀리/옆을 보도록(3/4~완전 옆모습) 일부러 0 근처 값을 피해서 골랐음.
+const LAYOUT_SLOTS = [
+  { dx:-2.6, dz:-0.4, yaw: 2.15 }, // 도토리
+  { dx:-1.1, dz:-1.9, yaw:-2.05 }, // 밤
+  { dx: 0.9, dz:-0.5, yaw: 2.65 }, // 땅콩
+  { dx: 2.5, dz:-1.7, yaw:-1.78 }, // 병아리콩
+  { dx:-2.2, dz:-3.1, yaw: 2.95 }, // 완두콩삼형제
+  { dx: 1.5, dz:-3.3, yaw:-2.55 }, // 해바라기씨
+  { dx: 3.6, dz:-0.5, yaw: 2.05 }, // 쌀
+];
 
-// 수정 2: 인원수가 늘어도 화면에 적당히 꽉 차 보이게 — 사람이 많을수록 책상 간격을 살짝 좁힘
-function spacingFor(total){
-  return THREE.MathUtils.clamp(2.2 - 0.16*total, 1.0, 1.9);
-}
-function deskPositionFor(index, total){
-  const spacing = spacingFor(total);
-  const startX = -((total - 1) * spacing) / 2;
-  return new THREE.Vector3(startX + index*spacing, 0, ROW_Z);
-}
+const DESK_TOP_Y = 0.42;       // 흰 책상 윗면 높이(전판 비례 — 캐릭터 키의 절반 아래쪽)
+const DESK_FRONT = 0.42;       // 책상(모니터 쪽)은 캐릭터가 "바라보는" 방향으로 이만큼 앞에
+const CHAIR_BACK = 0.34;       // 검은 의자 등받이는 반대쪽(카메라 쪽)으로 이만큼
 
-// 책상 앞판 높이(수정 5 "눈만 빼꼼"의 기준선으로도 씀) — 캐릭터 키(0.95) 중 아래쪽만 가려주는 높이
-// (주의: 박스 중심이 아니라 "책상 윗면" 높이 — 박스 생성 때 height=DESK_TOP_Y, center y=DESK_TOP_Y/2로 맞춤)
-const DESK_TOP_Y = 0.32; // 캐릭터 키(0.95)의 아래 1/3 지점(0.317) — 총괄 2차 피드백: 전엔 눈 아래가 다 가려졌음
-const DESK_FRONT_OFFSET = 0.4; // 수정 1: 책상을 캐릭터보다 카메라 쪽(+z)에 둬서 "책상 앞에 앉아 손님을 보는" 구도로
-
-const deskAccMats = {
-  wood: new THREE.MeshLambertMaterial({ color: 0x9F5528 }), // 정본 캐러멜색(--caramel) 그대로, 전보다 밝게
-  frame: new THREE.MeshLambertMaterial({ color: 0x682301 }),
-  cream: new THREE.MeshLambertMaterial({ color: 0xFCF7E5 }),
-  dark: new THREE.MeshLambertMaterial({ color: 0x3a2c22 }),
-  leaf: new THREE.MeshLambertMaterial({ color: 0x6FA050 }),
-  pot: new THREE.MeshLambertMaterial({ color: 0x9F5528 }),
+const deskMats = {
+  desk: new THREE.MeshLambertMaterial({ color: 0xF2F0EC }),
+  monFrame: new THREE.MeshLambertMaterial({ color: 0x8C8C88 }),
+  monScreen: null, // 캐릭터별로 따로(깜빡임 각자 제어)
+  keyboard: new THREE.MeshLambertMaterial({ color: 0xDCDCD6 }),
+  pencup: new THREE.MeshLambertMaterial({ color: 0xC9C9C2 }),
+  pen: new THREE.MeshLambertMaterial({ color: 0x682301 }),
+  chair: new THREE.MeshLambertMaterial({ color: 0x2E2F34 }),
+  mug: new THREE.MeshLambertMaterial({ color: 0x3a2c22 }),
+  leaf: new THREE.MeshLambertMaterial({ color: 0x5FA85A }),
+  pot: new THREE.MeshLambertMaterial({ color: 0xFFFFFF }),
 };
-// 수정 3: 사무실이 텅 비어 보이던 문제 — 책상마다 돌아가며 모니터·서류더미·머그·화분 중 하나(또는 없음)만
-// 얹어서 "일하는 느낌"을 살리되, 면 수는 가볍게 유지(desk당 소품 1개 이하, 다 합쳐도 수백 면 수준).
-const DESK_ACCESSORIES = ['monitor', 'papers', null, 'mug', 'plant', null, 'papers'];
-function addDeskAccessory(g, type){
-  if (!type) return;
-  if (type === 'monitor'){
-    const frameM = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.19, 0.02), deskAccMats.frame);
-    const screenM = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.01), deskAccMats.cream);
-    frameM.position.set(-0.12, DESK_TOP_Y + 0.11, 0.08);
-    screenM.position.set(-0.12, DESK_TOP_Y + 0.11, 0.095);
-    g.add(frameM, screenM);
-  } else if (type === 'papers'){
-    const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.12), deskAccMats.cream);
-    const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.02, 0.11), deskAccMats.cream);
-    p1.position.set(0.14, DESK_TOP_Y + 0.01, 0.06);
-    p2.position.set(0.145, DESK_TOP_Y + 0.035, 0.065);
-    p2.rotation.y = 0.15;
-    g.add(p1, p2);
-  } else if (type === 'mug'){
-    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.06, 8), deskAccMats.dark);
-    mug.position.set(0.16, DESK_TOP_Y + 0.03, 0.1);
+
+// 수정(총괄 2차·3차): 책상 소품은 모니터+키보드+연필꽂이(1~2개 수준)만 — 너무 많이 올리지 않음.
+// 일부 책상에만 머그/화분을 보너스로 추가(변화를 주되 가볍게).
+const BONUS_PROP = [null, 'mug', null, 'plant', null, 'mug', null];
+
+function buildDeskForSlot(pos, yaw, bonus){
+  const g = new THREE.Group();
+  g.userData.isDesk = true;
+  const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const back = dir.clone().multiplyScalar(-1);
+
+  // 흰 책상(모니터 쪽, 캐릭터가 바라보는 방향)
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, DESK_TOP_Y, 0.4), deskMats.desk);
+  desk.position.copy(pos).addScaledVector(dir, DESK_FRONT);
+  desk.position.y = DESK_TOP_Y/2;
+  desk.rotation.y = yaw;
+  g.add(desk);
+
+  // 모니터(회색 틀 + 화면 — 화면은 캐릭터별로 다른 재질 인스턴스라 따로 깜빡일 수 있음)
+  const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.02), deskMats.monFrame);
+  const monScreenMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA });
+  const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.15, 0.01), monScreenMat);
+  const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.05), deskMats.monFrame);
+  const monBase = desk.position.clone().addScaledVector(dir, 0.08);
+  const monFront = monBase.clone().addScaledVector(dir, -0.012); // 화면을 틀보다 캐릭터 쪽으로 살짝 더 — z-fighting(겹쳐서 까맣게 보이던 버그) 방지
+  monFrame.position.set(monBase.x, DESK_TOP_Y + 0.14, monBase.z);
+  monScreen.position.set(monFront.x, DESK_TOP_Y + 0.14, monFront.z);
+  monStand.position.set(monBase.x, DESK_TOP_Y + 0.04, monBase.z);
+  monFrame.rotation.y = monScreen.rotation.y = monStand.rotation.y = yaw;
+  g.add(monFrame, monScreen, monStand);
+
+  // 키보드
+  const kb = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.08), deskMats.keyboard);
+  const kbPos = desk.position.clone().addScaledVector(dir, -0.06).addScaledVector(new THREE.Vector3(dir.z,0,-dir.x), 0.01);
+  kb.position.set(kbPos.x, DESK_TOP_Y + 0.012, kbPos.z);
+  kb.rotation.y = yaw;
+  g.add(kb);
+
+  // 연필꽂이(원통 + 연필 2개)
+  const sideVec = new THREE.Vector3(dir.z, 0, -dir.x); // yaw 기준 오른쪽 방향
+  const cupPos = desk.position.clone().addScaledVector(sideVec, 0.22);
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.06, 8), deskMats.pencup);
+  cup.position.set(cupPos.x, DESK_TOP_Y + 0.03, cupPos.z);
+  g.add(cup);
+  for (let i = 0; i < 2; i++){
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.1, 5), deskMats.pen);
+    pen.position.set(cupPos.x + (i?0.012:-0.01), DESK_TOP_Y + 0.08, cupPos.z);
+    pen.rotation.z = i ? 0.15 : -0.1;
+    g.add(pen);
+  }
+
+  // 보너스 소품(머그/화분 중 하나, 일부 책상만)
+  if (bonus === 'mug'){
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.026, 0.05, 8), deskMats.mug);
+    const mp = desk.position.clone().addScaledVector(sideVec, -0.2);
+    mug.position.set(mp.x, DESK_TOP_Y + 0.025, mp.z);
     g.add(mug);
-  } else if (type === 'plant'){
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.05, 8), deskAccMats.pot);
-    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 5), deskAccMats.leaf);
-    pot.position.set(-0.15, DESK_TOP_Y + 0.025, 0.09);
-    leaf.position.set(-0.15, DESK_TOP_Y + 0.08, 0.09);
+  } else if (bonus === 'plant'){
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.04, 8), deskMats.pot);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), deskMats.leaf);
+    const pp = desk.position.clone().addScaledVector(sideVec, -0.2);
+    pot.position.set(pp.x, DESK_TOP_Y + 0.02, pp.z);
+    leaf.position.set(pp.x, DESK_TOP_Y + 0.06, pp.z);
     g.add(pot, leaf);
   }
-}
 
-function buildDeskAndChair(pos, accType){
-  const g = new THREE.Group();
-  g.userData.isDesk = true; // setFriendCount()가 바뀔 때 clearActors()가 이걸로 찾아서 지움(버그 수정: 전엔 표식이 없어 안 지워졌음)
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.86, DESK_TOP_Y, 0.42), deskAccMats.wood);
-  // 수정 1: 책상을 캐릭터 앞(카메라 쪽, +z)에 둠 — 전엔 -0.35(캐릭터 뒤)였음
-  desk.position.set(0, DESK_TOP_Y/2, DESK_FRONT_OFFSET);
-  g.add(desk);
-  addDeskAccessory(g, accType);
-  g.position.copy(pos);
+  // 검은 사무용 의자(등받이) — 캐릭터가 바라보는 반대쪽(카메라에 더 가까운 쪽)
+  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.07), deskMats.chair);
+  const chairSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 10), deskMats.chair);
+  const chairPos = pos.clone().addScaledVector(back, CHAIR_BACK);
+  chairBack.position.set(chairPos.x, 0.62, chairPos.z);
+  chairBack.rotation.y = yaw;
+  chairSeat.position.set(pos.x, 0.32, pos.z);
+  g.add(chairBack, chairSeat);
+
+  g.userData.monScreenMat = monScreenMat;
+  g.position.set(0,0,0); // 전부 이미 절대좌표로 넣었으니 그룹 자체는 원점
   return g;
 }
 
-function createActor(key, index, total){
+// ---- 캐릭터 액터 ----
+const actors = [];
+let friendCount = 2;
+const WALK_SPEED = 1.35;
+
+function lerpAngle(a, b, t){
+  let diff = ((b - a + Math.PI) % (Math.PI*2)) - Math.PI;
+  if (diff < -Math.PI) diff += Math.PI*2;
+  return a + diff*t;
+}
+
+function createActor(key, slot){
   const def = FRIEND_DEFS[key];
   const tmpl = templates[key];
-  const model = tmpl.clone(true); // 같은 지오메트리/재질 참조 — 가벼운 clone
+  const model = tmpl.clone(true);
   const wrapper = new THREE.Group();
   wrapper.add(model);
-  const deskPos = deskPositionFor(index, total);
-  // 수정 1: 평소에도 손님(화면/카메라) 쪽을 보게 함(전엔 Math.PI로 책상=안쪽을 보고 있어 뒤통수만 보였음).
-  // 전원이 똑같이 정면만 보면 어색해서 캐릭터마다 아주 살짝(3/4 각도 정도) 다르게 틀어 둠.
-  const idleYaw = (Math.random() - 0.5) * 0.5;
-  wrapper.position.copy(deskPos);
-  wrapper.rotation.y = idleYaw;
+  const homePos = new THREE.Vector3(slot.dx, 0, slot.dz);
+  wrapper.position.copy(homePos);
+  wrapper.rotation.y = slot.yaw;
   scene.add(wrapper);
-  const accType = DESK_ACCESSORIES[index % DESK_ACCESSORIES.length];
-  scene.add(buildDeskAndChair(deskPos, accType));
+
   const shadow = makeShadow();
-  shadow.position.x = deskPos.x; shadow.position.z = deskPos.z;
+  shadow.position.x = homePos.x; shadow.position.z = homePos.z;
   scene.add(shadow);
 
+  // 서류 나르기용 "들고 있는 서류" 프롭(몸 위에 얹힘, 평소엔 숨김)
+  const cargoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.1), new THREE.MeshLambertMaterial({ color: 0xFCF7E5 }));
+  cargoMesh.position.set(0, TARGET_HEIGHT*0.72, 0);
+  cargoMesh.visible = false;
+  wrapper.add(cargoMesh);
+
+  const thoughtSprite = makeThoughtSprite();
+
   return {
-    key, def, wrapper, model, shadow, deskPos, idleYaw,
+    key, def, wrapper, model, shadow, homePos, deskYaw: slot.yaw,
     phase: Math.random()*Math.PI*2,
-    // 레벨0 유틸리티 AI
-    needs: { work: Math.random()*2, rest: Math.random(), chat: Math.random() },
-    action: 'working',
-    actionT: 0,
-    nextTickAt: 1 + Math.random()*2,
-    partnerIndex: null,
-    throwCooldown: Math.random()*0.6,
-    // 전이용 임시 스케일/오프셋(레벨 변할 때 lerp)
-    hideAmt: 0, // 0=평소 1=완전히 숨음(수정 5: 책상 뒤로 내려가 눈만 빼꼼 — §3 애니메이션 참고)
+    needs: { work: Math.random()*1.5, rest: Math.random()*1.2, chat: Math.random(), coffee: Math.random() },
+    action: 'working', lastAction: null, actionT: 0, nextTickAt: 1 + Math.random()*2,
+    partnerIndex: null, throwCooldown: Math.random()*0.6,
+    hideAmt: 0,
+    // 이동(서류 나르기·수다·커피) 상태
+    movePhase: 'idle', moveFrom: null, moveTo: null, moveDur: 0, moveElapsed: 0, busyT: 0, visitKind: null, visitTargetActor: null,
+    cargoMesh, monScreenMat: null, thoughtSprite, lastIcon: null,
   };
 }
 
@@ -653,11 +801,13 @@ function clearActors(){
   for (const a of actors){
     scene.remove(a.wrapper);
     scene.remove(a.shadow);
+    scene.remove(a.thoughtSprite);
   }
-  // 책상도 다시 그리므로 친구 배치용 오브젝트 전부 지움(바닥/벽/바주카/유리창 제외)
   const toRemove = [];
   scene.traverse(o => { if (o.userData && o.userData.isDesk) toRemove.push(o); });
   for (const o of toRemove) scene.remove(o);
+  for (let i = droppedPapers.length-1; i >= 0; i--){ scene.remove(droppedPapers[i].mesh); }
+  droppedPapers.length = 0;
   actors.length = 0;
 }
 
@@ -666,10 +816,13 @@ function setFriendCount(n){
   clearActors();
   const keys = FRIEND_ORDER.slice(0, n);
   keys.forEach((key, i) => {
-    const actor = createActor(key, i, keys.length);
+    const slot = LAYOUT_SLOTS[i];
+    const actor = createActor(key, slot);
+    const deskGroup = buildDeskForSlot(actor.homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length]);
+    scene.add(deskGroup);
+    actor.monScreenMat = deskGroup.userData.monScreenMat;
     actors.push(actor);
   });
-  // 관계도(정본 §4 기반) — 가능하면 서로 말걸 상대 지정(단순 다음 인덱스와 짝)
   actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
   updateCameraFraming(keys.length);
   document.querySelectorAll('#countBtns button').forEach(b => {
@@ -677,23 +830,23 @@ function setFriendCount(n){
   });
 }
 
-// 수정 2: 구도 — 전엔 바닥이 화면 아래 절반, 친구는 화면 높이의 1/10밖에 안 됐음.
-// 카메라를 훨씬 가깝고 낮게(캐릭터 눈높이 근처) 두고, 인원수가 늘면 화각(FOV)을 넓혀서
-// (거리를 덜 늘려도) 다 같이 화면에 들어오게 함 — 2명이든 7명이든 "적당히 꽉 차" 보이는 게 목표.
+// ---- 구도: 전판처럼 살짝 위에서 내려다보는 각도로, 흩어진 책상 전체가 들어오게 ----
 function updateCameraFraming(n){
-  const fov = THREE.MathUtils.clamp(42 + (n-2)*4.6, 42, 68);
+  const slots = LAYOUT_SLOTS.slice(0, n);
+  let cx = 0, cz = 0;
+  for (const s of slots){ cx += s.dx; cz += s.dz; }
+  cx /= slots.length; cz /= slots.length;
+  let maxR = 1.0;
+  for (const s of slots){ maxR = Math.max(maxR, Math.hypot(s.dx-cx, s.dz-cz)); }
+  const fov = THREE.MathUtils.clamp(36 + (n-2)*2.6, 36, 52);
   camera.fov = fov;
-  const spacing = spacingFor(n);
-  const halfWidth = ((n-1)*spacing)/2 + 0.55; // 캐릭터+책상 폭 여유
+  camera.updateProjectionMatrix();
   const halfVFOV = THREE.MathUtils.degToRad(fov/2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const distForWidth = halfWidth / Math.tan(halfHFOV);
-  const distForHeight = (0.95/0.4) / (2*Math.tan(halfVFOV)); // 캐릭터가 화면 높이의 1/3 이상(여유 있게 0.4 기준) 되도록
-  const dist = Math.max(distForWidth, distForHeight, 1.8);
-  // 수정(총괄 2차 피드백): 바닥이 화면 아래 절반을 차지함 — 내려다보는 각도(피치)를 거의 없애서
-  // (카메라 높이와 바라보는 지점 높이를 거의 같게) 지평선을 화면 가운데 가깝게 올려 바닥 비율을 줄임.
-  camera.position.set(0, 0.64, ROW_Z + dist);
-  camera.lookAt(0, 0.84, ROW_Z);
+  const dist = (maxR + 1.8) / Math.tan(Math.min(halfVFOV, halfHFOV));
+  const PITCH = THREE.MathUtils.degToRad(23); // 전판처럼 살짝 위에서 내려다보는 각도
+  camera.position.set(cx, 2.0 + dist*Math.sin(PITCH)*0.25, cz + dist*Math.cos(PITCH));
+  camera.lookAt(cx, 0.55, cz - 0.6);
   camera.updateProjectionMatrix();
 }
 
@@ -705,117 +858,209 @@ function onResize(){
 window.addEventListener('resize', onResize);
 
 // ===================================================================================
-// §3. 애니메이션 — 뼈대 없이 몸 전체 변형만(스케일/회전/위치). 새 뼈대 애니메이션 절대 안 만듦.
+// §3. 행동 — 뼈대 없이 몸 전체 변형 + 실제 위치 이동만 사용(팔 없음 제약 그대로).
+//    두뇌(욕구 점수)는 tickUtilityAI가 3~6초(또는 이동 끝난 뒤)마다 행동을 고름 — §4 두뇌 보기에 표시.
 // ===================================================================================
-// 수정 1: 평소에도 손님(카메라) 쪽을 보고 있어야 하므로, 아래 네 함수 모두 rotation.y를
-// a.idleYaw(캐릭터마다 살짝 다른 정면 각도) 쪽으로 서서히 당겨 둠(레벨1+ 가 되면 applyLookup/
-// applyThrowing이 0(정면)으로 덮어씀 — 그래서 "고개를 든다"는 느낌이 남).
 function applyWorkingBounce(a, t){
-  const bob = Math.abs(Math.sin(t*9 + a.phase)) * 0.025;
-  a.wrapper.position.y = a.deskPos.y + bob;
+  const bob = Math.abs(Math.sin(t*9 + a.phase)) * 0.03;
+  a.wrapper.position.set(a.homePos.x, bob, a.homePos.z);
   a.wrapper.rotation.z = Math.sin(t*9 + a.phase) * 0.03;
-  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
-}
-function applyCarrying(a, t){
-  const hop = Math.abs(Math.sin(t*6 + a.phase)) * 0.06;
-  a.wrapper.position.y = a.deskPos.y + hop;
-  a.wrapper.position.x = a.deskPos.x + Math.sin(t*2 + a.phase) * 0.35;
-  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
+  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.08);
+  a.wrapper.rotation.x = lerpAngle(a.wrapper.rotation.x, 0, 0.1);
 }
 function applyDozing(a, t){
-  a.wrapper.rotation.z = Math.sin(t*0.6 + a.phase) * 0.16;
-  a.wrapper.position.y = a.deskPos.y;
-  a.wrapper.rotation.y += (a.idleYaw - a.wrapper.rotation.y) * 0.05;
+  a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
+  a.wrapper.rotation.z = 0.28 + Math.sin(t*0.8 + a.phase) * 0.05;
+  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.06);
 }
-function applyChatting(a, t, partner){
-  const yaw = partner ? Math.atan2(partner.deskPos.x - a.deskPos.x, partner.deskPos.z - a.deskPos.z) : 0;
-  const targetYaw = a.idleYaw + yaw*0.35;
-  a.wrapper.rotation.y += (targetYaw - a.wrapper.rotation.y) * 0.08;
-  a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*4 + a.phase)) * 0.02;
+function applyQuirk(a, t){
+  a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
+  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.08);
+  switch(a.key){
+    case 'dotori': a.wrapper.rotation.z = Math.sin(t*5 + a.phase) * 0.1; break; // 단어 고르는 갸웃
+    case 'ddangkong': a.wrapper.rotation.x = -0.14 + Math.sin(t*2 + a.phase) * 0.06; break; // 돋보기 품평
+    case 'bam': a.wrapper.position.y = Math.abs(Math.sin(t*4.5 + a.phase)) * 0.04; break; // 상자 톡톡 정리
+    case 'byeongari': a.wrapper.rotation.z = -0.08 + Math.sin(t*3 + a.phase) * 0.12; break; // 편지 들어보이기
+    case 'wandukong3': a.wrapper.position.y = Math.abs(Math.sin(t*6 + a.phase)) * 0.025; break; // 촬영 자세
+    case 'haebaragi': a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.PI, 0.02); break; // 태연히 창밖
+    case 'ssal': a.wrapper.rotation.x = Math.sin(t*2 + a.phase) * 0.09; break; // 차 홀짝
+    default: break;
+  }
+}
+function updateMovement(a, dt, t){
+  if (a.movePhase === 'going' || a.movePhase === 'returning'){
+    a.moveElapsed += dt;
+    const prog = a.moveDur > 0 ? Math.min(1, a.moveElapsed/a.moveDur) : 1;
+    const from = a.movePhase === 'going' ? a.moveFrom : a.moveTo;
+    const to   = a.movePhase === 'going' ? a.moveTo   : a.moveFrom;
+    const eased = prog < 0.5 ? 2*prog*prog : 1 - Math.pow(-2*prog+2, 2)/2;
+    const pos = from.clone().lerp(to, eased);
+    const hop = Math.abs(Math.sin(t*8 + a.phase)) * 0.06;
+    a.wrapper.position.set(pos.x, hop, pos.z);
+    const dir = to.clone().sub(from);
+    if (dir.lengthSq() > 1e-6){
+      a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.atan2(dir.x, dir.z), 0.22);
+    }
+    if (prog >= 1){
+      if (a.movePhase === 'going'){
+        a.movePhase = 'busy'; a.busyT = 0;
+        if (a.visitKind === 'carry'){ a.cargoMesh.visible = false; spawnDroppedPapers(a.moveTo); }
+      } else {
+        a.movePhase = 'idle';
+        a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
+        a.action = 'working';
+        a.nextTickAt = 1.4 + Math.random()*2;
+      }
+    }
+  } else if (a.movePhase === 'busy'){
+    a.busyT += dt;
+    const dur = a.visitKind === 'chat' ? 2.2 : 1.1;
+    const hop = Math.abs(Math.sin(t*7 + a.phase)) * 0.045;
+    a.wrapper.position.set(a.moveTo.x, hop, a.moveTo.z);
+    if (a.visitKind === 'chat' && a.visitTargetActor){
+      const dir = a.visitTargetActor.wrapper.position.clone().sub(a.wrapper.position);
+      if (dir.lengthSq() > 1e-6) a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.atan2(dir.x, dir.z), 0.15);
+    }
+    if (a.busyT >= dur){
+      a.movePhase = 'returning';
+      a.moveElapsed = 0;
+      a.moveDur = a.moveFrom.distanceTo(a.moveTo) / WALK_SPEED;
+    }
+  }
 }
 function applyLookup(a, t){
-  // 레벨1: 전원 손님(카메라) 쪽 — 책상 반대 방향(+z)으로 몸을 돌림(목이 따로 없어 몸 전체 회전으로 표현)
-  a.wrapper.rotation.y += (0 - a.wrapper.rotation.y) * 0.1; // 0 rad = +z(카메라) 방향
-  a.wrapper.rotation.x += (-0.08 - a.wrapper.rotation.x) * 0.1; // 살짝 뒤로 젖혀 "올려다보기"
-  a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*2 + a.phase)) * 0.015;
+  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, 0, 0.12);
+  a.wrapper.rotation.x += (-0.08 - a.wrapper.rotation.x) * 0.1;
+  a.wrapper.position.y = Math.abs(Math.sin(t*2 + a.phase)) * 0.015;
 }
 function applyThrowing(a, t, nowSec){
   if (!a.def.canThrow){
-    // 해바라기씨: 태연하게 구경 — 느긋한 좌우 둘러보기만
     a.wrapper.rotation.y = Math.sin(t*0.8)*0.25;
     a.wrapper.rotation.x = -0.05;
-    a.wrapper.position.y = a.deskPos.y + Math.abs(Math.sin(t*1.5 + a.phase)) * 0.012;
+    a.wrapper.position.y = Math.abs(Math.sin(t*1.5 + a.phase)) * 0.012;
     return;
   }
-  a.wrapper.rotation.y += (0 - a.wrapper.rotation.y) * 0.15;
+  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, 0, 0.18);
   const cyclePos = (t*1.3 + a.phase) % (Math.PI*2);
-  const lean = Math.max(0, Math.sin(cyclePos)); // 앞으로 기울였다 튕김
+  const lean = Math.max(0, Math.sin(cyclePos));
   a.wrapper.rotation.x = -0.1 - lean*0.35;
-  a.wrapper.position.y = a.deskPos.y + lean*0.04;
+  a.wrapper.position.y = lean*0.04;
   a.throwCooldown -= (t - (a._lastT||t)); a._lastT = t;
   if (a.throwCooldown <= 0 && lean > 0.85){
-    // 책상 앞판(DESK_TOP_Y*2 ≈ 0.72 높이)보다 확실히 위에서 던져야 책상에 가려 안 보이는 문제가 없음
-    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.8;
+    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.85;
     if (fireSeed(chestPos, false)) a.throwCooldown = 1.0 + Math.random()*0.5;
   }
 }
-// 수정 5: 전엔 그냥 갈색 상자처럼 납작하게 눌려서 어색했음 → 책상이 이미 캐릭터 앞(카메라 쪽)에
-// 있으니(수정 1) 그 뒤로 몸을 내려서 책상에 가려지고 눈(머리 위쪽)만 빼꼼 보이게 바꿈.
-// 납작 눌리는 스케일 변형은 아주 조금만(지시사항 그대로) 남겨 둠.
-// 책상이 카메라와 더 가까워서(수정 1) 원근 때문에 책상 윗변이 실제 높이차보다 더 높게 보임 —
-// 세계 좌표로는 머리가 책상보다 조금만 높아도 화면에선 가려 보여서, 숨김 깊이를 넉넉히 작게 잡음.
-const DUCK_DEPTH = 0.12; // 완전히 숨었을 때 내려가는 양 — 평소 서 있을 때 이미 책상이 64%쯤 가리므로
-// (count7 구도 확인) 조금만 더 내려가도 "눈만 빼꼼"이 됨 — 너무 많이 내리면 통째로 안 보임(실측 후 조정)
+const DUCK_DEPTH = 0.3;
 function applyFleeing(a, t, dt){
   a.hideAmt = Math.min(1, a.hideAmt + dt*3.2);
-  const duck = DUCK_DEPTH * (a.def.duckMul || 1) * (0.92 + (a.phase % 1) * 0.16); // 모자/머리 모양 따라(도토리는 모자가 높아 덜 숙임) + 아주 살짝 변주
-  const jitter = (Math.random()-0.5) * 0.015 * a.hideAmt; // 부르르 떨기(아주 작게)
-  a.wrapper.position.y = a.deskPos.y - a.hideAmt*duck;
-  a.wrapper.position.x = a.deskPos.x + jitter;
-  const s = 1 - a.hideAmt*0.12; // "납작 눌림"은 아주 조금만
-  a.wrapper.scale.set(1, s, 1);
-  // 버그 수정: 레벨2(던지기)의 앞으로 기운 회전(rotation.x)이 그대로 남아 옆으로 쓰러진 것처럼
-  // 보이던 문제 — 숨을 때는 몸을 똑바로 세움(살짝 남은 흔들림만 rotation.z로 작게).
+  const duck = DUCK_DEPTH * (a.def.duckMul || 1) * (0.92 + (a.phase % 1) * 0.16);
+  const jitter = (Math.random()-0.5) * 0.015 * a.hideAmt;
+  a.wrapper.position.y = -a.hideAmt*duck;
+  a.wrapper.position.x = a.homePos.x + jitter;
+  a.wrapper.position.z = a.homePos.z;
+  a.wrapper.scale.set(1, 1 - a.hideAmt*0.12, 1);
   a.wrapper.rotation.x += (0 - a.wrapper.rotation.x) * 0.25;
   a.wrapper.rotation.z = jitter * 2;
 }
 function applyReturnToNormal(a, dt){
   a.hideAmt = Math.max(0, a.hideAmt - dt*2.4);
   const duck = DUCK_DEPTH * (0.92 + (a.phase % 1) * 0.16);
-  a.wrapper.position.y = a.deskPos.y - a.hideAmt*duck;
-  a.wrapper.position.x = a.deskPos.x;
+  a.wrapper.position.y = -a.hideAmt*duck;
   a.wrapper.scale.set(1, 1 - a.hideAmt*0.12, 1);
   a.wrapper.rotation.x += (0 - a.wrapper.rotation.x) * 0.25;
   a.wrapper.rotation.z += (0 - a.wrapper.rotation.z) * 0.25;
 }
 
+// 사람이 멀어져 레벨이 0으로 돌아온 "그 순간" — 전원 자기 자리로 바로 되돌림(지시사항 그대로)
+function onReturnToIdle(){
+  for (const a of actors){
+    a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
+    a.wrapper.rotation.set(0, a.deskYaw, 0);
+    a.wrapper.scale.set(1,1,1);
+    a.hideAmt = 0;
+    a.movePhase = 'idle';
+    a.cargoMesh.visible = false;
+    a.action = 'working';
+    a.actionT = 0;
+    a.nextTickAt = 1 + Math.random()*2;
+  }
+}
+
+function pickOtherActor(a){
+  const others = actors.filter(o => o !== a);
+  if (!others.length) return null;
+  return others[Math.floor(Math.random()*others.length)];
+}
+function beginVisit(a, kind){
+  a.moveFrom = new THREE.Vector3(a.homePos.x, 0, a.homePos.z);
+  let target = null;
+  if (kind === 'carry'){
+    const other = pickOtherActor(a);
+    if (!other){ a.action = 'working'; return false; }
+    target = other.homePos.clone().addScaledVector(new THREE.Vector3(Math.sin(other.deskYaw+1.6),0,Math.cos(other.deskYaw+1.6)), 0.5);
+    a.visitTargetActor = other;
+    a.cargoMesh.visible = true;
+  } else if (kind === 'chat'){
+    const other = actors[a.partnerIndex];
+    if (!other || other === a){ a.action = 'working'; return false; }
+    target = other.homePos.clone().addScaledVector(new THREE.Vector3(Math.sin(other.deskYaw+2.2),0,Math.cos(other.deskYaw+2.2)), 0.55);
+    a.visitTargetActor = other;
+  } else { // coffee
+    target = COFFEE_SPOT.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0, 0.4));
+    a.visitTargetActor = null;
+  }
+  a.moveTo = target;
+  a.visitKind = kind;
+  a.movePhase = 'going';
+  a.moveElapsed = 0;
+  a.moveDur = a.moveFrom.distanceTo(a.moveTo) / WALK_SPEED;
+  return true;
+}
+
 function tickUtilityAI(a, dt, t){
+  if (a.movePhase !== 'idle'){ updateMovement(a, dt, t); return; }
   a.nextTickAt -= dt;
   if (a.nextTickAt <= 0){
-    a.needs.work += 0.6 + Math.random()*0.4;
-    a.needs.rest += a.needs.work > 3 ? 0.9 : 0.3;
-    const partner = actors[a.partnerIndex];
-    a.needs.chat += (partner && partner.action === 'working') ? 0.5 : 0.1;
-    const scored = [
+    a.needs.work += 0.5 + Math.random()*0.4;
+    a.needs.rest += a.needs.work > 3 ? 0.8 : 0.25;
+    a.needs.chat += 0.3 + Math.random()*0.3;
+    a.needs.coffee += 0.25 + Math.random()*0.25;
+    const canMove = actors.length > 1;
+    const candidates = [
       { k:'working', v:a.needs.work + Math.random()*0.4 },
-      { k:'carrying', v:a.needs.work*0.5 + Math.random()*0.6 },
-      { k:'dozing', v:a.needs.rest + Math.random()*0.3 },
-      { k:'chatting', v:a.needs.chat + Math.random()*0.3 },
+      { k:'dozing',  v:a.needs.rest + Math.random()*0.3 },
+      { k:'quirk',   v:0.7 + Math.random()*0.7 },
     ];
-    scored.sort((x,y)=>y.v-x.v);
-    a.action = scored[0].k;
-    if (a.action === 'working') a.needs.work = 0;
-    if (a.action === 'dozing') a.needs.rest = 0;
-    if (a.action === 'chatting') a.needs.chat = 0;
+    if (canMove){
+      candidates.push({ k:'carrying', v:a.needs.work*0.4 + Math.random()*0.6 });
+      candidates.push({ k:'chatting', v:a.needs.chat + Math.random()*0.4 });
+    }
+    candidates.push({ k:'coffee', v:a.needs.coffee + Math.random()*0.4 });
+    // 지시사항: 같은 행동이 연속으로 반복되지 않게
+    const filtered = candidates.filter(c => c.k !== a.lastAction);
+    const pool = filtered.length ? filtered : candidates;
+    pool.sort((x,y)=>y.v-x.v);
+    const chosen = pool[0].k;
+    a.lastAction = chosen;
+    a.action = chosen;
     a.actionT = 0;
-    a.nextTickAt = 3 + Math.random()*3;
+    if (chosen === 'working') a.needs.work = 0;
+    else if (chosen === 'dozing') a.needs.rest = 0;
+    else if (chosen === 'chatting') a.needs.chat = 0;
+    else if (chosen === 'coffee') a.needs.coffee = 0;
+    if (chosen === 'carrying' || chosen === 'chatting' || chosen === 'coffee'){
+      const ok = beginVisit(a, chosen === 'carrying' ? 'carry' : chosen === 'chatting' ? 'chat' : 'coffee');
+      if (!ok) a.nextTickAt = 2 + Math.random()*2;
+    } else {
+      a.nextTickAt = 3 + Math.random()*3;
+    }
   }
-  a.actionT += dt;
   switch(a.action){
-    case 'carrying': applyCarrying(a, t); break;
     case 'dozing': applyDozing(a, t); break;
-    case 'chatting': applyChatting(a, t, actors[a.partnerIndex]); break;
-    default: applyWorkingBounce(a, t);
+    case 'quirk': applyQuirk(a, t); break;
+    case 'working': applyWorkingBounce(a, t); break;
+    default: break; // carrying/chatting/coffee는 movePhase가 'going'으로 이미 바뀐 뒤 updateMovement가 처리
   }
 }
 
@@ -824,24 +1069,51 @@ function updateBazooka(dt, nowSec, level){
     bazookaAimT = Math.min(1, bazookaAimT + dt*2.2);
     if (nowSec*1000 >= bazookaNextFire){
       bazookaNextFire = nowSec*1000 + 1300 + Math.random()*600;
-      const tip = new THREE.Vector3(3.3, 1.17, ROW_Z - 0.7);
+      const tip = BAZOOKA_POS.clone(); tip.y += 0.22;
       fireSeed(tip, true);
-      bazookaGroup.rotation.z = -0.25; // 반동
+      bazookaGroup.rotation.z = -0.25;
     }
   } else {
     bazookaAimT = Math.max(0, bazookaAimT - dt*2.5);
     bazookaNextFire = 0;
   }
   bazookaGroup.rotation.x = -bazookaAimT*0.35;
-  bazookaGroup.rotation.z += (0 - bazookaGroup.rotation.z) * 0.1; // 반동 복귀
+  bazookaGroup.rotation.z += (0 - bazookaGroup.rotation.z) * 0.1;
+}
+
+// 모니터 화면 깜빡임(전원 공통, 가볍게) — "모니터 화면이 깜빡이는 효과"
+function updateMonitorFlicker(t){
+  for (const a of actors){
+    if (!a.monScreenMat) continue;
+    const f = 0.55 + 0.45*Math.max(0, Math.sin(t*1.7 + a.phase*3));
+    a.monScreenMat.color.setRGB(0.62*f + 0.2, 0.82*f + 0.1, 0.88*f + 0.1);
+  }
 }
 
 let clock = new THREE.Clock();
 let lastFpsShown = 0;
-let fpsEMA = 60, fpsAccum = 0, fpsFrames = 0, fpsLastUpdate = 0;
+let fpsEMA = 60, fpsAccum = 0, fpsFrames = 0;
 const fpsBox = document.getElementById('fpsBox');
 const dbgFpsEl = document.getElementById('dbgFps');
 const dbgTrisEl = document.getElementById('dbgTris');
+
+const ACTION_LABEL = { working:'일하기', carrying:'서류 나르기', chatting:'수다', dozing:'졸기', coffee:'커피', quirk:'버릇' };
+let brainAccum = 0;
+function updateBrainPanel(){
+  const rowsEl = document.getElementById('brainRows');
+  if (!rowsEl) return;
+  let html = '';
+  for (const a of actors){
+    const label = ACTION_LABEL[a.action] || a.action;
+    const bars = ['work','rest','chat','coffee'].map(k => {
+      const v = Math.min(1, (a.needs[k]||0) / 3.5);
+      const names = { work:'일', rest:'쉼', chat:'수다', coffee:'커피' };
+      return `<div class="brainBar"><span class="lbl">${names[k]}</span><div class="track"><div class="fill" style="width:${Math.round(v*100)}%"></div></div></div>`;
+    }).join('');
+    html += `<div class="brainRow"><span class="bName">${a.def.name}</span><span class="bAction">${label}${a.movePhase!=='idle' ? '('+a.movePhase+')' : ''}</span><div class="brainBars">${bars}</div></div>`;
+  }
+  rowsEl.innerHTML = html;
+}
 
 function renderLoop(){
   requestAnimationFrame(renderLoop);
@@ -850,6 +1122,7 @@ function renderLoop(){
   const nowSec = performance.now()/1000;
 
   for (const a of actors){
+    a.actionT += dt;
     if (currentLevel === 0){
       applyReturnToNormal(a, dt);
       if (a.hideAmt <= 0.01) tickUtilityAI(a, dt, t);
@@ -862,14 +1135,17 @@ function renderLoop(){
     } else {
       applyFleeing(a, t, dt);
     }
-    a.shadow.scale.setScalar(Math.max(0.3, 1 - Math.abs(a.wrapper.position.y - a.deskPos.y)*3));
+    a.shadow.position.set(a.wrapper.position.x, 0.01, a.wrapper.position.z);
+    a.shadow.scale.setScalar(Math.max(0.3, 1 - Math.abs(a.wrapper.position.y)*3));
+    updateThought(a);
   }
   updateBazooka(dt, nowSec, currentLevel);
   updateSeeds(nowSec);
+  updateDroppedPapers(nowSec);
+  updateMonitorFlicker(t);
 
   renderer.render(scene, camera);
 
-  // FPS 표시(250ms마다 갱신 — 매 프레임 DOM 갱신은 낭비)
   fpsFrames++; fpsAccum += dt;
   if (fpsAccum >= 0.25){
     const fps = fpsFrames / fpsAccum;
@@ -884,6 +1160,8 @@ function renderLoop(){
     }
     fpsAccum = 0; fpsFrames = 0;
   }
+  brainAccum += dt;
+  if (panelOpen && brainAccum >= 0.3){ updateBrainPanel(); brainAccum = 0; }
 }
 
 // ---- 숨은 조절 화면: 왼쪽 위 구석 5번 연속 탭(jg/index.html과 동일 패턴) ----
@@ -901,7 +1179,7 @@ cornerTap.addEventListener('touchend', (e) => { e.preventDefault(); onCornerTap(
 function setPanelOpen(open){
   panelOpen = open;
   debugPanel.style.display = open ? 'block' : 'none';
-  if (open) document.getElementById('dbgFaceDelegate').textContent = faceDelegate;
+  if (open){ document.getElementById('dbgFaceDelegate').textContent = faceDelegate; updateBrainPanel(); }
 }
 document.getElementById('bodyToggle').addEventListener('change', (e) => {
   bodyEnabled = e.target.checked;
@@ -910,20 +1188,25 @@ document.getElementById('bodyToggle').addEventListener('change', (e) => {
 document.querySelectorAll('#countBtns button').forEach(btn => {
   btn.addEventListener('click', () => setFriendCount(Number(btn.dataset.n)));
 });
-// 시험 자동화용 훅(Playwright) — 사장님 손가락이 아니라 스크립트로 친구 수를 바꿔 FPS를 잴 때만 씀.
-// 숨은 조절 화면 버튼과 똑같은 함수를 그대로 부르는 것뿐이라 동작 차이 없음.
+// 시험 자동화용 훅(Playwright) — 사장님 손가락 대신 스크립트로 친구 수/두뇌 보기를 조작할 때만 씀.
 window.__jgSetFriendCount = setFriendCount;
+window.__jgOpenBrainPanel = () => setPanelOpen(true);
+// 시험 자동화용 읽기 전용 훅 — 각 친구의 지금 행동·이동상태·위치를 로그로 확인할 때만 씀(화면엔 영향 없음).
+window.__jgActors = () => actors.map(a => ({
+  key: a.key, action: a.action, movePhase: a.movePhase,
+  x: Math.round(a.wrapper.position.x*100)/100, z: Math.round(a.wrapper.position.z*100)/100,
+}));
 
 // ===================================================================================
 // §4. 시작
 // ===================================================================================
 onResize();
-renderLoop(); // 카메라 준비 전에도 장면은 바로 그려짐(까맣게 비지 않게)
+renderLoop();
 
 (async () => {
   loadingMsg.textContent = '3D 모델 불러오는 중…';
   await loadAllTemplates();
-  setFriendCount(2); // 시작은 친구 2명(도토리·밤)만
+  setFriendCount(2);
   loadingMsg.textContent = '';
 })();
 
