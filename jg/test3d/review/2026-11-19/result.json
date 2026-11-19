@@ -1,0 +1,59 @@
+{
+  "version": "2026-11-19-6",
+  "completed_at": "2026-11-19T05:19:58.759629+00:00",
+  "output_file": "jg/test3d/index.html",
+  "sha256": "f1e6662876125182eeb4c5ea415230bc0f58c88e629f05b5adacf02e269a4173",
+  "reference": {
+    "title": "20261104 office v8 - first scene",
+    "drive_url": "https://drive.google.com/file/d/1pP0iVPmIeJdsQVlyTuhkl-KXn-i8yjXh/view"
+  },
+  "changes": [
+    "Staggered three front and four rear seats, with face clearance",
+    "Thin desk tops and legs; monitors beside faces",
+    "Closer daylight window and reduced floor area",
+    "Perspective fit from actual model and desk bounds; recompute on resize",
+    "Foreground chair anchored to lower-left screen coordinates"
+  ],
+  "validation": {
+    "source": {
+      "detection_unchanged": true,
+      "behavior_and_render_unchanged": true,
+      "model_loading_unchanged": true,
+      "production_jg_unchanged": true,
+      "module_syntax": true
+    },
+    "framing_cases": 16,
+    "framing_passed": 16,
+    "motion": {
+      "actions": [
+        "working",
+        "chatting",
+        "dozing",
+        "coffee"
+      ],
+      "clippedActors": [],
+      "clippedSamples": 0,
+      "durationSeconds": 40,
+      "errors": [],
+      "phases": [
+        "idle",
+        "going",
+        "busy",
+        "returning"
+      ],
+      "samples": 201
+    }
+  },
+  "screenshots": {
+    "before": "before-7.png",
+    "after": "after-7.png",
+    "two_friends": "after-2.png",
+    "tablet_aspect": "after-tablet-7.png"
+  },
+  "limits": [
+    "Camera acquisition and face detection were not exercised. Detection source is unchanged.",
+    "No physical LG Ultra Tab performance measurement.",
+    "Portrait views keep all characters in frame at a smaller scale.",
+    "Tablet screenshot shows a 2000x1200 render scaled to fit the managed browser viewport."
+  ]
+}

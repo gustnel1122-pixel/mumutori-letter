@@ -1,0 +1,250 @@
+﻿{
+  "checks": [
+    {
+      "actualHeight": 1200,
+      "actualWidth": 2000,
+      "count": 2,
+      "height": 1200,
+      "heightRatios": [
+        0.355,
+        0.269
+      ],
+      "maxExtent": 0.7686202008178709,
+      "visible": true,
+      "width": 2000
+    },
+    {
+      "actualHeight": 1200,
+      "actualWidth": 2000,
+      "count": 3,
+      "height": 1200,
+      "heightRatios": [
+        0.355,
+        0.269,
+        0.249
+      ],
+      "maxExtent": 0.7686202008178709,
+      "visible": true,
+      "width": 2000
+    },
+    {
+      "actualHeight": 1200,
+      "actualWidth": 2000,
+      "count": 5,
+      "height": 1200,
+      "heightRatios": [
+        0.344,
+        0.263,
+        0.243,
+        0.364,
+        0.251
+      ],
+      "maxExtent": 0.7798177506646237,
+      "visible": true,
+      "width": 2000
+    },
+    {
+      "actualHeight": 1200,
+      "actualWidth": 2000,
+      "count": 7,
+      "height": 1200,
+      "heightRatios": [
+        0.291,
+        0.232,
+        0.215,
+        0.307,
+        0.221,
+        0.267,
+        0.224
+      ],
+      "maxExtent": 0.892261059046244,
+      "visible": true,
+      "width": 2000
+    },
+    {
+      "actualHeight": 1080,
+      "actualWidth": 1920,
+      "count": 2,
+      "height": 1080,
+      "heightRatios": [
+        0.355,
+        0.269
+      ],
+      "maxExtent": 0.7686202008178709,
+      "visible": true,
+      "width": 1920
+    },
+    {
+      "actualHeight": 1080,
+      "actualWidth": 1920,
+      "count": 3,
+      "height": 1080,
+      "heightRatios": [
+        0.355,
+        0.269,
+        0.249
+      ],
+      "maxExtent": 0.7686202008178709,
+      "visible": true,
+      "width": 1920
+    },
+    {
+      "actualHeight": 1080,
+      "actualWidth": 1920,
+      "count": 5,
+      "height": 1080,
+      "heightRatios": [
+        0.344,
+        0.263,
+        0.243,
+        0.364,
+        0.251
+      ],
+      "maxExtent": 0.7798177506646237,
+      "visible": true,
+      "width": 1920
+    },
+    {
+      "actualHeight": 1080,
+      "actualWidth": 1920,
+      "count": 7,
+      "height": 1080,
+      "heightRatios": [
+        0.316,
+        0.246,
+        0.228,
+        0.333,
+        0.235,
+        0.289,
+        0.238
+      ],
+      "maxExtent": 0.8917498590829137,
+      "visible": true,
+      "width": 1920
+    },
+    {
+      "actualHeight": 2000,
+      "actualWidth": 1200,
+      "count": 2,
+      "height": 2000,
+      "heightRatios": [
+        0.143,
+        0.128
+      ],
+      "maxExtent": 0.8018214336917899,
+      "visible": true,
+      "width": 1200
+    },
+    {
+      "actualHeight": 2000,
+      "actualWidth": 1200,
+      "count": 3,
+      "height": 2000,
+      "heightRatios": [
+        0.143,
+        0.128,
+        0.12
+      ],
+      "maxExtent": 0.8018214336917899,
+      "visible": true,
+      "width": 1200
+    },
+    {
+      "actualHeight": 2000,
+      "actualWidth": 1200,
+      "count": 5,
+      "height": 2000,
+      "heightRatios": [
+        0.136,
+        0.122,
+        0.114,
+        0.141,
+        0.117
+      ],
+      "maxExtent": 0.8992022204780125,
+      "visible": true,
+      "width": 1200
+    },
+    {
+      "actualHeight": 2000,
+      "actualWidth": 1200,
+      "count": 7,
+      "height": 2000,
+      "heightRatios": [
+        0.091,
+        0.086,
+        0.08,
+        0.094,
+        0.082,
+        0.085,
+        0.083
+      ],
+      "maxExtent": 0.8971985642641175,
+      "visible": true,
+      "width": 1200
+    },
+    {
+      "actualHeight": 844,
+      "actualWidth": 390,
+      "count": 2,
+      "height": 844,
+      "heightRatios": [
+        0.11,
+        0.101
+      ],
+      "maxExtent": 0.8224438581510838,
+      "visible": true,
+      "width": 390
+    },
+    {
+      "actualHeight": 844,
+      "actualWidth": 390,
+      "count": 3,
+      "height": 844,
+      "heightRatios": [
+        0.11,
+        0.101,
+        0.095
+      ],
+      "maxExtent": 0.8224438581510838,
+      "visible": true,
+      "width": 390
+    },
+    {
+      "actualHeight": 844,
+      "actualWidth": 390,
+      "count": 5,
+      "height": 844,
+      "heightRatios": [
+        0.102,
+        0.095,
+        0.089,
+        0.105,
+        0.091
+      ],
+      "maxExtent": 0.8993854711288557,
+      "visible": true,
+      "width": 390
+    },
+    {
+      "actualHeight": 844,
+      "actualWidth": 390,
+      "count": 7,
+      "height": 844,
+      "heightRatios": [
+        0.069,
+        0.066,
+        0.062,
+        0.071,
+        0.064,
+        0.065,
+        0.064
+      ],
+      "maxExtent": 0.8978409514191075,
+      "visible": true,
+      "width": 390
+    }
+  ],
+  "errors": [],
+  "restored": 1.904564315352697
+}

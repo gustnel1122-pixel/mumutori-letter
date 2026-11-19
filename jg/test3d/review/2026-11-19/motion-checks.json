@@ -1,0 +1,19 @@
+﻿{
+  "actions": [
+    "working",
+    "chatting",
+    "dozing",
+    "coffee"
+  ],
+  "clippedActors": [],
+  "clippedSamples": 0,
+  "durationSeconds": 40,
+  "errors": [],
+  "phases": [
+    "idle",
+    "going",
+    "busy",
+    "returning"
+  ],
+  "samples": 201
+}
