@@ -123,7 +123,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-19-6 · three.js r160 · GLB 7종 11/16판 · v6(앞뒤 자리 배치·화면 비율별 구도)</div>
+    <div class="ver">버전 2026-11-20-7b · three.js r160 · GLB 7종 11/16판 · v7(3줄 원근·배 높이 책상·바퀴 의자)</div>
   </div>
 </div>
 
@@ -143,7 +143,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-19-6';
+const VERSION = '2026-11-20-7b';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
@@ -363,23 +363,49 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
-// ---- 뒷벽 = 거의 전체가 큰 창(밝은 하늘색, 거의 흰빛), 위아래 살짝만 벽 ----
+// ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
 const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
-const WINDOW_Z = -3.6;
-const backWallTop = new THREE.Mesh(new THREE.PlaneGeometry(40, 1.1), wallMat);
-backWallTop.position.set(0, 4.55, WINDOW_Z);
-scene.add(backWallTop);
-const windowMat = new THREE.MeshBasicMaterial({ color: 0xEEF5FB }); // 창은 실내 조명에 영향받지 않는 밝은 면
-const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(40, 8), windowMat);
-bigWindow.position.set(0, 4.0, WINDOW_Z - 0.02);
+const WINDOW_Z = -6.3;
+const WINDOW_WIDTH = 12.4;
+const WINDOW_BOTTOM = 0.18;
+const WINDOW_HEIGHT = 4.6;
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 12), wallMat);
+backWall.position.set(0, 4, WINDOW_Z - 0.1);
+scene.add(backWall);
+
+// 작은 그라데이션 텍스처로 창 너머의 밝은 하늘을 표현한다.
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 64; skyCanvas.height = 256;
+const skyContext = skyCanvas.getContext('2d');
+const skyGradient = skyContext.createLinearGradient(0, 0, 0, 256);
+skyGradient.addColorStop(0, '#E4EDFF');
+skyGradient.addColorStop(0.65, '#F2F6FF');
+skyGradient.addColorStop(1, '#F9FCFF');
+skyContext.fillStyle = skyGradient;
+skyContext.fillRect(0, 0, 64, 256);
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+skyTexture.colorSpace = THREE.SRGBColorSpace;
+const windowMat = new THREE.MeshBasicMaterial({ map: skyTexture });
+const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(WINDOW_WIDTH, WINDOW_HEIGHT), windowMat);
+bigWindow.position.set(0, WINDOW_BOTTOM + WINDOW_HEIGHT / 2, WINDOW_Z);
 scene.add(bigWindow);
-// 창틀(세로 분할 몇 개 — 복잡한 디자인 없이 단순 기둥)
-const muntinMat = new THREE.MeshLambertMaterial({ color: 0xCFCFC8 });
-for (let i = -5; i <= 5; i++){
-  const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 8, 0.1), muntinMat);
-  m.position.set(i*3.4, 4.0, WINDOW_Z);
-  scene.add(m);
+
+const windowFrameMat = new THREE.MeshLambertMaterial({ color: 0xCED5DB });
+const windowSillMat = new THREE.MeshLambertMaterial({ color: 0xFAFBFC });
+function addWindowFrame(width, height, depth, x, y, material = windowFrameMat){
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  frame.position.set(x, y, WINDOW_Z + depth / 2);
+  scene.add(frame);
 }
+for (const x of [-WINDOW_WIDTH / 2, WINDOW_WIDTH / 2]){
+  addWindowFrame(0.11, WINDOW_HEIGHT + 0.16, 0.16, x, WINDOW_BOTTOM + WINDOW_HEIGHT / 2);
+}
+// 중앙 유리 한 장의 폭을 넓게 남겨 창살처럼 잘게 나뉘어 보이지 않게 한다.
+for (const x of [-4.35, 4.35]){
+  addWindowFrame(0.045, WINDOW_HEIGHT, 0.08, x, WINDOW_BOTTOM + WINDOW_HEIGHT / 2);
+}
+addWindowFrame(WINDOW_WIDTH + 0.2, 0.1, 0.16, 0, WINDOW_BOTTOM + WINDOW_HEIGHT);
+addWindowFrame(WINDOW_WIDTH + 0.3, 0.12, 0.32, 0, WINDOW_BOTTOM - 0.02, windowSillMat);
 
 // ---- 화분(양옆, 전판처럼) — 단순 도형 ----
 function buildPlant(x, z, scale){
@@ -400,9 +426,9 @@ function buildPlant(x, z, scale){
   g.scale.setScalar(scale);
   scene.add(g);
 }
-buildPlant(-3.35, -1.8, 0.85);
-buildPlant(3.55, -1.8, 0.8);
-buildPlant(-2.65, -2.35, 0.5);
+buildPlant(-4.75, -5.25, 0.95);
+buildPlant(4.75, -5.25, 0.9);
+buildPlant(-3.85, -2.5, 0.55);
 
 // ---- 전판 특징: 왼쪽 아래 구석에 살짝만 걸친 의자 등받이(메시 느낌 — 반투명·작게) ----
 // 총괄 피드백: 전엔 화면 1/6을 훨씬 넘는 큰 검은 네모라 "화면 고장"처럼 보였음 → 훨씬 작고
@@ -428,7 +454,7 @@ function updateForeChair(){
 const bazookaGroup = new THREE.Group();
 const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
 const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
-const BAZOOKA_POS = new THREE.Vector3(3.45, 0.52, -2.1); // 얼굴 옆을 비우고 창가 오른쪽 구석으로
+const BAZOOKA_POS = new THREE.Vector3(4.6, 0.48, WINDOW_Z + 0.2);
 shelf.position.copy(BAZOOKA_POS);
 scene.add(shelf);
 const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
@@ -448,7 +474,7 @@ let bazookaAimT = 0;
 let bazookaNextFire = 0;
 
 // ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
-const COFFEE_SPOT = new THREE.Vector3(-2.35, 0, -1.65); // v5: 좁아진 자리 배치에 맞춰 가까이로
+const COFFEE_SPOT = new THREE.Vector3(-3.35, 0, -1.65); // 세 줄 책상 바깥쪽의 왼쪽 통로
 (function buildCoffeeCorner(){
   const tableMat = new THREE.MeshLambertMaterial({ color: 0xF2F0EC });
   const table = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), tableMat);
@@ -655,21 +681,21 @@ async function loadAllTemplates(){
   loadingMsg.textContent = '';
 }
 
-// ---- 기준 사진 ①의 앞줄 3명 / 뒷줄 4명 배치. 앞줄 사이로 뒤쪽 얼굴이 보이게 엇갈림. ----
-// +z가 손님 쪽. 인원수를 바꿔도 같은 친구는 같은 자리를 쓰고, 카메라만 선택된 자리에 맞춘다.
+// ---- 앞줄 3 / 중간줄 3 / 뒷줄 1. 간격을 벌려 앞은 크게, 뒤는 작고 멀게 보이게 한다. ----
+// +z가 손님 쪽. 빈 책상도 유지해 친구가 2명이어도 사무실은 항상 세 줄이다.
 const LAYOUT_SLOTS = [
-  { dx: 0.00, dz: 0.35, yaw: 0.14 }, // 도토리 — 앞줄 가운데
-  { dx:-2.65, dz:-1.35, yaw: 0.20 }, // 밤 — 뒷줄 왼쪽
-  { dx:-0.78, dz:-1.35, yaw: 0.12 }, // 땅콩
-  { dx:-1.55, dz: 0.45, yaw: 0.22 }, // 병아리콩 — 앞줄 왼쪽
-  { dx: 0.78, dz:-1.35, yaw:-0.12 }, // 완두콩삼형제
-  { dx: 1.55, dz: 0.45, yaw:-0.18 }, // 해바라기씨 — 앞줄 오른쪽
-  { dx: 2.85, dz:-1.35, yaw:-0.20 }, // 쌀 — 뒷줄 오른쪽
+  { dx: 0.00, dz: 1.20, yaw: 0.14, row:'front' },  // 도토리
+  { dx:-2.85, dz:-1.40, yaw: 0.20, row:'middle' }, // 밤
+  { dx:-0.80, dz:-1.40, yaw: 0.12, row:'middle' }, // 땅콩
+  { dx:-2.15, dz: 1.20, yaw: 0.22, row:'front' },  // 병아리콩
+  { dx: 1.30, dz:-1.40, yaw:-0.12, row:'middle' }, // 완두콩삼형제
+  { dx: 2.10, dz: 1.20, yaw:-0.18, row:'front' },  // 해바라기씨
+  { dx: 2.65, dz:-4.20, yaw:-0.20, row:'back' },   // 쌀
 ];
 
-const DESK_TOP_Y = 0.24;       // 흰 책상 윗면 높이 — 총괄 피드백: 전경 소품이 키의 1/3(≈0.32) 이하여야 함
+const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
-const CHAIR_BACK = 0.16;       // 검은 의자는 캐릭터 바로 뒤(작게) — 몸에 거의 가려짐
+const CHAIR_BACK = 0.24;       // 검은 바퀴 의자를 친구 바로 뒤에 둔다.
 
 const deskMats = {
   desk: new THREE.MeshLambertMaterial({ color: 0xF7F6F2 }),
@@ -696,13 +722,13 @@ function buildDeskForSlot(pos, yaw, bonus){
   const sideVec0 = new THREE.Vector3(dir.z, 0, -dir.x);
 
   // 얇은 상판과 다리로 사무용 책상을 표현. 낮은 흰 상자처럼 보이던 덩어리를 없앤다.
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.045, 0.42), deskMats.desk);
-  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 0.4);
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.045, 0.60), deskMats.desk);
+  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 1.0);
   desk.position.y = DESK_TOP_Y - 0.0225;
   desk.rotation.y = yaw;
   g.add(desk);
-  for (const x of [-0.36, 0.36]){
-    for (const z of [-0.16, 0.16]){
+  for (const x of [-0.50, 0.50]){
+    for (const z of [-0.25, 0.25]){
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.035, DESK_TOP_Y - 0.045, 0.035), deskMats.desk);
       leg.position.copy(desk.position).addScaledVector(sideVec0, x).addScaledVector(dir, z);
       leg.position.y = (DESK_TOP_Y - 0.045) / 2;
@@ -713,20 +739,21 @@ function buildDeskForSlot(pos, yaw, bonus){
 
   // 모니터(연회색 틀 + 화면 — 화면은 캐릭터별로 다른 재질 인스턴스라 따로 깜빡일 수 있음)
   // 총괄 v5 피드백: 전경 소품이 얼굴을 가리는 비율이 너무 컸음 → 더 작게
-  const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.015), deskMats.monFrame);
+  const monFrame = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.025), deskMats.monFrame);
+  monFrame.userData.isMonitor = true;
   const monScreenMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA });
-  const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.165, 0.105, 0.01), monScreenMat);
-  const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.06, 0.04), deskMats.monFrame);
-  const monBase = desk.position.clone().addScaledVector(dir, 0.08).addScaledVector(sideVec0, 0.12);
-  const monFront = monBase.clone().addScaledVector(dir, -0.012); // 화면을 틀보다 캐릭터 쪽으로 살짝 더 — z-fighting(겹쳐서 까맣게 보이던 버그) 방지
-  monFrame.position.set(monBase.x, DESK_TOP_Y + 0.14, monBase.z);
-  monScreen.position.set(monFront.x, DESK_TOP_Y + 0.14, monFront.z);
-  monStand.position.set(monBase.x, DESK_TOP_Y + 0.04, monBase.z);
+  const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.19, 0.01), monScreenMat);
+  const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.10, 0.06), deskMats.monFrame);
+  const monBase = desk.position.clone().addScaledVector(dir, 0.08).addScaledVector(sideVec0, 0.30);
+  const monFront = monBase.clone().addScaledVector(dir, -0.02);
+  monFrame.position.set(monBase.x, DESK_TOP_Y + 0.18, monBase.z);
+  monScreen.position.set(monFront.x, DESK_TOP_Y + 0.18, monFront.z);
+  monStand.position.set(monBase.x, DESK_TOP_Y + 0.05, monBase.z);
   monFrame.rotation.y = monScreen.rotation.y = monStand.rotation.y = yaw;
   g.add(monFrame, monScreen, monStand);
 
   // 키보드
-  const kb = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.08), deskMats.keyboard);
+  const kb = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.012, 0.11), deskMats.keyboard);
   const kbPos = desk.position.clone().addScaledVector(dir, -0.06).addScaledVector(new THREE.Vector3(dir.z,0,-dir.x), 0.01);
   kb.position.set(kbPos.x, DESK_TOP_Y + 0.012, kbPos.z);
   kb.rotation.y = yaw;
@@ -734,13 +761,13 @@ function buildDeskForSlot(pos, yaw, bonus){
 
   // 연필꽂이(원통 + 연필 2개)
   const sideVec = new THREE.Vector3(dir.z, 0, -dir.x); // yaw 기준 오른쪽 방향
-  const cupPos = desk.position.clone().addScaledVector(sideVec, 0.32);
-  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.06, 8), deskMats.pencup);
-  cup.position.set(cupPos.x, DESK_TOP_Y + 0.03, cupPos.z);
+  const cupPos = desk.position.clone().addScaledVector(sideVec, 0.49);
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.038, 0.08, 8), deskMats.pencup);
+  cup.position.set(cupPos.x, DESK_TOP_Y + 0.04, cupPos.z);
   g.add(cup);
   for (let i = 0; i < 2; i++){
-    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.1, 5), deskMats.pen);
-    pen.position.set(cupPos.x + (i?0.012:-0.01), DESK_TOP_Y + 0.08, cupPos.z);
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.14, 5), deskMats.pen);
+    pen.position.set(cupPos.x + (i?0.012:-0.01), DESK_TOP_Y + 0.10, cupPos.z);
     pen.rotation.z = i ? 0.15 : -0.1;
     g.add(pen);
   }
@@ -760,14 +787,31 @@ function buildDeskForSlot(pos, yaw, bonus){
     g.add(pot, leaf);
   }
 
-  // 검은 사무용 의자 — 작게, 캐릭터 바로 뒤라 몸에 많이 가려짐.
-  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.3, 0.06), deskMats.chair);
-  const chairSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.05, 10), deskMats.chair);
-  const chairPos = pos.clone().addScaledVector(back, CHAIR_BACK);
-  chairBack.position.set(chairPos.x, 0.44, chairPos.z);
-  chairBack.rotation.y = yaw;
-  chairSeat.position.set(pos.x, 0.22, pos.z);
-  g.add(chairBack, chairSeat);
+  // 등받이·좌판·중심봉·다섯 갈래 다리·바퀴를 갖춘 검은 사무용 의자.
+  const chair = new THREE.Group();
+  chair.userData.isOfficeChair = true;
+  const chairPos = pos.clone().addScaledVector(back, CHAIR_BACK).addScaledVector(sideVec0, -0.16);
+  chair.position.copy(chairPos);
+  chair.rotation.y = yaw;
+  const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.40, 0.055), deskMats.chair);
+  chairBack.position.set(0, 0.40, -0.16);
+  const chairSeat = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.045, 10), deskMats.chair);
+  chairSeat.position.y = 0.17;
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.11, 6), deskMats.chair);
+  stem.position.y = 0.10;
+  chair.add(chairBack, chairSeat, stem);
+  for (let i = 0; i < 5; i++){
+    const angle = i * Math.PI * 2 / 5;
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.025, 0.27), deskMats.chair);
+    spoke.position.set(Math.sin(angle) * 0.135, 0.065, Math.cos(angle) * 0.135);
+    spoke.rotation.y = angle;
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.045, 6), deskMats.chair);
+    wheel.position.set(Math.sin(angle) * 0.27, 0.037, Math.cos(angle) * 0.27);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.userData.isCaster = true;
+    chair.add(spoke, wheel);
+  }
+  g.add(chair);
 
   g.userData.monScreenMat = monScreenMat;
   g.position.set(0,0,0); // 전부 이미 절대좌표로 넣었으니 그룹 자체는 원점
@@ -838,24 +882,26 @@ function clearActors(){
 function setFriendCount(n){
   friendCount = n;
   clearActors();
-  const keys = FRIEND_ORDER.slice(0, n);
-  keys.forEach((key, i) => {
-    const slot = LAYOUT_SLOTS[i];
-    const actor = createActor(key, slot);
-    const deskGroup = buildDeskForSlot(actor.homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length]);
+  LAYOUT_SLOTS.forEach((slot, i) => {
+    const homePos = new THREE.Vector3(slot.dx, 0, slot.dz);
+    const deskGroup = buildDeskForSlot(homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length]);
+    deskGroup.userData.slotIndex = i;
+    deskGroup.userData.row = slot.row;
     scene.add(deskGroup);
+    if (i >= n) return;
+    const actor = createActor(FRIEND_ORDER[i], slot);
     actor.monScreenMat = deskGroup.userData.monScreenMat;
     actors.push(actor);
   });
   actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
-  updateCameraFraming(keys.length);
+  updateCameraFraming(n);
   document.querySelectorAll('#countBtns button').forEach(b => {
     b.classList.toggle('active', Number(b.dataset.n) === n);
   });
 }
 
 // ---- 구도: 실제 캐릭터·책상의 외곽을 투영해 맞춘다(자리 중심의 반지름만으로 계산하지 않음).
-// 기준 사진 ①처럼 낮은 시점, 앞줄/뒷줄의 깊이, 위쪽의 넓은 창을 유지한다.
+// 세 줄의 높이 차가 보이는 시점과 위쪽의 넓은 창을 유지한다.
 let compositionBounds = new THREE.Box3();
 function updateCameraFraming(n){
   if (!actors.length) return;
@@ -884,13 +930,13 @@ function updateCameraFraming(n){
     COFFEE_SPOT.clone().add(new THREE.Vector3(0.7, 1.34, 0.9))));
   compositionBounds.copy(bounds);
 
-  camera.fov = 32;
+  camera.fov = 36;
   const halfVFOV = THREE.MathUtils.degToRad(camera.fov / 2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const pitch = THREE.MathUtils.degToRad(8);
+  const pitch = THREE.MathUtils.degToRad(15);
   const sin = Math.sin(pitch), cos = Math.cos(pitch);
   const center = bounds.getCenter(new THREE.Vector3());
-  const target = new THREE.Vector3(center.x, 1.0, center.z);
+  const target = new THREE.Vector3(center.x, 0.80, center.z);
   // 앞쪽 끝을 거리 기준으로 삼아 2~3명일 때도 앞줄 친구가 화면 높이의 약 1/3을 유지한다.
   let distance = (TARGET_HEIGHT / 0.32) / (2 * Math.tan(halfVFOV))
     + (bounds.max.z - target.z) * cos;
@@ -1263,6 +1309,15 @@ window.__jgComposition = () => ({
   version: VERSION, width: canvas.width, height: canvas.height, aspect: camera.aspect,
   camera: camera.position.toArray(),
   bounds: {min: compositionBounds.min.toArray(), max: compositionBounds.max.toArray()},
+  desks: scene.children.filter(o => o.userData.isDesk).map(o => {
+    const screen = o.children[0].getWorldPosition(new THREE.Vector3()).project(camera);
+    return {slot: o.userData.slotIndex, row: o.userData.row,
+      position: [LAYOUT_SLOTS[o.userData.slotIndex].dx, LAYOUT_SLOTS[o.userData.slotIndex].dz],
+      screen: screen.toArray()};
+  }),
+  window: {width: WINDOW_WIDTH, height: WINDOW_HEIGHT, z: WINDOW_Z,
+    corners: [-1, 1].flatMap(x => [0, 1].map(y => new THREE.Vector3(
+      x * WINDOW_WIDTH / 2, WINDOW_BOTTOM + y * WINDOW_HEIGHT, WINDOW_Z).project(camera).toArray()))},
   actors: actors.map(a => {
     const box = new THREE.Box3().setFromObject(a.wrapper);
     const points = [];
@@ -1273,6 +1328,45 @@ window.__jgComposition = () => ({
       bottom: Math.min(...points.map(p => p.y)), top: Math.max(...points.map(p => p.y)) };
   }),
 });
+window.__jgFurniture = () => {
+  const desks = scene.children.filter(o => o.userData.isDesk);
+  let chairs = 0, casters = 0;
+  for (const desk of desks) desk.traverse(o => {
+    if (o.userData.isOfficeChair) chairs++;
+    if (o.userData.isCaster) casters++;
+  });
+  return {desks: desks.length, chairs, casters, deskTopHeight: DESK_TOP_Y};
+};
+// 가구가 눈을 가리는지 실제 EyeIris 메시의 표면점으로 확인하는 읽기 전용 검사.
+window.__jgEyeClearance = () => {
+  const furniture = scene.children.filter(o => o.userData.isDesk);
+  const ray = new THREE.Raycaster();
+  return actors.map(a => {
+    let samples = 0, blocked = 0;
+    const blockedBy = {};
+    a.wrapper.updateMatrixWorld(true);
+    a.wrapper.traverse(o => {
+      if (!o.isMesh || !/^EyeIris/.test(o.name)) return;
+      const positions = o.geometry.attributes.position;
+      for (let i = 0; i < positions.count; i += Math.max(1, Math.floor(positions.count / 64))){
+        const point = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(o.matrixWorld);
+        const direction = point.clone().sub(camera.position);
+        ray.set(camera.position, direction.clone().normalize());
+        ray.far = direction.length() - 0.01;
+        samples++;
+        const hit = ray.intersectObjects(furniture, true)[0];
+        if (hit){
+          blocked++;
+          let owner = hit.object;
+          while (owner.parent && !owner.userData.isDesk) owner = owner.parent;
+          const slot = owner.userData.slotIndex;
+          blockedBy[slot] = (blockedBy[slot] || 0) + 1;
+        }
+      }
+    });
+    return {key: a.key, samples, blocked, blockedBy};
+  });
+};
 
 // ===================================================================================
 // §4. 시작
