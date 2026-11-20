@@ -123,7 +123,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-20-7b · three.js r160 · GLB 7종 11/16판 · v7(3줄 원근·배 높이 책상·바퀴 의자)</div>
+    <div class="ver">버전 2026-11-20-7c · three.js r160 · GLB 7종 11/16판 · v7(3줄 원근·배 높이 책상·바퀴 의자)</div>
   </div>
 </div>
 
@@ -143,7 +143,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-20-7b';
+const VERSION = '2026-11-20-7c';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
@@ -429,26 +429,6 @@ function buildPlant(x, z, scale){
 buildPlant(-4.75, -5.25, 0.95);
 buildPlant(4.75, -5.25, 0.9);
 buildPlant(-3.85, -2.5, 0.55);
-
-// ---- 전판 특징: 왼쪽 아래 구석에 살짝만 걸친 의자 등받이(메시 느낌 — 반투명·작게) ----
-// 총괄 피드백: 전엔 화면 1/6을 훨씬 넘는 큰 검은 네모라 "화면 고장"처럼 보였음 → 훨씬 작고
-// 반투명(메시 소재 느낌)하게, 구석에 살짝만 걸치도록 위치도 더 가깝고 왼쪽으로.
-const foreChairMat = new THREE.MeshLambertMaterial({ color: 0x4a4b52, transparent:true, opacity:0.5 });
-const foreChairBack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.05), foreChairMat);
-scene.add(foreChairBack);
-// 카메라 기준 상대 위치로 매번 다시 둠(인원수마다 카메라 거리가 달라도 항상 왼쪽 아래 구석에만
-// 살짝 걸치게) — updateCameraFraming() 끝에서 updateForeChair()를 호출.
-function updateForeChair(){
-  // 화면 좌표로 고정: 화각·가로세로 비율이 바뀌어도 왼쪽 아래 6% 높이에만 걸침.
-  const distance = 1.35;
-  const viewHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const viewWidth = viewHeight * camera.aspect;
-  foreChairBack.position.set(-viewWidth * 0.43, -viewHeight * 0.54, -distance)
-    .applyMatrix4(camera.matrixWorld);
-  foreChairBack.quaternion.copy(camera.quaternion);
-  foreChairBack.rotateY(0.3);
-  foreChairBack.scale.set(viewWidth * 0.25 / 0.3, viewHeight * 0.2 / 0.3, 1);
-}
 
 // ---- 씨앗 바주카(새 소품 — 단순 원통, 정본 색상 계열), 코너 선반 위 ----
 const bazookaGroup = new THREE.Group();
@@ -952,7 +932,6 @@ function updateCameraFraming(n){
   camera.lookAt(target);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
-  updateForeChair();
 }
 
 function onResize(){
