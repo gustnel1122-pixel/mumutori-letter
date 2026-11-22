@@ -93,7 +93,7 @@
 
   <div id="startOverlay">
     <div style="font-size:22px;font-weight:700">진격의 오피스 — 3D 시험판</div>
-    <p>친구 일곱이 사무실에서 일하고 있어요. 가까이 오면 씨앗 던지기·깍지 총·도토리 바주카로 장난을 치고, 엉망이 된 유리창은 잠시 뒤 깨끗해져요.
+    <p>친구 일곱이 사무실에서 일하고 있어요. 손님을 발견하면 다 같이 씨앗 장난감을 챙겨 장난을 치고 숨어요. 손님이 지나가면 빼꼼 고개를 내밀고 다시 일해요.
        왼쪽 위 구석을 5번 빠르게 탭하면 숨은 조절 화면(두뇌 보기 포함)이 나와요.</p>
     <div id="loadingMsg"></div>
     <button id="startBtn">탭해서 시작하기</button>
@@ -110,6 +110,7 @@
     <div class="row"><span>현재 레벨</span><span id="dbgLevel">0</span></div>
     <div class="row"><span>얼굴 가속</span><span id="dbgFaceDelegate">-</span></div>
     <div class="row"><span>삼각형 수</span><span id="dbgTris">-</span></div>
+    <div class="row"><span>현재 화질 · 픽셀비</span><span id="dbgQuality">high · 시작 중</span></div>
 
     <label><input type="checkbox" id="bodyToggle"> 몸 감지 사용(무거움·기본 꺼짐)</label>
 
@@ -122,15 +123,17 @@
     </div>
 
     <button id="scenePreview" class="previewButton">장면 미리보기 · 카메라 없이</button>
+    <label>사람 감지 시험 · 카메라 없이</label>
+    <select id="personPreview"><option value="">실제 카메라 감지 사용</option><option value="0">사람 없음</option><option value="1">손님 발견 · 계속 머무름</option><option value="3">손님이 아주 가까움</option></select>
     <label>감정 미리보기</label>
     <select id="emotionPreview"><option value="">자동</option><option value="working">평소 · 일하는 중</option><option value="surprised">깜짝 · 발견</option><option value="determined">결심 · 준비</option><option value="excited">신남</option><option value="proud">뿌듯 · 웃음</option><option value="tired">졸림 · 지침</option></select>
-    <label>화질</label><select id="qualityChoice"><option value="auto">자동 · FPS에 맞춤</option><option value="high">선명함 · 부드러운 그림자</option><option value="medium">균형</option><option value="low">가벼움 · 그림자 끔</option></select>
+    <label>화질</label><select id="qualityChoice"><option value="auto">자동 · 24FPS 아래 5초 넘으면 조절</option><option value="high">고화질 · 2048 그림자 · SSAO</option><option value="medium">균형 · 원래 해상도 유지</option><option value="low">가벼움 · 512 그림자</option></select>
     <div id="brainView">
       <h4>🧠 두뇌 보기 — 친구마다 지금 하는 일</h4>
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-22-8c · 정본 GLB 7종 · 감정 6종 · 가운데까지 채우는 친구 구도</div>
+    <div class="ver">버전 2026-11-23-8d · 전원 전투·무기 챙기기·도망 · CC0 가구·HDRI</div>
   </div>
 </div>
 
@@ -146,13 +149,13 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261122-8c';
+import {createV8} from './v8-runtime.js?v=20261123-8d';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-22-8c';
+const VERSION = '2026-11-23-8d';
 // Display transforms only: the canonical GLBs and their proportions stay intact.
 const COMPOSITION = {actorScale:3.4, deskScale:2.3, pitch:28, targetFraction:.36};
 
@@ -366,9 +369,10 @@ function scheduleDetectLoop(delay=DETECT_INTERVAL_MS){clearTimeout(detectTimer);
 //    비교판을 남김 — 결과 폴더의 compare_methods.png 참고.
 // ===================================================================================
 const canvas = document.getElementById('glCanvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'default' });
-renderer.setPixelRatio(1); // LG 울트라탭 예산 — 디바이스 픽셀비 무시
-renderer.shadowMap.enabled = false; // 실시간 그림자 없음
+let v8;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1,2));
+renderer.shadowMap.enabled = true;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xBFE3EA); // 전판처럼 창 너머 밝은 하늘색이 배경 기본값
@@ -494,10 +498,14 @@ const COFFEE_SPOT = new THREE.Vector3(-3.35, 0, -1.65); // 세 줄 책상 바깥
   }
 })();
 
-// ---- 발밑 동그란 그림자(실시간 그림자 대신) ----
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.28, depthWrite:false });
+// ---- 부드러운 접지 그림자(실시간 그림자와 SSAO 보완) ----
+const contactCanvas=document.createElement('canvas');contactCanvas.width=contactCanvas.height=128;
+const contactContext=contactCanvas.getContext('2d'),contactGradient=contactContext.createRadialGradient(64,64,10,64,64,64);
+contactGradient.addColorStop(0,'rgba(35,23,13,.38)');contactGradient.addColorStop(.5,'rgba(35,23,13,.16)');contactGradient.addColorStop(1,'rgba(35,23,13,0)');
+contactContext.fillStyle=contactGradient;contactContext.fillRect(0,0,128,128);
+const shadowMat = new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(contactCanvas),transparent:true,opacity:.65,depthWrite:false });
 function makeShadow(){
-  const m = new THREE.Mesh(new THREE.CircleGeometry(0.34*COMPOSITION.actorScale, 16), shadowMat);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(.9*COMPOSITION.actorScale,.9*COMPOSITION.actorScale), shadowMat);
   m.rotation.x = -Math.PI/2;
   m.position.y = 0.01;
   return m;
@@ -666,6 +674,8 @@ const deskMats = {
 const BONUS_PROP = [null, 'mug', null, 'plant', null, 'mug', null];
 
 function buildDeskForSlot(pos, yaw, bonus, characterKey){
+  const furnished=v8.office.desk({pos,yaw,bonus,key:characterKey,deskScale:COMPOSITION.deskScale});
+  if(furnished){furnished.userData.cc0=true;return furnished;}
   const g = new THREE.Group();
   g.userData.isDesk = true;
   const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); // 캐릭터가 바라보는 방향(이제 카메라 쪽에 가까움)
@@ -834,7 +844,7 @@ function clearActors(){
   }
   const toRemove = [];
   scene.traverse(o => { if (o.userData && o.userData.isDesk) toRemove.push(o); });
-  for (const o of toRemove){o.traverse(m=>{if(m.isMesh)m.geometry.dispose();});o.userData.monScreenMat?.dispose();scene.remove(o);}
+  for (const o of toRemove){o.traverse(m=>{if(m.isMesh){m.geometry.dispose();if(o.userData.cc0)for(const material of [m.material].flat())material.dispose();}});o.userData.monScreenMat?.dispose();scene.remove(o);}
   for (let i = droppedPapers.length-1; i >= 0; i--){droppedPapers[i].mesh.geometry.dispose();droppedPapers[i].mesh.material.dispose();scene.remove(droppedPapers[i].mesh);}
   droppedPapers.length = 0;
   actors.length = 0;
@@ -850,7 +860,7 @@ function setFriendCount(n){
     deskGroup.userData.row = slot.row;
     const oldScreen=deskGroup.userData.monScreenMat;let screen;
     deskGroup.traverse(o=>{if(o.isMesh && o.material===oldScreen)screen=o;});
-    v8.office.upgradeTree(deskGroup);
+    if(!deskGroup.userData.cc0)v8.office.upgradeTree(deskGroup);
     if(screen)deskGroup.userData.monScreenMat=screen.material;
     scene.add(deskGroup);
     if (i >= n) return;
@@ -929,6 +939,7 @@ function onResize(){
   camera.aspect = width / height;
   renderer.setSize(width, height, false);
   updateCameraFraming(friendCount);
+  v8?.resize();
 }
 window.addEventListener('resize', onResize);
 new ResizeObserver(onResize).observe(document.getElementById('stageWrap'));
@@ -1131,7 +1142,7 @@ function updateMonitorFlicker(t){
   }
 }
 
-const v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
+v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
   bazookaGroup,actorScale:COMPOSITION.actorScale,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
@@ -1178,7 +1189,7 @@ function renderLoop(){
     updateThought(a);v8.updateEmotion(a,t);
   }
   v8.afterActors(t,nowSec);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
-  renderer.render(scene,camera);
+  v8.render();
   fpsFrames++;fpsAccum+=rawDt;
   if(fpsAccum>=.5){
     const fps=fpsFrames/fpsAccum;fpsEMA=fpsEMA*.3+fps*.7;lastFpsShown=Math.round(fpsEMA);v8.setFPS(fps);
@@ -1214,8 +1225,10 @@ document.querySelectorAll('#countBtns button').forEach(btn => {
   btn.addEventListener('click', () => setFriendCount(Number(btn.dataset.n)));
 });
 document.getElementById('scenePreview').addEventListener('click',()=>v8.api.demo());
+document.getElementById('personPreview').addEventListener('change',e=>v8.api.testDetection(e.target.value===''?null:Number(e.target.value)));
 document.getElementById('emotionPreview').addEventListener('change',e=>v8.api.emotion(e.target.value));
 document.getElementById('qualityChoice').addEventListener('change',e=>v8.api.quality(e.target.value));
+if(new URLSearchParams(location.search).get('debug')==='1')setPanelOpen(true);
 // 시험 자동화용 훅(Playwright) — 사장님 손가락 대신 스크립트로 친구 수/두뇌 보기를 조작할 때만 씀.
 window.__jgSetFriendCount = setFriendCount;
 window.__jgOpenBrainPanel = () => setPanelOpen(true);
@@ -1261,7 +1274,7 @@ window.__jgFurniture = () => {
 };
 // 가구가 눈을 가리는지 실제 EyeIris 메시의 표면점으로 확인하는 읽기 전용 검사.
 window.__jgEyeClearance = () => {
-  const furniture = scene.children.filter(o => o.userData.isDesk);
+  const furniture = [...scene.children.filter(o => o.userData.isDesk),...v8.office.covers];
   const ray = new THREE.Raycaster();
   return actors.map(a => {
     let samples = 0, blocked = 0;
@@ -1280,8 +1293,8 @@ window.__jgEyeClearance = () => {
         if (hit){
           blocked++;
           let owner = hit.object;
-          while (owner.parent && !owner.userData.isDesk) owner = owner.parent;
-          const slot = owner.userData.slotIndex;
+          while (owner.parent && !owner.userData.isDesk && !owner.userData.cc0Model) owner = owner.parent;
+          const slot = owner.userData.slotIndex ?? owner.userData.cc0Model ?? 'scene';
           blockedBy[slot] = (blockedBy[slot] || 0) + 1;
         }
       }
@@ -1299,6 +1312,7 @@ renderLoop();
 (async () => {
   loadingMsg.textContent = '3D 모델 불러오는 중…';
   await loadAllTemplates();
+  await v8.ready;
   setFriendCount(7);
   if(new URLSearchParams(location.search).get('demo')==='1')v8.api.demo();
   loadingMsg.textContent = '';

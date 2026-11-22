@@ -82,8 +82,9 @@ export function createEmotionRig(actor){
   return {
     dispose(){owned.forEach(o=>o.dispose());sprite.material.dispose();visualRoot.remove(sprite);},
     eyes:centers.length,eyeMeshes:eyeMeshes.length,
-    update(name,t,active=false){
+    update(name,t,active=false,effectOverride=null){
       const e=EMOTIONS[name] || EMOTIONS.working;
+      const effect=effectOverride || e.effect;
       let open=e.open;
       if(actor.key==='haebaragi' && name==='surprised')open=1.05;
       if(actor.key==='bam' && name==='working')open=.7;
@@ -94,8 +95,8 @@ export function createEmotionRig(actor){
       for(const h of highlights)h.visible=uniforms.open.value>.48;
       for(const arm of arms)arm.node.rotation.z=arm.z+(active?Math.sin(t*8+actor.phase)*.35:Math.sin(t*4+actor.phase)*.05);
       for(const prop of props)prop.node.rotation.z=prop.z+(name==='excited'?Math.sin(t*8+actor.phase)*.02:0);
-      sprite.visible=!!e.effect;
-      if(e.effect && previous!==e.effect){sprite.material.map=effectTexture(e.effect);sprite.material.needsUpdate=true;previous=e.effect;}
+      sprite.visible=!!effect;
+      if(effect && previous!==effect){sprite.material.map=effectTexture(effect);sprite.material.needsUpdate=true;previous=effect;}
       sprite.position.y=1.19+Math.sin(t*3+actor.phase)*.035;
       sprite.material.opacity=.88;
       actor.emotion=name;

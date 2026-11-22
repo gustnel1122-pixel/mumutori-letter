@@ -1,12 +1,13 @@
 import * as THREE from 'three';
+import {loadOfficeAssets} from './v8-assets.js?v=20261123-8d';
 
 function mat(color,roughness=.65,metalness=0){return new THREE.MeshStandardMaterial({color,roughness,metalness});}
 function box(parent,w,h,d,x,y,z,material){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);parent.add(m);return m;}
 const pots=mat(0xf3e4c9),leaf=mat(0x4c8b45),wood=mat(0xbd8d5c,.68),paper=mat(0xf5eddb,.95),metal=mat(0xadb6b5,.3,.65),ink=mat(0x4d493e,.85);
 function grainTexture(){
-  const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');
-  x.fillStyle='#fffaf1';x.fillRect(0,0,128,128);x.strokeStyle='rgba(107,71,39,.15)';x.lineWidth=.65;
-  for(let i=0;i<30;i++){x.beginPath();for(let y=0;y<=128;y+=4){const px=i*4.5+Math.sin(y*.035+i)*1.7;x.lineTo(px,y);}x.stroke();}
+  const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');
+  x.fillStyle='#fffaf1';x.fillRect(0,0,512,512);x.strokeStyle='rgba(107,71,39,.12)';x.lineWidth=.8;
+  for(let i=0;i<100;i++){x.beginPath();for(let y=0;y<=512;y+=4){const px=i*5.5+Math.sin(y*.035+i)*1.7;x.lineTo(px,y);}x.stroke();}
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
 }
 
@@ -37,17 +38,18 @@ function plant(parent,x,z,scale=1){
 }
 
 export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom}){
-  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;
   let env=null;
   try{env=environment(renderer);scene.environment=env.texture;}catch(e){console.warn('HDR 환경맵 미지원 → 반구 조명 사용:',e);}
-  wood.map=grainTexture();wood.needsUpdate=true;
+  wood.map=grainTexture();wood.map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());wood.needsUpdate=true;
+  const assets=loadOfficeAssets({renderer,scene});
   const cache=new WeakMap();
   const upgrade=original=>{
     if(!original || original.isMeshBasicMaterial || original.isSpriteMaterial)return original;
     if(cache.has(original))return cache.get(original);
     const m=new THREE.MeshStandardMaterial({color:original.color?.clone() || 0xffffff,map:original.map || null,
       transparent:original.transparent,opacity:original.opacity,alphaTest:original.alphaTest,side:original.side,
-      roughness:.76,metalness:0,envMapIntensity:.6});cache.set(original,m);return m;
+      roughness:.59,metalness:0,envMapIntensity:.72});cache.set(original,m);return m;
   };
   function upgradeTree(root){root.traverse(o=>{
     if(!o.isMesh)return;
@@ -59,13 +61,13 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     }
   });}
   upgradeTree(scene);
-  floor.material=new THREE.MeshPhysicalMaterial({color:0xded6c6,roughness:.46,metalness:.08,clearcoat:.16,clearcoatRoughness:.5,envMapIntensity:.62});
-  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.35);
-  dirLight.color.set(0xffebd0);dirLight.intensity=2.4;dirLight.position.set(-3,7,4);
+  floor.material=new THREE.MeshPhysicalMaterial({color:0xd4d5cf,roughness:.52,metalness:.02,clearcoat:.12,clearcoatRoughness:.5,envMapIntensity:.72});
+  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.19);
+  dirLight.color.set(0xfff0db);dirLight.intensity=2.1;dirLight.position.set(-3,9,5);
   dirLight.target.position.set(0,.3,-2);scene.add(dirLight.target);
   dirLight.shadow.camera.left=-8;dirLight.shadow.camera.right=8;dirLight.shadow.camera.top=8;dirLight.shadow.camera.bottom=-8;
   dirLight.shadow.camera.near=.1;dirLight.shadow.camera.far=26;dirLight.shadow.bias=-.0004;dirLight.shadow.normalBias=.025;
-  dirLight.shadow.radius=3;
+  dirLight.shadow.radius=3;dirLight.shadow.blurSamples=8;
   scene.add(new THREE.HemisphereLight(0xdcefff,0x9b7953,.55));
   const furnishings=new THREE.Group();furnishings.name='v8-authored-office-props';scene.add(furnishings);
   // Side shelving keeps the central window unobstructed.
@@ -104,8 +106,8 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   const seamGeometry=new THREE.BufferGeometry();seamGeometry.setAttribute('position',new THREE.Float32BufferAttribute(seams,3));
   furnishings.add(new THREE.LineSegments(seamGeometry,new THREE.LineBasicMaterial({color:0xb7b0a5,transparent:true,opacity:.25})));
   // PBR glass in front of the same sky pane. Transmission is disabled on lower tiers.
-  const glassMaterial=new THREE.MeshPhysicalMaterial({color:0xdceefa,roughness:.08,metalness:0,transparent:true,opacity:.12,
-    transmission:.16,thickness:.06,ior:1.45,clearcoat:1,clearcoatRoughness:.08,envMapIntensity:.65,depthWrite:false});
+  const glassMaterial=new THREE.MeshPhysicalMaterial({color:0xdceefa,roughness:.06,metalness:0,transparent:true,opacity:.22,
+    transmission:.12,thickness:.06,ior:1.48,clearcoat:1,clearcoatRoughness:.06,envMapIntensity:1.1,depthWrite:false});
   const glass=new THREE.Mesh(new THREE.PlaneGeometry(windowWidth,windowHeight),glassMaterial);
   glass.position.copy(windowMesh.position);glass.position.z=windowZ+.018;glass.renderOrder=1;scene.add(glass);
   upgradeTree(furnishings);
@@ -115,9 +117,46 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     dirLight.castShadow=enabled;
     if(dirLight.shadow.mapSize.x!==q.shadow && enabled){dirLight.shadow.map?.dispose();dirLight.shadow.map=null;dirLight.shadow.mapSize.set(q.shadow,q.shadow);}
     glassMaterial.transmission=q.transmission;glassMaterial.needsUpdate=true;
-    renderer.setPixelRatio(q.scale);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1,2)*q.scale);
   }
-  return {quality,upgradeTree,glass,props:furnishings,environment:env,info:{hdr:env?'authored float radiance 128×64 → PMREM':'hemisphere fallback (HDR unavailable)',props:['책장','화이트보드','서류함','머그','책·서류','화분','재활용통','바닥 줄눈']}};
+  function place(parent,name,size,position,yaw=0){const obj=assets.model(name,size);if(!obj)return null;obj.position.copy(position);obj.rotation.y=yaw;parent.add(obj);return obj;}
+  function desk({pos,yaw,bonus,key,deskScale}){
+    if(!assets.info.models.includes('desk'))return null;
+    const g=new THREE.Group();g.userData.isDesk=true;
+    const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)),side=new THREE.Vector3(dir.z,0,-dir.x);
+    const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,.85);center.y=0;
+    place(g,'desk',[1.16,.42,.60],center,yaw);
+    const monitor=center.clone().addScaledVector(dir,.08).addScaledVector(side,key==='wandukong3'?.46:.30);monitor.y=.42;
+    place(g,'computerScreen',[.34,key==='wandukong3'?.26:.34,.07],monitor,yaw+Math.PI);
+    const keyboard=center.clone().addScaledVector(dir,-.13);keyboard.y=.425;place(g,'computerKeyboard',[.28,.015,.11],keyboard,yaw);
+    const mouse=keyboard.clone().addScaledVector(side,.21);place(g,'computerMouse',[.055,.023,.08],mouse,yaw);
+    const chair=place(g,'chairDesk',[.46,.60,.48],pos.clone().addScaledVector(dir,-.24).addScaledVector(side,-.16),yaw+Math.PI);
+    if(chair)chair.userData.isOfficeChair=true;
+    const books=center.clone().addScaledVector(side,-.35);books.y=.42;place(g,'books',[.17,.06,.17],books,yaw);
+    if(bonus==='plant'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.15);pp.y=.42;place(g,'plantSmall1',[.13,.20,.13],pp);}
+    if(bonus==='mug'){
+      const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.16);pp.y=.42;
+      place(g,'mug',[.09,.075,.065],pp,yaw);
+    }
+    const sx=deskScale*.78,sz=deskScale*.82;g.scale.set(sx,deskScale,sz);g.position.set(pos.x*(1-sx),0,pos.z*(1-sz));
+    return g;
+  }
+  const covers=[];
+  const ready=assets.ready.then(()=>{
+    // The shelves serve as real opaque cover during the retreat. They sit
+    // beside, rather than across, the seven friends' resting sight lines.
+    for(const side of [-1,1]){
+      const cover=place(furnishings,'bookcaseClosed',[2.0,3.45,.85],new THREE.Vector3(side*7.1,0,-4.75));if(cover)covers.push(cover);
+      const base=place(furnishings,'cardboardBoxClosed',[2.0,.42,.85],new THREE.Vector3(side*7.1,0,-4.75));if(base)covers.push(base);
+      place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*6.3,0,-3.3));
+      for(let i=0;i<3;i++)place(furnishings,'books',[.7,.4,.32],new THREE.Vector3(side*7.1,.4+i*.92,-4.65));
+    }
+    cabinet.visible=false;
+    place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(5.25,0,-.8));
+    place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(5.25,1.15,-.8));
+  });
+  return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,
+    get info(){return {...assets.info,anisotropy:assets.anisotropy,props:['CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그','직접 만든 종이·장난감']};}};
 }
 
 export function makePeaGun(){

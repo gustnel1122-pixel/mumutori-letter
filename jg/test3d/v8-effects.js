@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export class WindowMess {
   constructor(scene,{width,height,z,bottom}){
     this.width=width;this.height=height;this.z=z;this.bottom=bottom;this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};
-    const c=document.createElement('canvas');c.width=1024;c.height=Math.round(1024*height/width);this.canvas=c;this.ctx=c.getContext('2d');
+    const c=document.createElement('canvas');c.width=2048;c.height=Math.round(2048*height/width);this.canvas=c;this.ctx=c.getContext('2d');
     this.texture=new THREE.CanvasTexture(c);this.texture.colorSpace=THREE.SRGBColorSpace;
     this.material=new THREE.MeshBasicMaterial({map:this.texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
     this.mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),this.material);
