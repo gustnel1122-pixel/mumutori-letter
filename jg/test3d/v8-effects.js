@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 
 export class WindowMess {
   constructor(scene,{width,height,z,bottom}){
     this.width=width;this.height=height;this.z=z;this.bottom=bottom;this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};
     const c=document.createElement('canvas');c.width=2048;c.height=Math.round(2048*height/width);this.canvas=c;this.ctx=c.getContext('2d');
     this.texture=new THREE.CanvasTexture(c);this.texture.colorSpace=THREE.SRGBColorSpace;
-    this.material=new THREE.MeshBasicMaterial({map:this.texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+    this.material=gradeMaterial(new THREE.MeshBasicMaterial({map:this.texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
     this.mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),this.material);
     this.mesh.position.set(0,bottom+height/2,z+.045);this.mesh.renderOrder=3;scene.add(this.mesh);
   }
@@ -50,9 +51,9 @@ export class SeedProjectiles {
   constructor(scene,onImpact,displayScale=1){
     this.onImpact=onImpact;this.displayScale=displayScale;this.pool=Array.from({length:28},()=>({active:false,start:new THREE.Vector3(),target:new THREE.Vector3(),kind:'throw',shape:0,t0:0,duration:0,arc:0,size:1}));
     this.meshes=[
-      new THREE.InstancedMesh(new THREE.SphereGeometry(.055,8,6),new THREE.MeshStandardMaterial({color:0x91b954,roughness:.7}),28),
-      new THREE.InstancedMesh(new THREE.CapsuleGeometry(.048,.075,2,7),new THREE.MeshStandardMaterial({color:0xc59454,roughness:.7}),28),
-      new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.065,0),new THREE.MeshStandardMaterial({color:0xf2e6c8,roughness:.9}),28),
+      new THREE.InstancedMesh(new THREE.SphereGeometry(.055,8,6),gradeMaterial(new THREE.MeshLambertMaterial({color:0x91b954})),28),
+      new THREE.InstancedMesh(new THREE.CapsuleGeometry(.048,.075,2,7),gradeMaterial(new THREE.MeshLambertMaterial({color:0xc59454})),28),
+      new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.065,0),gradeMaterial(new THREE.MeshLambertMaterial({color:0xf2e6c8})),28),
     ];
     this.meshes.forEach(m=>{m.frustumCulled=false;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(m);});
     this.dummy=new THREE.Object3D();this.position=new THREE.Vector3();this.shots={throw:0,gun:0,bazooka:0};this.peak=0;this.update(0);

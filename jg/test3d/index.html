@@ -127,13 +127,13 @@
     <select id="personPreview"><option value="">실제 카메라 감지 사용</option><option value="0">사람 없음</option><option value="1">손님 발견 · 계속 머무름</option><option value="3">손님이 아주 가까움</option></select>
     <label>감정 미리보기</label>
     <select id="emotionPreview"><option value="">자동</option><option value="working">평소 · 일하는 중</option><option value="surprised">깜짝 · 발견</option><option value="determined">결심 · 준비</option><option value="excited">신남</option><option value="proud">뿌듯 · 웃음</option><option value="tired">졸림 · 지침</option></select>
-    <label>화질</label><select id="qualityChoice"><option value="auto">자동 · 24FPS 아래 5초 넘으면 조절</option><option value="high">고화질 · 2048 그림자 · SSAO</option><option value="medium">균형 · 원래 해상도 유지</option><option value="low">가벼움 · 512 그림자</option></select>
+    <label>화질</label><select id="qualityChoice"><option value="auto">자동 · 베이크 조명</option><option value="high">선명 · 원래 해상도</option><option value="medium">균형 · 원래 해상도 유지</option><option value="low">가벼움 · 해상도 85%</option></select>
     <div id="brainView">
       <h4>🧠 두뇌 보기 — 친구마다 지금 하는 일</h4>
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-23-8d.1 · 색 대비·창 노출 보정 · 전원 전투·CC0 가구</div>
+    <div class="ver">버전 2026-11-23-8e · 가벼운 조명 · 큰 창 · 길 피하기</div>
   </div>
 </div>
 
@@ -149,18 +149,18 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261123-8d1';
+import {createV8} from './v8-runtime.js?v=20261123-8e';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-23-8d.1';
+const VERSION = '2026-11-23-8e';
 // Display transforms only: the canonical GLBs and their proportions stay intact.
-const COMPOSITION = {actorScale:2.6, deskScale:1.8, pitch:32, targetFraction:.36};
+const COMPOSITION = {actorScale:1.65, deskScale:1.2, pitch:32, targetFraction:.36};
 
 // ===================================================================================
-// §0. v8: PBR + 작은 HDR PMREM · 그림자/해상도 자동 조절 · 감지 Worker 분리.
+// §0. v8e: 정적 베이크 + Lambert · 단일 그리기 · 충돌 회피 · 감지 Worker 분리.
 // 정본 GLB 원본은 그대로, 인스턴스의 눈 표면과 자세만 바꾼다.
 // ===================================================================================
 
@@ -391,18 +391,18 @@ scene.add(fillLight);
 
 // ---- 전판처럼: 밝은 연회색 바닥(은은한 반짝임 — 이 한 군데만 Phong으로 아주 약한 반사光) ----
 const floorMat = new THREE.MeshPhongMaterial({ color: 0xE9E9EA, specular: 0x999999, shininess: 18 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), floorMat);
 floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
 // ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
 const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
-const WINDOW_Z = -6.3;
-const WINDOW_WIDTH = 16.4;
+const WINDOW_Z = -8.8;
+const WINDOW_WIDTH = 28.8;
 const WINDOW_BOTTOM = 0.08;
-const WINDOW_HEIGHT = 4.9;
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 12), wallMat);
-backWall.position.set(0, 4, WINDOW_Z - 0.1);
+const WINDOW_HEIGHT = 8.4;
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), wallMat);
+backWall.position.set(0, 12, WINDOW_Z - 0.1);
 scene.add(backWall);
 
 // 작은 그라데이션 텍스처로 창 너머의 밝은 하늘을 표현한다.
@@ -458,9 +458,8 @@ function buildPlant(x, z, scale){
   g.scale.setScalar(scale);
   scene.add(g);
 }
-buildPlant(-4.75, -5.25, 0.95);
-buildPlant(4.75, -5.25, 0.9);
-buildPlant(-3.85, -2.5, 0.55);
+buildPlant(-11.2, .2, 0.95);
+buildPlant(11.2, .2, 0.9);
 
 // ---- 씨앗 바주카(새 소품 — 단순 원통, 정본 색상 계열), 코너 선반 위 ----
 const bazookaGroup = new THREE.Group();
@@ -468,7 +467,7 @@ const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
 const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
 const BAZOOKA_POS = new THREE.Vector3(4.6, 0.48, WINDOW_Z + 0.2);
 shelf.position.copy(BAZOOKA_POS);
-scene.add(shelf);
+// The wheeled launchers use the floor; no floating shelf crosses the window.
 const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
 const bazookaBody = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.6, 10), bazookaBodyMat);
 bazookaBody.rotation.z = Math.PI/2;
@@ -484,7 +483,7 @@ bazookaGroup.rotation.y = 2.3;
 scene.add(bazookaGroup);
 
 // ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
-const COFFEE_SPOT = new THREE.Vector3(-3.35, 0, -1.65); // 세 줄 책상 바깥쪽의 왼쪽 통로
+const COFFEE_SPOT = new THREE.Vector3(-10.6, 0, 1.5); // 중앙 통로를 비운 옆쪽 커피 코너
 (function buildCoffeeCorner(){
   const tableMat = new THREE.MeshLambertMaterial({ color: 0xF2F0EC });
   const table = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 12), tableMat);
@@ -643,13 +642,13 @@ async function loadAllTemplates(){
 // ---- 앞줄 3 / 중간줄 3 / 뒷줄 1. 간격을 벌려 앞은 크게, 뒤는 작고 멀게 보이게 한다. ----
 // +z가 손님 쪽. 빈 책상도 유지해 친구가 2명이어도 사무실은 항상 세 줄이다.
 const LAYOUT_SLOTS = [
-  { dx: 0.20, dz: 1.80, yaw: 0.14, row:'front' },
-  { dx:-1.60, dz:-2.60, yaw: 0.20, row:'middle' },
-  { dx:-4.65, dz:-2.60, yaw: 0.12, row:'middle' },
-  { dx:-3.05, dz: 1.80, yaw: 0.22, row:'front' },
-  { dx: 1.65, dz:-2.60, yaw:-0.12, row:'middle' },
-  { dx: 4.00, dz: 1.80, yaw:-0.18, row:'front' },
-  { dx: 4.00, dz:-4.90, yaw:-0.20, row:'back' },
+  { dx: 0.00, dz: 3.10, yaw: 0, row:'front' },
+  { dx:-2.00, dz:-1.70, yaw: 0, row:'middle' },
+  { dx:-6.00, dz:-1.70, yaw: 0, row:'middle' },
+  { dx:-6.00, dz: 3.10, yaw: 0, row:'front' },
+  { dx: 3.00, dz:-1.70, yaw: 0, row:'middle' },
+  { dx: 6.00, dz: 3.10, yaw: 0, row:'front' },
+  { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },
 ];
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
@@ -684,7 +683,7 @@ function buildDeskForSlot(pos, yaw, bonus, characterKey){
 
   // 얇은 상판과 다리로 사무용 책상을 표현. 낮은 흰 상자처럼 보이던 덩어리를 없앤다.
   const desk = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.045, 0.60), deskMats.desk);
-  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 0.85);
+  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 1.85);
   desk.position.y = DESK_TOP_Y - 0.0225;
   desk.rotation.y = yaw;
   g.add(desk);
@@ -753,7 +752,7 @@ function buildDeskForSlot(pos, yaw, bonus, characterKey){
   // 등받이·좌판·중심봉·다섯 갈래 다리·바퀴를 갖춘 검은 사무용 의자.
   const chair = new THREE.Group();
   chair.userData.isOfficeChair = true;
-  const chairPos = pos.clone().addScaledVector(back, CHAIR_BACK).addScaledVector(sideVec0, -0.16);
+  const chairPos = pos.clone().addScaledVector(dir, .65).addScaledVector(sideVec0, 1.85);
   chair.position.copy(chairPos);
   chair.rotation.y = yaw;
   const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.40, 0.055), deskMats.chair);
@@ -869,6 +868,7 @@ function setFriendCount(n){
     actors.push(actor);
   });
   actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
+  v8.rebuildWorld();
   updateCameraFraming(n);
   document.querySelectorAll('#countBtns button').forEach(b => {
     b.classList.toggle('active', Number(b.dataset.n) === n);
@@ -1076,7 +1076,7 @@ function beginVisit(a, kind){
     target = other.homePos.clone().addScaledVector(new THREE.Vector3(Math.sin(other.deskYaw+2.2),0,Math.cos(other.deskYaw+2.2)), 0.55);
     a.visitTargetActor = other;
   } else { // coffee
-    target = COFFEE_SPOT.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0, 0.4));
+    target = COFFEE_SPOT.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0, 1.4));
     a.visitTargetActor = null;
   }
   a.moveTo = target;
@@ -1143,7 +1143,7 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
+  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
 let lastFpsShown = 0;
@@ -1188,7 +1188,7 @@ function renderLoop(){
     a.shadow.scale.setScalar(Math.max(.3,1-Math.abs(a.wrapper.position.y)*3));
     updateThought(a);v8.updateEmotion(a,t);
   }
-  v8.afterActors(t,nowSec);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
+  v8.afterActors(t,nowSec,dt);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
   v8.render();
   fpsFrames++;fpsAccum+=rawDt;
   if(fpsAccum>=.5){

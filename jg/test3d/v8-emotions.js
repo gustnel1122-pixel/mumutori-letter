@@ -58,7 +58,8 @@ export function createEmotionRig(actor){
     geometry.setAttribute('emotionCenter',new THREE.BufferAttribute(attribute,4));mesh.geometry=geometry;owned.push(geometry);
     const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
     const copies=materials.map(m=>{
-      const copy=m.clone();copy.onBeforeCompile=shader=>{
+      const copy=m.clone(),baseCompile=m.onBeforeCompile;copy.onBeforeCompile=function(shader,...args){
+        baseCompile.call(this,shader,...args);
         shader.uniforms.emotionOpen=uniforms.open;shader.uniforms.emotionSlant=uniforms.slant;shader.uniforms.emotionCurve=uniforms.curve;
         shader.vertexShader='attribute vec4 emotionCenter;\nuniform float emotionOpen;\nuniform float emotionSlant;\nuniform float emotionCurve;\n'+shader.vertexShader;
         shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>

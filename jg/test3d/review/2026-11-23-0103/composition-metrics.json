@@ -1,0 +1,218 @@
+[
+  {
+    "resolution": "1920x1080",
+    "phase": "work",
+    "beforeWindowVisible": 0.7244444444444444,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.5648148148148148,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 472.99680179051734,
+        "after": 191.89655195065967
+      },
+      "byeongari": {
+        "before": 482.32050194616744,
+        "after": 197.5879421353394
+      },
+      "haebaragi": {
+        "before": 386.04105803477387,
+        "after": 151.77807003141177
+      }
+    }
+  },
+  {
+    "resolution": "1920x1080",
+    "phase": "attack",
+    "beforeWindowVisible": 0.7185185185185186,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.5524691358024691,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 470.76017687081867,
+        "after": 187.280933325514
+      },
+      "byeongari": {
+        "before": 509.73536740847624,
+        "after": 204.57611559688124
+      },
+      "haebaragi": {
+        "before": 409.9467117218349,
+        "after": 155.46713265163947
+      }
+    }
+  },
+  {
+    "resolution": "1920x1080",
+    "phase": "mess",
+    "beforeWindowVisible": 0.748641975308642,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.6152263374485597,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 470.7900939938237,
+        "after": 186.71315276916093
+      },
+      "byeongari": {
+        "before": 479.742553429128,
+        "after": 190.445344412509
+      },
+      "haebaragi": {
+        "before": 401.40376351877126,
+        "after": 155.1840116642311
+      }
+    }
+  },
+  {
+    "resolution": "2000x1200",
+    "phase": "work",
+    "beforeWindowVisible": 0.7244444444444444,
+    "afterWindowVisible": 0.985679012345679,
+    "beforeLowerVisible": 0.5648148148148148,
+    "afterLowerVisible": 0.970164609053498,
+    "beforeWindowScreenArea": 0.24555463505900657,
+    "afterWindowScreenArea": 0.30030584849531794,
+    "actorHeights": {
+      "dotori": {
+        "before": 525.5520019894636,
+        "after": 199.31419405720325
+      },
+      "byeongari": {
+        "before": 535.911668829075,
+        "after": 205.03170726672158
+      },
+      "haebaragi": {
+        "before": 428.9345089275265,
+        "after": 158.25487264715
+      }
+    }
+  },
+  {
+    "resolution": "2000x1200",
+    "phase": "attack",
+    "beforeWindowVisible": 0.7185185185185186,
+    "afterWindowVisible": 0.985679012345679,
+    "beforeLowerVisible": 0.5524691358024691,
+    "afterLowerVisible": 0.970164609053498,
+    "beforeWindowScreenArea": 0.24555463505900657,
+    "afterWindowScreenArea": 0.30030584849531794,
+    "actorHeights": {
+      "dotori": {
+        "before": 523.0668631897985,
+        "after": 194.47790456820758
+      },
+      "byeongari": {
+        "before": 566.3726304538625,
+        "after": 212.28598903601053
+      },
+      "haebaragi": {
+        "before": 455.4963463575943,
+        "after": 162.09253236010827
+      }
+    }
+  },
+  {
+    "resolution": "2000x1200",
+    "phase": "mess",
+    "beforeWindowVisible": 0.748641975308642,
+    "afterWindowVisible": 0.985679012345679,
+    "beforeLowerVisible": 0.6152263374485597,
+    "afterLowerVisible": 0.970164609053498,
+    "beforeWindowScreenArea": 0.24555463505900657,
+    "afterWindowScreenArea": 0.30030584849531794,
+    "actorHeights": {
+      "dotori": {
+        "before": 523.1001044375819,
+        "after": 193.8941841598052
+      },
+      "byeongari": {
+        "before": 533.04728158792,
+        "after": 198.62058275756053
+      },
+      "haebaragi": {
+        "before": 446.0041816875236,
+        "after": 161.79663490298879
+      }
+    }
+  },
+  {
+    "resolution": "1280x720",
+    "phase": "work",
+    "beforeWindowVisible": 0.7244444444444444,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.5648148148148148,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 315.3312011936782,
+        "after": 127.93103463377312
+      },
+      "byeongari": {
+        "before": 321.547001297445,
+        "after": 131.72529475689294
+      },
+      "haebaragi": {
+        "before": 257.36070535651595,
+        "after": 101.1853800209412
+      }
+    }
+  },
+  {
+    "resolution": "1280x720",
+    "phase": "attack",
+    "beforeWindowVisible": 0.7185185185185186,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.5524691358024691,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 313.8401179138791,
+        "after": 124.85395555034269
+      },
+      "byeongari": {
+        "before": 339.8235782723175,
+        "after": 136.38407706458747
+      },
+      "haebaragi": {
+        "before": 273.29780781455656,
+        "after": 103.64475510109298
+      }
+    }
+  },
+  {
+    "resolution": "1280x720",
+    "phase": "mess",
+    "beforeWindowVisible": 0.748641975308642,
+    "afterWindowVisible": 0.9851851851851852,
+    "beforeLowerVisible": 0.6152263374485597,
+    "afterLowerVisible": 0.9691358024691358,
+    "beforeWindowScreenArea": 0.23020747036781863,
+    "afterWindowScreenArea": 0.3124248526157729,
+    "actorHeights": {
+      "dotori": {
+        "before": 313.8600626625491,
+        "after": 124.47543517944062
+      },
+      "byeongari": {
+        "before": 319.828368952752,
+        "after": 126.96356294167266
+      },
+      "haebaragi": {
+        "before": 267.6025090125142,
+        "after": 103.45600777615407
+      }
+    }
+  }
+]

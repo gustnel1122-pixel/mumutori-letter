@@ -1,0 +1,68 @@
+[
+  {
+    "variant": "before",
+    "resolution": "1920x1080",
+    "averageFPS": 78.83751739307942,
+    "onePercentLowFPS": 31.260175848196685,
+    "seconds": 60.0095,
+    "frames": 4731,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": 1726
+  },
+  {
+    "variant": "before",
+    "resolution": "2000x1200",
+    "averageFPS": 74.41505434025274,
+    "onePercentLowFPS": 25.215734646699513,
+    "seconds": 60.00130000019073,
+    "frames": 4465,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": 1730
+  },
+  {
+    "variant": "after",
+    "resolution": "1920x1080",
+    "averageFPS": 140.69837587735535,
+    "onePercentLowFPS": 42.84274196637451,
+    "seconds": 60.007800000190734,
+    "frames": 8443,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": 141
+  },
+  {
+    "variant": "after",
+    "resolution": "2000x1200",
+    "averageFPS": 142.50170398842738,
+    "onePercentLowFPS": 57.998381489010676,
+    "seconds": 60.006299999713896,
+    "frames": 8551,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": 142
+  },
+  {
+    "variant": "fast",
+    "resolution": "1920x1080",
+    "averageFPS": 23.970069894544054,
+    "onePercentLowFPS": 18.429782537204083,
+    "seconds": 60.0332000002861,
+    "frames": 1439,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": null
+  },
+  {
+    "variant": "fast",
+    "resolution": "2000x1200",
+    "averageFPS": 23.97234600807963,
+    "onePercentLowFPS": 16.600265606001688,
+    "seconds": 60.0275,
+    "frames": 1439,
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "cameraRequests": 0,
+    "drawCalls": null
+  }
+]

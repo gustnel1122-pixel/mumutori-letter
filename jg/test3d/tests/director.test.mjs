@@ -28,8 +28,9 @@ test('camera-free demo follows all stages and completes without a presence feed'
   const d=new SceneDirector();d.begin(true);const seen=new Set();for(let t=0;t<40;t+=.02)seen.add(d.update(.02,0).id);
   for(const s of SCENES)assert.ok(seen.has(s.id),s.id);assert.equal(d.snapshot().id,'work');
 });
-test('quality starts high on every device and 24–33 FPS does not reduce it',()=>{
-  const q=new AdaptiveQuality();assert.equal(q.current.shadow,2048);for(let i=0;i<1200;i++)q.sample(1/30);assert.equal(q.current.id,'high');
+test('quality preserves native resolution without real-time effects, even when fixed high',()=>{
+  const q=new AdaptiveQuality();assert.equal(q.current.scale,1);assert.equal(q.current.shadow,0);assert.equal(q.current.ao,false);assert.equal(q.current.bloom,false);assert.equal(q.current.transmission,0);
+  for(let i=0;i<1200;i++)q.sample(1/30);assert.equal(q.current.id,'high');
 });
 test('quality needs over five seconds below 24 FPS and drops only one tier at a time',()=>{
   const q=new AdaptiveQuality();for(let i=0;i<99;i++)q.sample(.05);assert.equal(q.current.id,'high');

@@ -1,0 +1,144 @@
+{
+  "label": "runtime-checks-budgeted",
+  "counts": [
+    {
+      "count": 2,
+      "inside": true,
+      "eyeBlocked": 0,
+      "completed": "work",
+      "attackFacing": true,
+      "frames": 824,
+      "overlapFrames": 0,
+      "hits": 23,
+      "pickups": 2
+    },
+    {
+      "count": 3,
+      "inside": true,
+      "eyeBlocked": 0,
+      "completed": "work",
+      "attackFacing": true,
+      "frames": 880,
+      "overlapFrames": 0,
+      "hits": 33,
+      "pickups": 3
+    },
+    {
+      "count": 5,
+      "inside": true,
+      "eyeBlocked": 0,
+      "completed": "work",
+      "attackFacing": true,
+      "frames": 989,
+      "overlapFrames": 0,
+      "hits": 58,
+      "pickups": 5
+    },
+    {
+      "count": 7,
+      "inside": true,
+      "eyeBlocked": 0,
+      "completed": "work",
+      "attackFacing": true,
+      "frames": 989,
+      "overlapFrames": 0,
+      "hits": 74,
+      "pickups": 7
+    }
+  ],
+  "detection": {
+    "persistentPersonHeld": true,
+    "returningPersonRetreated": true,
+    "recovered": true,
+    "frames": 3354,
+    "overlapFrames": 0
+  },
+  "qualities": [
+    {
+      "quality": "low",
+      "render": {
+        "antialias": true,
+        "msaa": 4,
+        "offscreenMSAA": 0,
+        "pixelRatio": 0.85,
+        "devicePixelRatio": 1,
+        "canvas": [
+          1632,
+          918
+        ],
+        "ssao": false,
+        "bloom": false,
+        "shadow": 0,
+        "transmission": 0,
+        "toneMapping": "ACESFilmic",
+        "output": "sRGB",
+        "contrast": 1.12,
+        "saturation": 1.1,
+        "passes": 1,
+        "frames": 2,
+        "cpuSubmitMS": 0,
+        "drawCalls": 145,
+        "triangles": 295637,
+        "geometries": 149
+      }
+    },
+    {
+      "quality": "medium",
+      "render": {
+        "antialias": true,
+        "msaa": 4,
+        "offscreenMSAA": 0,
+        "pixelRatio": 1,
+        "devicePixelRatio": 1,
+        "canvas": [
+          1920,
+          1080
+        ],
+        "ssao": false,
+        "bloom": false,
+        "shadow": 0,
+        "transmission": 0,
+        "toneMapping": "ACESFilmic",
+        "output": "sRGB",
+        "contrast": 1.12,
+        "saturation": 1.1,
+        "passes": 1,
+        "frames": 3,
+        "cpuSubmitMS": 0,
+        "drawCalls": 145,
+        "triangles": 295637,
+        "geometries": 149
+      }
+    },
+    {
+      "quality": "high",
+      "render": {
+        "antialias": true,
+        "msaa": 4,
+        "offscreenMSAA": 0,
+        "pixelRatio": 1,
+        "devicePixelRatio": 1,
+        "canvas": [
+          1920,
+          1080
+        ],
+        "ssao": false,
+        "bloom": false,
+        "shadow": 0,
+        "transmission": 0,
+        "toneMapping": "ACESFilmic",
+        "output": "sRGB",
+        "contrast": 1.12,
+        "saturation": 1.1,
+        "passes": 1,
+        "frames": 4,
+        "cpuSubmitMS": 0,
+        "drawCalls": 145,
+        "triangles": 295637,
+        "geometries": 149
+      }
+    }
+  ],
+  "cameraRequests": 0,
+  "errors": []
+}

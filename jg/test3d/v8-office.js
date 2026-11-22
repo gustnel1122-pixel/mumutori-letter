@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import {loadOfficeAssets} from './v8-assets.js?v=20261123-8d1';
+import {loadOfficeAssets} from './v8-assets.js?v=20261123-8e';
+import {gradeMaterial,createStaticBake} from './v8-lighting.js?v=20261123-8e';
 
-function mat(color,roughness=.65,metalness=0){return new THREE.MeshStandardMaterial({color,roughness,metalness});}
+function mat(color){return gradeMaterial(new THREE.MeshLambertMaterial({color}));}
 function box(parent,w,h,d,x,y,z,material){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);parent.add(m);return m;}
-const pots=mat(0xf3e4c9),leaf=mat(0x4c8b45),wood=mat(0xbd8d5c,.68),paper=mat(0xf5eddb,.95),metal=mat(0xadb6b5,.3,.65),ink=mat(0x4d493e,.85);
+const pots=mat(0xf3e4c9),wood=mat(0xbd8d5c),paper=mat(0xf5eddb),metal=mat(0xadb6b5),ink=mat(0x4d493e);
 function grainTexture(){
   const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');
   x.fillStyle='#fffaf1';x.fillRect(0,0,512,512);x.strokeStyle='rgba(107,71,39,.12)';x.lineWidth=.8;
@@ -11,45 +12,20 @@ function grainTexture(){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
 }
 
-// Authored HDR radiance values (up to 9.0), converted once to a small PMREM.
-// No downloaded HDR image or third-party scene assets are used.
-function environment(renderer){
-  const w=128,h=64,data=new Float32Array(w*h*4);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const u=x/w,v=y/h,i=(y*w+x)*4;
-    const sun=Math.exp(-((u-.22)**2/.004+(v-.30)**2/.012))*8;
-    const window=(u>.55 && u<.8 && v>.25 && v<.58)?2.4:0;
-    const sky=.20+.7*Math.max(0,1-v*1.5);
-    data[i]=sky*.95+sun+window;data[i+1]=sky+sun*.88+window*.94;data[i+2]=sky*1.1+sun*.67+window*.83;data[i+3]=1;
-  }
-  const texture=new THREE.DataTexture(data,w,h,THREE.RGBAFormat,THREE.FloatType);
-  texture.mapping=THREE.EquirectangularReflectionMapping;texture.needsUpdate=true;
-  const pmrem=new THREE.PMREMGenerator(renderer),target=pmrem.fromEquirectangular(texture);
-  pmrem.dispose();texture.dispose();return target;
-}
-
-function plant(parent,x,z,scale=1){
-  const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(scale);parent.add(g);
-  const pot=new THREE.Mesh(new THREE.CylinderGeometry(.23,.17,.37,12),pots);pot.position.y=.185;g.add(pot);
-  for(let i=0;i<8;i++){
-    const a=i*2.4,m=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),leaf);
-    m.scale.set(.6,2.7,.35);m.position.set(Math.cos(a)*.17,.52+i%3*.13,Math.sin(a)*.17);m.rotation.z=Math.sin(a)*.7;g.add(m);
-  }
-}
-
-export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom}){
+export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom,bazookaGroup}){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
   let env=null;
-  try{env=environment(renderer);scene.environment=env.texture;}catch(e){console.warn('HDR 환경맵 미지원 → 반구 조명 사용:',e);}
+  scene.environment=null;
   wood.map=grainTexture();wood.map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());wood.needsUpdate=true;
   const assets=loadOfficeAssets({renderer,scene});
   const cache=new WeakMap();
   const upgrade=original=>{
-    if(!original || original.isMeshBasicMaterial || original.isSpriteMaterial)return original;
+    if(!original)return original;
+    if(original.isMeshBasicMaterial || original.isSpriteMaterial)return gradeMaterial(original);
     if(cache.has(original))return cache.get(original);
-    const m=new THREE.MeshStandardMaterial({color:original.color?.clone() || 0xffffff,map:original.map || null,
+    const m=gradeMaterial(new THREE.MeshLambertMaterial({color:original.color?.clone() || 0xffffff,map:original.map || null,
       transparent:original.transparent,opacity:original.opacity,alphaTest:original.alphaTest,side:original.side,
-      roughness:.68,metalness:0,envMapIntensity:.32});cache.set(original,m);return m;
+      }));cache.set(original,m);return m;
   };
   function upgradeTree(root){root.traverse(o=>{
     if(!o.isMesh)return;
@@ -61,27 +37,18 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     }
   });}
   upgradeTree(scene);
-  floor.material=new THREE.MeshPhysicalMaterial({color:0xdde2e2,roughness:.66,metalness:0,clearcoat:.06,clearcoatRoughness:.65,envMapIntensity:.32});
-  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.12);
-  dirLight.color.set(0xfff5e8);dirLight.intensity=2.8;dirLight.position.set(-3,9,5);
+  floor.material=gradeMaterial(new THREE.MeshBasicMaterial({color:0xdde2e2}));
+  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.55);
+  dirLight.color.set(0xfff5e8);dirLight.intensity=1.7;dirLight.position.set(-3,9,5);
   dirLight.target.position.set(0,.3,-2);scene.add(dirLight.target);
   dirLight.shadow.camera.left=-8;dirLight.shadow.camera.right=8;dirLight.shadow.camera.top=8;dirLight.shadow.camera.bottom=-8;
   dirLight.shadow.camera.near=.1;dirLight.shadow.camera.far=26;dirLight.shadow.bias=-.0004;dirLight.shadow.normalBias=.025;
   dirLight.shadow.radius=3;dirLight.shadow.blurSamples=8;
-  scene.add(new THREE.HemisphereLight(0xe6f3ff,0x8c775e,.32));
+  scene.add(new THREE.HemisphereLight(0xe6f3ff,0x8c775e,.65));
   const furnishings=new THREE.Group();furnishings.name='v8-authored-office-props';scene.add(furnishings);
-  // Side shelving keeps the central window unobstructed.
-  for(const side of [-1,1]){
-    const x=side*5.15,z=-5.5;
-    box(furnishings,1.3,.08,.48,x,.12,z,wood);
-    for(const y of [.15,.85,1.55])box(furnishings,1.3,.06,.48,x,y,z,wood);
-    for(const dx of [-.62,.62])box(furnishings,.06,1.65,.48,x+dx,.83,z,metal);
-    for(let i=0;i<6;i++)box(furnishings,.11,.35+(i%3)*.04,.28,x-.47+i*.17,1.75+(i%3)*.02,z,mat([0xaec3b2,0xe5bd79,0xb8bfce][i%3]));
-    box(furnishings,.38,.28,.34,x-.25,1.02,z,pots);box(furnishings,.35,.22,.31,x+.26,.99,z,wood);
-    plant(furnishings,x,-4.7,.9);
-  }
+  // The imported side bookcases below replace the old duplicate shelving.
   // Whiteboard, marker tray and abstract work diagrams; no customer letter text.
-  const board=new THREE.Group();board.position.set(-5.25,1.9,-5.45);board.rotation.y=.18;furnishings.add(board);
+  const board=new THREE.Group();board.position.set(-11.3,1.9,-1.0);board.rotation.y=.18;furnishings.add(board);
   box(board,1.4,.88,.06,0,0,0,metal);box(board,1.3,.78,.065,0,0,.01,mat(0xf5f8eb,.35));
   box(board,1.42,.05,.18,0,-.47,.08,metal);
   for(let i=0;i<3;i++){
@@ -92,10 +59,10 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   // Recycling bins, file cabinet, small parcels and a reading lamp.
   for(const side of [-1,1]){
     const bin=new THREE.Mesh(new THREE.CylinderGeometry(.20,.17,.42,12,1,true),mat(side<0?0x8d9c8b:0xbca98b));
-    bin.position.set(side*4.45,.21,.75);furnishings.add(bin);
-    const pages=box(furnishings,.16,.025,.12,side*4.45,.36,.75,paper);pages.rotation.z=.24;
+    bin.position.set(side*11.3,.21,.75);furnishings.add(bin);
+    const pages=box(furnishings,.16,.025,.12,side*11.3,.36,.75,paper);pages.rotation.z=.24;
   }
-  const cabinet=new THREE.Group();cabinet.position.set(5.25,0,-.8);furnishings.add(cabinet);
+  const cabinet=new THREE.Group();cabinet.position.set(11.3,0,-.8);furnishings.add(cabinet);
   box(cabinet,1.05,1.15,.65,0,.575,0,mat(0xdbccad));
   for(let i=0;i<3;i++){box(cabinet,.96,.32,.025,0,.22+i*.35,.34,pots);box(cabinet,.22,.025,.04,0,.22+i*.35,.37,metal);}
   for(let i=0;i<4;i++)box(cabinet,.46,.035,.34,(i%2)*.1-.05,1.2+i*.037,0,paper);
@@ -105,32 +72,27 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   for(let z=-7;z<=4;z+=1.3)seams.push(-8,.004,z,8,.004,z);
   const seamGeometry=new THREE.BufferGeometry();seamGeometry.setAttribute('position',new THREE.Float32BufferAttribute(seams,3));
   furnishings.add(new THREE.LineSegments(seamGeometry,new THREE.LineBasicMaterial({color:0xb7b0a5,transparent:true,opacity:.25})));
-  // PBR glass in front of the same sky pane. Transmission is disabled on lower tiers.
-  const glassMaterial=new THREE.MeshPhysicalMaterial({color:0xdceefa,roughness:.06,metalness:0,transparent:true,opacity:.22,
-    transmission:.12,thickness:.06,ior:1.48,clearcoat:1,clearcoatRoughness:.06,envMapIntensity:1.1,depthWrite:false});
+  // A light glass tint over the sky pane, without transmission/reflection passes.
+  const glassMaterial=gradeMaterial(new THREE.MeshBasicMaterial({color:0xdceefa,transparent:true,opacity:.08,depthWrite:false}));
   const glass=new THREE.Mesh(new THREE.PlaneGeometry(windowWidth,windowHeight),glassMaterial);
   glass.position.copy(windowMesh.position);glass.position.z=windowZ+.018;glass.renderOrder=1;scene.add(glass);
   upgradeTree(furnishings);
   function quality(q){
-    const enabled=q.shadow>0;
-    renderer.shadowMap.enabled=enabled;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-    dirLight.castShadow=enabled;
-    if(dirLight.shadow.mapSize.x!==q.shadow && enabled){dirLight.shadow.map?.dispose();dirLight.shadow.map=null;dirLight.shadow.mapSize.set(q.shadow,q.shadow);}
-    glassMaterial.transmission=q.transmission;glassMaterial.needsUpdate=true;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1,2)*q.scale);
+    renderer.shadowMap.enabled=false;dirLight.castShadow=false;
+    renderer.setPixelRatio(q.scale);
   }
   function place(parent,name,size,position,yaw=0){const obj=assets.model(name,size);if(!obj)return null;obj.position.copy(position);obj.rotation.y=yaw;parent.add(obj);return obj;}
   function desk({pos,yaw,bonus,key,deskScale}){
     if(!assets.info.models.includes('desk'))return null;
     const g=new THREE.Group();g.userData.isDesk=true;
     const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)),side=new THREE.Vector3(dir.z,0,-dir.x);
-    const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,key==='wandukong3'?1.02:.85);center.y=0;
+    const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,1.85);center.y=0;
     place(g,'desk',[1.16,.42,.60],center,yaw);
     const monitor=center.clone().addScaledVector(dir,.08).addScaledVector(side,key==='wandukong3'?.46:.30);monitor.y=.42;
     place(g,'computerScreen',[.34,key==='wandukong3'?.26:.34,.07],monitor,yaw+Math.PI);
     const keyboard=center.clone().addScaledVector(dir,-.13);keyboard.y=.425;place(g,'computerKeyboard',[.28,.015,.11],keyboard,yaw);
     const mouse=keyboard.clone().addScaledVector(side,.21);place(g,'computerMouse',[.055,.023,.08],mouse,yaw);
-    const chair=place(g,'chairDesk',[.46,.60,.48],pos.clone().addScaledVector(dir,-.24).addScaledVector(side,-.16),yaw+Math.PI);
+    const chair=place(g,'chairDesk',[.46,.60,.48],pos.clone().addScaledVector(dir,.65).addScaledVector(side,1.85),yaw+Math.PI);
     if(chair)chair.userData.isOfficeChair=true;
     const books=center.clone().addScaledVector(side,-.35);books.y=.42;place(g,'books',[.17,.06,.17],books,yaw);
     if(bonus==='plant'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.15);pp.y=.42;place(g,'plantSmall1',[.13,.20,.13],pp);}
@@ -146,16 +108,34 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     // The shelves serve as real opaque cover during the retreat. They sit
     // beside, rather than across, the seven friends' resting sight lines.
     for(const side of [-1,1]){
-      const cover=place(furnishings,'bookcaseClosed',[2.0,3.45,.85],new THREE.Vector3(side*7.1,0,-4.75));if(cover)covers.push(cover);
-      const base=place(furnishings,'cardboardBoxClosed',[2.0,.42,.85],new THREE.Vector3(side*7.1,0,-4.75));if(base)covers.push(base);
-      place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*6.3,0,-3.3));
-      for(let i=0;i<3;i++)place(furnishings,'books',[.7,.4,.32],new THREE.Vector3(side*7.1,.4+i*.92,-4.65));
+      const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-3.5));if(cover)covers.push(cover);
+      const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-3.5));if(base)covers.push(base);
+      place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*11.3,0,-2.5));
+      for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-3.4));
     }
+    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-3.5));if(extra)covers.push(extra);
     cabinet.visible=false;
-    place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(5.25,0,-.8));
-    place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(5.25,1.15,-.8));
+    place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(11.3,0,-.8));
+    place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(11.3,1.15,-.8));
   });
-  return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,
+  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.isLight);
+  const bake=createStaticBake(scene,floor);
+  let obstacles=[];
+  function rebuild(desks,crates){
+    const roots=[...fixed,...desks,...crates];obstacles=[];scene.updateMatrixWorld(true);
+    for(const root of roots)root.traverse(o=>{
+      if(!o.isMesh || Array.isArray(o.material) || o.material.transparent)return;
+      const b=new THREE.Box3().setFromObject(o);
+      if(b.min.y>1.8 || b.max.y<.12)return;
+      obstacles.push({key:root.userData.isDesk?'desk-'+root.userData.slotIndex:o.name || 'furniture',minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z});
+    });
+    // Keep the same occupied region while dropping duplicate/contained mesh
+    // rectangles (chair parts and cupboard panels often repeat a footprint).
+    obstacles=[...new Map(obstacles.map(o=>[[o.minX,o.maxX,o.minZ,o.maxZ].join(','),o])).values()];
+    obstacles=obstacles.filter((o,i,list)=>!list.some((b,j)=>i!==j && b.minX<=o.minX && b.maxX>=o.maxX && b.minZ<=o.minZ && b.maxZ>=o.maxZ));
+    bake.rebuild(roots);
+  }
+  return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,rebuild,get obstacles(){return obstacles;},bake,
     get info(){return {...assets.info,anisotropy:assets.anisotropy,props:['CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그','직접 만든 종이·장난감']};}};
 }
 

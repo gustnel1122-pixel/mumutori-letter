@@ -1,0 +1,17 @@
+{
+  "label": "fast-bench-verified-1920x1080",
+  "seconds": 60.0332000002861,
+  "frames": 1439,
+  "meanFPS": 23.970069894544054,
+  "onePercentLow": 18.429782537204083,
+  "canvas": [
+    1280,
+    720
+  ],
+  "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 (0x00002484) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+  "cameraRequests": 0,
+  "renderer": "GPU",
+  "sourceFPS": 24,
+  "errors": []
+}

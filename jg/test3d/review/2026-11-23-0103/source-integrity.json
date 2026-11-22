@@ -1,0 +1,68 @@
+{
+  "baseline": "4e09673212331dc31d66c1e36f17eea9ad07380c",
+  "sourceSHA256_LF": {
+    "jg/test3d/index.html": "0b3d975f151e0117ce0a8beb531ab566d4232ccfd35c8819358ffb0a9c058886",
+    "jg/test3d/v8-assets.js": "5ed3c8b18eb157f301068d34a064f23f72cd03874d210bcdcc82e3432e77aa85",
+    "jg/test3d/v8-detect-worker.js": "7700fb7eb4b22ea1705fdec55f4554936c549dff74346f1176d511cb120b16d3",
+    "jg/test3d/v8-detection.js": "68ad3e4e38c3bb48e9b9e73c924d80c490850b5b1a302cb40637d2ab0aef7f0b",
+    "jg/test3d/v8-director.js": "4b3b8cb0956b758ef02e7888a923eb00f8464e635a56fb5e5d89e3e6e7e2d656",
+    "jg/test3d/v8-effects.js": "0a2df74d232719fa59bfa40928ca74e814d3c9acbba8d69b5dbe524bf987ddfc",
+    "jg/test3d/v8-emotions.js": "7a1a9e5981cd3579c516b048ad717ca183b97c118f26b04322fd918d123b5cbc",
+    "jg/test3d/v8-lighting.js": "190ae0392d142846c8ee7e8a872754e2beba2b0bd2e7e589efc3bdb29acbf923",
+    "jg/test3d/v8-motion.js": "aab1c7fba25c4d97644dc452611b5abffe8822d7b3653b96b6b465c2256bb6c7",
+    "jg/test3d/v8-office.js": "94b330694bbaa9710c2433d39ab8a022de3a1f0731eaeace654248993dfa6857",
+    "jg/test3d/v8-render.js": "1c37eb732eb7a8cd2640642255d725d1c31435879c29a71a3f2354f733bdb255",
+    "jg/test3d/v8-runtime.js": "e1535d4e7aa5c6c61a9f07ff3dfd64143c484d6b9c292b3afade3a0319c1a52c"
+  },
+  "protectedFiles": {
+    "jg\\fast\\detect-worker.js": {
+      "before": "7700fb7eb4b22ea1705fdec55f4554936c549dff74346f1176d511cb120b16d3",
+      "after": "7700fb7eb4b22ea1705fdec55f4554936c549dff74346f1176d511cb120b16d3"
+    },
+    "jg\\fast\\detection.js": {
+      "before": "7083d6497d4c75ea5c87c0367454381ae5c07e462c6c7631f65a474d1c80dbe8",
+      "after": "7083d6497d4c75ea5c87c0367454381ae5c07e462c6c7631f65a474d1c80dbe8"
+    },
+    "jg\\fast\\index.html": {
+      "before": "73019b75d43906ce5e97b9d0f82e21c7ab84d1c6d8efec3599e8900c5ea7c382",
+      "after": "73019b75d43906ce5e97b9d0f82e21c7ab84d1c6d8efec3599e8900c5ea7c382"
+    },
+    "jg\\fast\\renderer.js": {
+      "before": "a7f394a010c48d98c87640c0246ecbe7bce96fcfeaa6cc129effa78d6edd6e87",
+      "after": "a7f394a010c48d98c87640c0246ecbe7bce96fcfeaa6cc129effa78d6edd6e87"
+    },
+    "jg\\test3d\\models\\bam.glb": {
+      "before": "42d7be764d2f78321fb896ff5a1218fa89bfead1052c28732759071c33844775",
+      "after": "42d7be764d2f78321fb896ff5a1218fa89bfead1052c28732759071c33844775"
+    },
+    "jg\\test3d\\models\\byeongari.glb": {
+      "before": "18eeadf8d3ba60ec7a264b7c9d0150093c919bfc36f78d286124f9be3c3944c5",
+      "after": "18eeadf8d3ba60ec7a264b7c9d0150093c919bfc36f78d286124f9be3c3944c5"
+    },
+    "jg\\test3d\\models\\ddangkong.glb": {
+      "before": "13fcf27a2d75dcbd99880966e2a86826c43f46c1159987d09bea88e59ac9b205",
+      "after": "13fcf27a2d75dcbd99880966e2a86826c43f46c1159987d09bea88e59ac9b205"
+    },
+    "jg\\test3d\\models\\dotori.glb": {
+      "before": "d1fade51001cef3feffa4066cae1f9714da55a6768fc45c35d30e8ae049cdf26",
+      "after": "d1fade51001cef3feffa4066cae1f9714da55a6768fc45c35d30e8ae049cdf26"
+    },
+    "jg\\test3d\\models\\haebaragi.glb": {
+      "before": "2b3e0c27d4e5df9bc9749190e914b042d46f28f8e771fefcd914d8a39044e740",
+      "after": "2b3e0c27d4e5df9bc9749190e914b042d46f28f8e771fefcd914d8a39044e740"
+    },
+    "jg\\test3d\\models\\ssal.glb": {
+      "before": "dcf1add3dc71e01d210e1a787253f76fee658d7352902b0a366db0168849f58a",
+      "after": "dcf1add3dc71e01d210e1a787253f76fee658d7352902b0a366db0168849f58a"
+    },
+    "jg\\test3d\\models\\wandukong3.glb": {
+      "before": "790402ce5268e3e0e89c469693729662804c3ecc0c3724b2764e1d2c1ca48d63",
+      "after": "790402ce5268e3e0e89c469693729662804c3ecc0c3724b2764e1d2c1ca48d63"
+    },
+    "jg/index.html": {
+      "before": "aa21e85b99acb808171d953131fcca8e18306edcffa5b4aa38830a8c94b4f9fd",
+      "after": "aa21e85b99acb808171d953131fcca8e18306edcffa5b4aa38830a8c94b4f9fd"
+    }
+  },
+  "allProtectedUnchanged": true
+}

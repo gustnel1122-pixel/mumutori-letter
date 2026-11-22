@@ -46,9 +46,9 @@ export class SceneDirector {
 }
 
 export const QUALITY=Object.freeze([
-  {id:'low',label:'가벼움',scale:.85,shadow:512,transmission:0,ao:false,bloom:false},
-  {id:'medium',label:'균형',scale:1,shadow:1024,transmission:0,ao:false,bloom:true},
-  {id:'high',label:'고화질',scale:1,shadow:2048,transmission:.12,ao:true,bloom:true},
+  {id:'low',label:'가벼움',scale:.85,shadow:0,transmission:0,ao:false,bloom:false},
+  {id:'medium',label:'균형',scale:1,shadow:0,transmission:0,ao:false,bloom:false},
+  {id:'high',label:'선명',scale:1,shadow:0,transmission:0,ao:false,bloom:false},
 ]);
 export class AdaptiveQuality {
   constructor(){this.level=2;this.mode='auto';this.resetSamples();}

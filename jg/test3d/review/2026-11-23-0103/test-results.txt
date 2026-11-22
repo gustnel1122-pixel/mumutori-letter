@@ -1,0 +1,22 @@
+✔ any detected person starts the same determined battle within one frame (2.4551ms)
+✔ battle emotions never include tired or working, and all attack stages run (4.2324ms)
+✔ persistent visitor keeps the group hidden; two seconds absent releases them (7.8898ms)
+✔ a returning visitor during peek sends everyone back to cover (2.4238ms)
+✔ camera-free demo follows all stages and completes without a presence feed (2.536ms)
+✔ quality preserves native resolution without real-time effects, even when fixed high (0.9726ms)
+✔ quality needs over five seconds below 24 FPS and drops only one tier at a time (0.4469ms)
+✔ quality restores after recovery, ignores suspended time, and honors fixed high (0.5345ms)
+✔ sustained one-FPS rendering also triggers a downgrade (0.3323ms)
+✔ routes a body around a desk instead of crossing its inflated corners (15.6701ms)
+✔ two crossing friends remain separated and both finish their routes (6.8746ms)
+✔ large frame gaps cannot tunnel through furniture or another body (3.8631ms)
+✔ an occupied destination makes a visitor wait safely (2.724ms)
+✔ a brief corner intersection cannot be skipped by route smoothing (2.8691ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 162.3764
