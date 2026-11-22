@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {loadOfficeAssets} from './v8-assets.js?v=20261123-8d';
+import {loadOfficeAssets} from './v8-assets.js?v=20261123-8d1';
 
 function mat(color,roughness=.65,metalness=0){return new THREE.MeshStandardMaterial({color,roughness,metalness});}
 function box(parent,w,h,d,x,y,z,material){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);parent.add(m);return m;}
@@ -38,7 +38,7 @@ function plant(parent,x,z,scale=1){
 }
 
 export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom}){
-  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
   let env=null;
   try{env=environment(renderer);scene.environment=env.texture;}catch(e){console.warn('HDR 환경맵 미지원 → 반구 조명 사용:',e);}
   wood.map=grainTexture();wood.map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());wood.needsUpdate=true;
@@ -49,7 +49,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     if(cache.has(original))return cache.get(original);
     const m=new THREE.MeshStandardMaterial({color:original.color?.clone() || 0xffffff,map:original.map || null,
       transparent:original.transparent,opacity:original.opacity,alphaTest:original.alphaTest,side:original.side,
-      roughness:.59,metalness:0,envMapIntensity:.72});cache.set(original,m);return m;
+      roughness:.68,metalness:0,envMapIntensity:.32});cache.set(original,m);return m;
   };
   function upgradeTree(root){root.traverse(o=>{
     if(!o.isMesh)return;
@@ -61,14 +61,14 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     }
   });}
   upgradeTree(scene);
-  floor.material=new THREE.MeshPhysicalMaterial({color:0xd4d5cf,roughness:.52,metalness:.02,clearcoat:.12,clearcoatRoughness:.5,envMapIntensity:.72});
-  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.19);
-  dirLight.color.set(0xfff0db);dirLight.intensity=2.1;dirLight.position.set(-3,9,5);
+  floor.material=new THREE.MeshPhysicalMaterial({color:0xdde2e2,roughness:.66,metalness:0,clearcoat:.06,clearcoatRoughness:.65,envMapIntensity:.32});
+  scene.children.filter(o=>o.isAmbientLight).forEach(o=>o.intensity=.12);
+  dirLight.color.set(0xfff5e8);dirLight.intensity=2.8;dirLight.position.set(-3,9,5);
   dirLight.target.position.set(0,.3,-2);scene.add(dirLight.target);
   dirLight.shadow.camera.left=-8;dirLight.shadow.camera.right=8;dirLight.shadow.camera.top=8;dirLight.shadow.camera.bottom=-8;
   dirLight.shadow.camera.near=.1;dirLight.shadow.camera.far=26;dirLight.shadow.bias=-.0004;dirLight.shadow.normalBias=.025;
   dirLight.shadow.radius=3;dirLight.shadow.blurSamples=8;
-  scene.add(new THREE.HemisphereLight(0xdcefff,0x9b7953,.55));
+  scene.add(new THREE.HemisphereLight(0xe6f3ff,0x8c775e,.32));
   const furnishings=new THREE.Group();furnishings.name='v8-authored-office-props';scene.add(furnishings);
   // Side shelving keeps the central window unobstructed.
   for(const side of [-1,1]){
@@ -124,7 +124,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     if(!assets.info.models.includes('desk'))return null;
     const g=new THREE.Group();g.userData.isDesk=true;
     const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)),side=new THREE.Vector3(dir.z,0,-dir.x);
-    const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,.85);center.y=0;
+    const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,key==='wandukong3'?1.02:.85);center.y=0;
     place(g,'desk',[1.16,.42,.60],center,yaw);
     const monitor=center.clone().addScaledVector(dir,.08).addScaledVector(side,key==='wandukong3'?.46:.30);monitor.y=.42;
     place(g,'computerScreen',[.34,key==='wandukong3'?.26:.34,.07],monitor,yaw+Math.PI);

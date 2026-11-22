@@ -6,7 +6,7 @@ const names=['desk','chairDesk','computerScreen','computerKeyboard','computerMou
 export function loadOfficeAssets({renderer,scene}){
   const templates=new Map(),loader=new GLTFLoader(),info={models:[],hdr:'loading',errors:[]},anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
   function textures(root){root.traverse(o=>{if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;for(const m of [o.material].flat()){
-    m.roughness=Math.max(.36,m.roughness??.65);m.envMapIntensity=.65;
+    m.roughness=Math.max(.46,m.roughness??.65);m.envMapIntensity=.32;
     for(const value of Object.values(m))if(value?.isTexture)value.anisotropy=anisotropy;
   }});}
   const ready=Promise.all([

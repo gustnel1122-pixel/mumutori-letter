@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261123-8d';
 import {createEmotionRig,EMOTIONS} from './v8-emotions.js?v=20261123-8d';
-import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261123-8d';
+import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261123-8d1';
 import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261123-8d';
-import {createRenderPipeline} from './v8-render.js?v=20261123-8d';
+import {createRenderPipeline} from './v8-render.js?v=20261123-8d1';
 
 const smooth=x=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const clamp=THREE.MathUtils.clamp;

@@ -1,0 +1,601 @@
+{
+  "total": 2025,
+  "visible": 1329,
+  "lowerTotal": 972,
+  "lowerVisible": 341,
+  "visibleFraction": 0.6562962962962963,
+  "lowerVisibleFraction": 0.3508230452674897,
+  "eyes": [
+    {
+      "key": "dotori",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "bam",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "ddangkong",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "byeongari",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "wandukong3",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "haebaragi",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    },
+    {
+      "key": "ssal",
+      "samples": 65,
+      "blocked": 0,
+      "blockedBy": {}
+    }
+  ],
+  "composition": {
+    "version": "2026-11-23-8d",
+    "width": 1920,
+    "height": 1080,
+    "aspect": 1.7777777777777777,
+    "display": {
+      "actorScale": 3.4,
+      "deskScale": 2.3,
+      "pitch": 28,
+      "targetFraction": 0.36
+    },
+    "camera": [
+      0,
+      9.92537079119638,
+      14.0401535790279
+    ],
+    "bounds": {
+      "min": [
+        -8.42,
+        -0.2383018094205686,
+        -6.5865099749112295
+      ],
+      "max": [
+        8.42,
+        5.16,
+        3.7466059810267396
+      ]
+    },
+    "desks": [
+      {
+        "slot": 0,
+        "row": "front",
+        "position": [
+          0.2,
+          1.8
+        ],
+        "screen": [
+          0.20371420067289558,
+          -0.6441833547202318,
+          0.9888048251503275
+        ]
+      },
+      {
+        "slot": 1,
+        "row": "middle",
+        "position": [
+          -1.6,
+          -2.6
+        ],
+        "screen": [
+          0.0001290787129275763,
+          -0.17078604558293622,
+          0.9915442192613388
+        ]
+      },
+      {
+        "slot": 2,
+        "row": "middle",
+        "position": [
+          -4.65,
+          -2.6
+        ],
+        "screen": [
+          -0.27949857444714044,
+          -0.1820067072370613,
+          0.9914792889926963
+        ]
+      },
+      {
+        "slot": 3,
+        "row": "front",
+        "position": [
+          -3.05,
+          1.8
+        ],
+        "screen": [
+          -0.16355776464558253,
+          -0.6265019100586621,
+          0.988907141839597
+        ]
+      },
+      {
+        "slot": 4,
+        "row": "middle",
+        "position": [
+          1.65,
+          -2.6
+        ],
+        "screen": [
+          0.28714923013782934,
+          -0.2149852776862462,
+          0.9912884528811798
+        ]
+      },
+      {
+        "slot": 5,
+        "row": "front",
+        "position": [
+          4,
+          1.8
+        ],
+        "screen": [
+          0.635451322943204,
+          -0.713543057639522,
+          0.9884034634229768
+        ]
+      },
+      {
+        "slot": 6,
+        "row": "back",
+        "position": [
+          4,
+          -4.9
+        ],
+        "screen": [
+          0.45250106542002333,
+          -0.042042827275519036,
+          0.9922892138087449
+        ]
+      }
+    ],
+    "window": {
+      "width": 16.4,
+      "height": 4.9,
+      "z": -6.3,
+      "corners": [
+        [
+          -0.6286504929415526,
+          0.11669078557680114,
+          0.9931362939219659
+        ],
+        [
+          -0.699956358110017,
+          0.7864733088709163,
+          0.992130684299328
+        ],
+        [
+          0.6286504929415526,
+          0.11669078557680114,
+          0.9931362939219659
+        ],
+        [
+          0.699956358110017,
+          0.7864733088709163,
+          0.992130684299328
+        ]
+      ]
+    },
+    "actors": [
+      {
+        "key": "dotori",
+        "left": -0.19652966774381797,
+        "right": 0.25183761155463263,
+        "bottom": -0.8002143336761545,
+        "top": 0.3597732932311663
+      },
+      {
+        "key": "bam",
+        "left": -0.336675946850567,
+        "right": -0.010066150302072375,
+        "bottom": -0.29443101149424716,
+        "top": 0.6141679235831455
+      },
+      {
+        "key": "ddangkong",
+        "left": -0.6089344570604328,
+        "right": -0.3022910624031306,
+        "bottom": -0.23730671177004117,
+        "top": 0.5788974432303585
+      },
+      {
+        "key": "byeongari",
+        "left": -0.6779232103666535,
+        "right": -0.14873004135635656,
+        "bottom": -0.8310280750947786,
+        "top": 0.37605237158198423
+      },
+      {
+        "key": "wandukong3",
+        "left": 0.008445605361530866,
+        "right": 0.34335020389048587,
+        "bottom": -0.2597361616021664,
+        "top": 0.6047095148393271
+      },
+      {
+        "key": "haebaragi",
+        "left": 0.31592532120709493,
+        "right": 0.6878410779180373,
+        "bottom": -0.6891843487430207,
+        "top": 0.2821801548950574
+      },
+      {
+        "key": "ssal",
+        "left": 0.19855695208741067,
+        "right": 0.51764983658419,
+        "bottom": -0.08356784018659615,
+        "top": 0.6953120556414472
+      }
+    ]
+  },
+  "info": {
+    "scene": {
+      "id": "work",
+      "mode": "work",
+      "emotion": "working",
+      "age": 0,
+      "progress": 0,
+      "elapsed": 0,
+      "active": false,
+      "clean": 1,
+      "encounters": 0
+    },
+    "emotionOverride": "working",
+    "attackSeconds": 12.5,
+    "encounterSeconds": 36,
+    "hits": 0,
+    "impactKinds": {
+      "throw": 0,
+      "gun": 0,
+      "bazooka": 0
+    },
+    "shots": {
+      "throw": 0,
+      "gun": 0,
+      "bazooka": 0
+    },
+    "projectilePeak": 0,
+    "lastCompleted": null,
+    "quality": {
+      "id": "high",
+      "label": "고화질",
+      "scale": 1,
+      "shadow": 2048,
+      "transmission": 0.12,
+      "ao": true,
+      "bloom": true
+    },
+    "qualityMode": "high",
+    "qualityChanges": [
+      {
+        "time": 1000,
+        "quality": "high",
+        "pixelRatio": 1
+      },
+      {
+        "time": 1000,
+        "quality": "high",
+        "pixelRatio": 1
+      }
+    ],
+    "render": {
+      "antialias": true,
+      "msaa": 4,
+      "pixelRatio": 1,
+      "devicePixelRatio": 1,
+      "canvas": [
+        1920,
+        1080
+      ],
+      "ssao": true,
+      "bloom": true,
+      "shadow": 2048,
+      "toneMapping": "ACESFilmic",
+      "output": "sRGB"
+    },
+    "fps": 0,
+    "environment": "Poly Haven / Studio Small 09 / Sergej Majboroda / CC0 / 1K RGBE → PMREM",
+    "assets": {
+      "models": [
+        "desk",
+        "chairDesk",
+        "computerScreen",
+        "computerKeyboard",
+        "computerMouse",
+        "pottedPlant",
+        "plantSmall1",
+        "cardboardBoxOpen",
+        "books",
+        "bookcaseClosed",
+        "cardboardBoxClosed",
+        "sideTableDrawers",
+        "lampRoundTable",
+        "mug"
+      ],
+      "hdr": "Poly Haven / Studio Small 09 / Sergej Majboroda / CC0 / 1K RGBE → PMREM",
+      "errors": [],
+      "anisotropy": 8,
+      "props": [
+        "CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그",
+        "직접 만든 종이·장난감"
+      ]
+    },
+    "models": [
+      {
+        "key": "dotori",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          0.2,
+          0,
+          1.8
+        ],
+        "equipment": [
+          -0.7,
+          0.72,
+          1.3
+        ],
+        "crate": [
+          -0.7,
+          0,
+          1.3
+        ]
+      },
+      {
+        "key": "bam",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          -1.6,
+          0,
+          -2.6
+        ],
+        "equipment": [
+          -2.5,
+          0.72,
+          -3.1
+        ],
+        "crate": [
+          -2.5,
+          0,
+          -3.1
+        ]
+      },
+      {
+        "key": "ddangkong",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          -4.65,
+          0,
+          -2.6
+        ],
+        "equipment": [
+          -5.550000000000001,
+          0.72,
+          -3.1
+        ],
+        "crate": [
+          -5.550000000000001,
+          0,
+          -3.1
+        ]
+      },
+      {
+        "key": "byeongari",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          -3.05,
+          0,
+          1.8
+        ],
+        "equipment": [
+          -3.9499999999999997,
+          0.72,
+          1.3
+        ],
+        "crate": [
+          -3.9499999999999997,
+          0,
+          1.3
+        ]
+      },
+      {
+        "key": "wandukong3",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 6,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          1.65,
+          0,
+          -2.6
+        ],
+        "equipment": [
+          0.7499999999999999,
+          0.72,
+          -3.1
+        ],
+        "crate": [
+          0.7499999999999999,
+          0,
+          -3.1
+        ]
+      },
+      {
+        "key": "haebaragi",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": false,
+        "hasWeapon": false,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          4,
+          0,
+          1.8
+        ],
+        "equipment": [
+          3.1,
+          0.72,
+          1.3
+        ],
+        "crate": [
+          3.1,
+          0,
+          1.3
+        ]
+      },
+      {
+        "key": "ssal",
+        "mode": "work",
+        "emotion": "working",
+        "eyeSurfaces": 2,
+        "canThrow": true,
+        "hasWeapon": true,
+        "held": false,
+        "pickupBlend": 0,
+        "position": [
+          4,
+          0,
+          -4.9
+        ],
+        "equipment": [
+          3.1,
+          0.72,
+          -5.4
+        ],
+        "crate": [
+          3.1,
+          0,
+          -5.4
+        ]
+      }
+    ],
+    "pickups": [],
+    "events": [],
+    "stages": [
+      {
+        "id": "notice",
+        "emotion": "determined",
+        "duration": 0.5,
+        "label": "다 같이 전투 준비!"
+      },
+      {
+        "id": "equip",
+        "emotion": "determined",
+        "duration": 5,
+        "label": "씨앗 보관함으로!"
+      },
+      {
+        "id": "ready",
+        "emotion": "determined",
+        "duration": 1,
+        "label": "모두 자리 잡기"
+      },
+      {
+        "id": "throw",
+        "emotion": "excited",
+        "duration": 3,
+        "label": "씨앗 던지기"
+      },
+      {
+        "id": "gun",
+        "emotion": "excited",
+        "duration": 4.5,
+        "label": "완두콩 깍지 총"
+      },
+      {
+        "id": "fetch",
+        "emotion": "determined",
+        "duration": 3.5,
+        "label": "도토리 바주카 가져오기"
+      },
+      {
+        "id": "bazooka",
+        "emotion": "excited",
+        "duration": 5,
+        "label": "도토리 바주카"
+      },
+      {
+        "id": "mess",
+        "emotion": "proud",
+        "duration": 2,
+        "label": "창문이 엉망!"
+      },
+      {
+        "id": "escape",
+        "emotion": "surprised",
+        "duration": 3,
+        "label": "들켰다, 다 같이 숨자!"
+      },
+      {
+        "id": "hide",
+        "emotion": "surprised",
+        "duration": 2,
+        "label": "쉿… 손님이 지나가길 기다려요"
+      },
+      {
+        "id": "peek",
+        "emotion": "surprised",
+        "duration": 3.5,
+        "label": "한 명씩 빼꼼"
+      },
+      {
+        "id": "recover",
+        "emotion": "working",
+        "duration": 3,
+        "label": "유리창 닦고 다시 일하기"
+      }
+    ],
+    "testLevel": null,
+    "cameraStored": false
+  },
+  "errors": []
+}

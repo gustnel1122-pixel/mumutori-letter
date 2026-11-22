@@ -133,7 +133,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-23-8d · 전원 전투·무기 챙기기·도망 · CC0 가구·HDRI</div>
+    <div class="ver">버전 2026-11-23-8d.1 · 색 대비·창 노출 보정 · 전원 전투·CC0 가구</div>
   </div>
 </div>
 
@@ -149,15 +149,15 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261123-8d';
+import {createV8} from './v8-runtime.js?v=20261123-8d1';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-23-8d';
+const VERSION = '2026-11-23-8d.1';
 // Display transforms only: the canonical GLBs and their proportions stay intact.
-const COMPOSITION = {actorScale:3.4, deskScale:2.3, pitch:28, targetFraction:.36};
+const COMPOSITION = {actorScale:2.6, deskScale:1.8, pitch:32, targetFraction:.36};
 
 // ===================================================================================
 // §0. v8: PBR + 작은 HDR PMREM · 그림자/해상도 자동 조절 · 감지 Worker 분리.
