@@ -123,7 +123,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-20-7c · three.js r160 · GLB 7종 11/16판 · v7(3줄 원근·배 높이 책상·바퀴 의자)</div>
+    <div class="ver">버전 2026-11-22-8a · three.js r160 · GLB 정본 7종 · v8(7명 기본·통창 전체 구도)</div>
   </div>
 </div>
 
@@ -143,7 +143,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-20-7c';
+const VERSION = '2026-11-22-8a';
 
 // ===================================================================================
 // §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
@@ -366,9 +366,9 @@ scene.add(floor);
 // ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
 const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
 const WINDOW_Z = -6.3;
-const WINDOW_WIDTH = 12.4;
-const WINDOW_BOTTOM = 0.18;
-const WINDOW_HEIGHT = 4.6;
+const WINDOW_WIDTH = 13.6;
+const WINDOW_BOTTOM = 0.08;
+const WINDOW_HEIGHT = 4.9;
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 12), wallMat);
 backWall.position.set(0, 4, WINDOW_Z - 0.1);
 scene.add(backWall);
@@ -800,7 +800,7 @@ function buildDeskForSlot(pos, yaw, bonus){
 
 // ---- 캐릭터 액터 ----
 const actors = [];
-let friendCount = 2;
+let friendCount = 7;
 const WALK_SPEED = 1.35;
 
 function lerpAngle(a, b, t){
@@ -908,15 +908,19 @@ function updateCameraFraming(n){
   includeBox(new THREE.Box3(
     COFFEE_SPOT.clone().add(new THREE.Vector3(-0.7, 0, 0)),
     COFFEE_SPOT.clone().add(new THREE.Vector3(0.7, 1.34, 0.9))));
+  // The entire outer window frame participates in the fit, including its top edge.
+  includeBox(new THREE.Box3(
+    new THREE.Vector3(-WINDOW_WIDTH/2-0.22,WINDOW_BOTTOM-0.08,WINDOW_Z-0.08),
+    new THREE.Vector3(WINDOW_WIDTH/2+0.22,WINDOW_BOTTOM+WINDOW_HEIGHT+0.18,WINDOW_Z+0.35)));
   compositionBounds.copy(bounds);
 
   camera.fov = 36;
   const halfVFOV = THREE.MathUtils.degToRad(camera.fov / 2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const pitch = THREE.MathUtils.degToRad(15);
+  const pitch = THREE.MathUtils.degToRad(10);
   const sin = Math.sin(pitch), cos = Math.cos(pitch);
   const center = bounds.getCenter(new THREE.Vector3());
-  const target = new THREE.Vector3(center.x, 0.80, center.z);
+  const target = new THREE.Vector3(center.x, bounds.min.y+(bounds.max.y-bounds.min.y)*0.45, center.z);
   // 앞쪽 끝을 거리 기준으로 삼아 2~3명일 때도 앞줄 친구가 화면 높이의 약 1/3을 유지한다.
   let distance = (TARGET_HEIGHT / 0.32) / (2 * Math.tan(halfVFOV))
     + (bounds.max.z - target.z) * cos;
@@ -1356,7 +1360,7 @@ renderLoop();
 (async () => {
   loadingMsg.textContent = '3D 모델 불러오는 중…';
   await loadAllTemplates();
-  setFriendCount(2);
+  setFriendCount(7);
   loadingMsg.textContent = '';
 })();
 
