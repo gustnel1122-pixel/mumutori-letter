@@ -29,13 +29,15 @@
 // v6: 그림만 작게, 투명한 버튼의 실제 터치 영역은 축소된 자리에서도 44px 이상.
   st.textContent += `
 .dw::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,calc(44px / var(--dw-scale,1)));height:max(100%,calc(44px / var(--dw-scale,1)));transform:translate(-50%,-50%)}
-.dw-say{max-width:calc(100vw - 24px);padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#682301;font:12px/1.4 "Jua","Gowun Dodum",system-ui,sans-serif;white-space:nowrap;transition:none;text-shadow:0 1px 2px #FFFDF7,0 -1px 2px #FFFDF7;transform-origin:50% 100%}
-.dw-say.on{animation:dw-fx 1.6s ease-out both}
+.dw-say{width:max-content;max-width:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#682301;font:12px/1.4 "Jua","Gowun Dodum",system-ui,sans-serif;white-space:nowrap;transition:none;text-shadow:0 1px 2px #FFFDF7,0 -1px 2px #FFFDF7}
+.dw-say.on{animation:none}
+.dw-say-text{display:block;transform-origin:50% 100%}
+.dw-say.on .dw-say-text{animation:dw-fx 1.6s ease-out both}
 .dw-mark{font-size:11px;top:-8px;right:-3px}
 .dw-shadow{left:22%;right:22%;height:4px;bottom:-2px}
 @keyframes dw-fx{0%{opacity:0;translate:0 5px;rotate:-6deg;scale:.82}16%{opacity:1;translate:0 -3px;rotate:-4deg;scale:1.06}30%,78%{opacity:1;translate:0 0;rotate:-4deg;scale:1}100%{opacity:0;translate:0 -7px;rotate:-2deg;scale:.98}}
 @media(max-width:759px){.dw-say{font-size:11px}}
-@media(prefers-reduced-motion:reduce){.dw-say.on{animation:none}.dw-dust{display:none}}
+@media(prefers-reduced-motion:reduce){.dw-say.on .dw-say-text{animation:none}.dw-dust{display:none}}
 `;
 /* 무무토리 자사몰 '도토리 상담원' 위젯 core — 시험판(아티팩트)과 진짜(자사몰)가 같은 화면을 씀. ask()만 바뀜 */
 (function () {
@@ -231,6 +233,8 @@
     }
     var body = btn.querySelector('.dw-body'), shadow = btn.querySelector('.dw-shadow'), mark = btn.querySelector('.dw-mark');
     var say = document.createElement('div'); say.className = 'dw-say'; say.setAttribute('role', 'status');
+    var sayText = document.createElement('span'); sayText.className = 'dw-say-text'; say.appendChild(sayText);
+    var captionSide = '', captionWidth = 0, captionFont = 0;
     var panel = document.createElement('div'); panel.className = 'dw-panel'; panel.hidden = true;
     var call = document.createElement('button'); call.className = 'dw-call'; call.type = 'button'; call.textContent = '도토리 부르기'; call.hidden = true;
     document.body.appendChild(btn); document.body.appendChild(say); document.body.appendChild(panel); document.body.appendChild(call);
@@ -247,9 +251,65 @@
     function showMark(s, ms) { mark.textContent = s; mark.classList.add('on'); clearTimeout(markT); if (ms) markT = setTimeout(function () { mark.classList.remove('on'); }, ms); }
     function hideMark() { mark.classList.remove('on'); }
     function speak(s) {
-      say.classList.remove('on'); say.textContent = s;
+      say.classList.remove('on'); sayText.textContent = s;
+      say.style.visibility = 'hidden'; captionSide = ''; captionWidth = 0;
       void say.offsetWidth; // 같은 글씨도 다음 상품에서 다시 톡 튀어나오게.
       say.classList.add('on'); st.sayUntil = performance.now() + 1600; st.lastSay = performance.now();
+    }
+    // Place the animated text's actual bounds, independently of its parent translation.
+    // The extra 2px beyond the required 8px also leaves room for the text shadow.
+    function captionSpot(a, text, viewport, preferred, bounce) {
+      var pad = 10, gap = 6, left = viewport.left + pad, top = viewport.top + pad;
+      var right = viewport.right - pad, bottom = viewport.bottom - pad;
+      var w = text.width, h = text.height;
+      if (w > right - left || h > bottom - top || a.right < viewport.left ||
+          a.left > viewport.right || a.bottom < viewport.top || a.top > viewport.bottom) return null;
+      var cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2;
+      var x = clamp(cx + bounce.x - w / 2, left, right - w);
+      var y = clamp(cy + bounce.y - h / 2, top, bottom - h);
+      var spots = {
+        right: { left: a.right + gap, top: y }, left: { left: a.left - gap - w, top: y },
+        above: { left: x, top: a.top - gap - h }, below: { left: x, top: a.bottom + gap }
+      };
+      var order = preferred ? [preferred, 'right', 'left', 'above', 'below'] : ['right', 'left', 'above', 'below'];
+      for (var i = 0; i < order.length; i++) {
+        var side = order[i], p = spots[side];
+        if (p.left < left || p.top < top || p.left + w > right || p.top + h > bottom) continue;
+        var dx = Math.max(a.left - (p.left + w), p.left - a.right, 0);
+        var dy = Math.max(a.top - (p.top + h), p.top - a.bottom, 0);
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance >= 4 && distance <= 8) return { left: p.left, top: p.top, side: side };
+      }
+      return null;
+    }
+    function placeCaption() {
+      var vv = window.visualViewport, root = document.documentElement;
+      var vx = vv ? vv.offsetLeft : 0, vy = vv ? vv.offsetTop : 0;
+      var viewport = { left: vx, top: vy,
+        right: Math.min(root.clientWidth, vx + (vv ? vv.width : innerWidth)),
+        bottom: Math.min(root.clientHeight, vy + (vv ? vv.height : innerHeight)) };
+      var width = viewport.right - viewport.left, normalFont = innerWidth >= 760 ? 12 : 11;
+      if (captionWidth !== width || captionFont !== normalFont) {
+        say.style.fontSize = normalFont + 'px'; captionWidth = width; captionFont = normalFont;
+      }
+      // Keep one line; a long caption may shrink by exactly 1px, never more.
+      if (sayText.offsetWidth * 1.08 + sayText.offsetHeight * .12 > width - 20) say.style.fontSize = (normalFont - 1) + 'px';
+      var parts = RIG ? [R.body, R.cap, R.hl, R.hr] : [face_];
+      var a = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+      parts.forEach(function (part) {
+        var r = part.getBoundingClientRect();
+        a.left = Math.min(a.left, r.left); a.top = Math.min(a.top, r.top);
+        a.right = Math.max(a.right, r.right); a.bottom = Math.max(a.bottom, r.bottom);
+      });
+      var text = sayText.getBoundingClientRect(), holder = say.getBoundingClientRect();
+      var bounce = { x: (text.left + text.right - holder.left - holder.right) / 2,
+        y: (text.top + text.bottom - holder.top - holder.bottom) / 2 };
+      var spot = captionSpot(a, text, viewport, captionSide, bounce);
+      if (!spot) { say.style.visibility = 'hidden'; return; }
+      captionSide = spot.side; say.dataset.side = spot.side;
+      say.style.transform = 'translate(' + (holder.left + spot.left - text.left).toFixed(3) + 'px,' +
+        (holder.top + spot.top - text.top).toFixed(3) + 'px)';
+      say.style.visibility = 'visible';
     }
     function wave(ms) { st.waveUntil = performance.now() + (ms || 1600); }
     function dust(vx, vy, dx, dy) {
@@ -576,14 +636,7 @@
         btn.style.setProperty('--dw-scale', (st.sc || 1).toFixed(3));
         btn.style.transform = 'translate(' + st.x.toFixed(1) + 'px,' + vy.toFixed(1) + 'px) scale(' + (st.sc || 1).toFixed(3) + ')';
         if (say.classList.contains('on')) {
-          var bw = say.offsetWidth, bh = say.offsetHeight;
-          var bx = Math.max(16, Math.min(W - bw - 16, st.x + W_ / 2 - bw / 2));
-          var by = vy - bh - 10; if (by < 8) by = vy + H_ + 8;
-          if (st.tour && st.tour.road && st.tour.arrived) {             // v4: 빈 줄에선 말풍선도 옆으로 (위 상품 글을 안 가리게)
-            bx = st.x + W_ + 8; if (bx + bw > W - 16) bx = st.x - bw - 8; bx = Math.max(16, bx);
-            by = Math.max(8, Math.min(H - bh - 8, vy + H_ * (1 - (st.sc || 1) / 2) - bh / 2));
-          }
-          say.style.transform = 'translate(' + bx.toFixed(0) + 'px,' + by.toFixed(0) + 'px)';
+          placeCaption();
           if (now > st.sayUntil) say.classList.remove('on');
         }
       }
