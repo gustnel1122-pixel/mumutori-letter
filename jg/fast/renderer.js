@@ -152,7 +152,7 @@ export function createRenderer(canvas,{forceCPU=false,onFallback=()=>{}}={}){
   }
   if(forceCPU)renderer=cpuRenderer(current);
   else try{renderer=gpuRenderer(current);}catch(e){fallback(String(e));}
-  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(renderer.mode==='GPU'){fallback('WebGL context lost');if(lastSource)renderer.key(lastSource);}});
+  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(renderer.mode==='GPU'){fallback('WebGL context lost');if(lastSource?.readyState>=2)renderer.key(lastSource);}});
   return {
     get canvas(){return current;}, get mode(){return renderer.mode;},
     get width(){return renderer.width;},get height(){return renderer.height;},
@@ -173,7 +173,13 @@ export function videoFrames(video){
   const hasCallback=typeof video.requestVideoFrameCallback==='function';
   function next(){if(stopped)return;dirty=true;id=video.requestVideoFrameCallback(next);}
   if(hasCallback)id=video.requestVideoFrameCallback(next);
-  const reset=()=>{dirty=true;lastTime=-1;};
+  const reset=()=>{
+    dirty=true;lastTime=-1;
+    if(hasCallback && !stopped){
+      if(id!==null)video.cancelVideoFrameCallback(id);
+      id=video.requestVideoFrameCallback(next);
+    }
+  };
   for(const event of ['loadeddata','seeked','emptied'])video.addEventListener(event,reset);
   return {
     take(){

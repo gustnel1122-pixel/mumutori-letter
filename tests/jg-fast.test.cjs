@@ -60,6 +60,19 @@ test('video callback keys once per delivered frame and cancels on stop', async (
   frames.stop();assert.equal(cancelled,17);
 });
 
+test('changing idle to reaction re-arms the video callback and invalidates the cached frame', async () => {
+  const {videoFrames}=await import(pathToFileURL(path.join(root,'renderer.js')));
+  const events={};let serial=0,cancelled=[];
+  const video={readyState:4,requestVideoFrameCallback:()=>++serial,cancelVideoFrameCallback:id=>cancelled.push(id),
+    addEventListener:(e,f)=>events[e]=f,removeEventListener(){}};
+  const frames=videoFrames(video);
+  frames.take();assert.equal(frames.take(),false);
+  video.readyState=0;events.emptied();assert.equal(frames.take(),false);
+  assert.deepEqual(cancelled,[1]);assert.equal(serial,2);
+  video.readyState=4;events.loadeddata();assert.equal(frames.take(),true);assert.equal(frames.take(),false);
+  assert.deepEqual(cancelled,[1,2]);assert.equal(serial,3);frames.stop();
+});
+
 test('worker forces CPU for iPad, maps crop boxes, closes frames after success and failure', async () => {
   const delegates=[],requests=[],replies=[];
   let draw,shouldFail=false;
