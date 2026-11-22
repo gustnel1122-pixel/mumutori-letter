@@ -9,21 +9,21 @@ const current=fs.readFileSync(path.join(root,'dotori/widget.js'),'utf8').replace
 const v6=fs.readFileSync(path.join(root,'dotori/widget_v6.js'),'utf8');
 const original=execFileSync('git',['show','a6918a8:dotori/widget.js'],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
 
-test('v4 remains byte-for-byte equivalent after exactly one opt-in dispatcher line',()=>{
-  assert.equal(current.slice(current.indexOf('\n')+1),original);
+test('the default entry serves the approved e1c121a v6 directly',()=>{
+  const approved=execFileSync('git',['show','e1c121a:dotori/widget_v6.js'],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
+  assert.equal(v6.replace(/\r\n/g,'\n'),approved);
+  assert.equal(current,approved);
 });
 
-test('only the exact dotori=v6 query opts in; regular visitors execute v4',()=>{
+test('all queries use the same duplicate-load guard without appending another script',()=>{
   for(const query of ['', '?dotori=1', '?dotori=v60', '?foo=dotori%3Dv6', '?dotori=v6', '?x=1&dotori=v6']){
-    const appended=[];let v4Guards=0;
-    const win={};Object.defineProperty(win,'__dotoriLoaded',{get(){v4Guards++;return true;}});
+    const appended=[];let guards=0;
+    const win={};Object.defineProperty(win,'__dotoriLoaded',{get(){guards++;return true;}});
     vm.runInNewContext(current,{URLSearchParams,location:{search:query},window:win,
       sessionStorage:{getItem(){return null;},setItem(){}},
       document:{createElement(){return {};},head:{appendChild(e){appended.push(e);}}}});
-    const optIn=new URLSearchParams(query).get('dotori')==='v6';
-    assert.equal(appended.length,optIn?1:0,query);
-    assert.equal(v4Guards,optIn?0:1,query);
-    if(optIn)assert.equal(appended[0].src,'https://letter.mumutori.com/dotori/widget_v6.js');
+    assert.equal(appended.length,0,query);
+    assert.equal(guards,1,query);
   }
 });
 

@@ -1,4 +1,4 @@
-/* v6 opt-in */ if (new URLSearchParams(location.search).get("dotori") === "v6") { var dotoriV6 = document.createElement("script"); dotoriV6.src = "https://letter.mumutori.com/dotori/widget_v6.js"; document.head.appendChild(dotoriV6); } else
+/* v6 시험판 · 2026-11-22: v4 길/상담 유지 · 40/32px · 글씨 효과 · 기존 그림 6자세 */
 /* 무무토리 자사몰 '돌아다니는 도토리 상담원' — letter.mumutori.com/dotori/widget.js
  * 식스샵 코드 넣기(본문 끝)에 <script src="https://letter.mumutori.com/dotori/widget.js" defer></script> 한 줄
  * 시험 중엔 주소 끝에 ?dotori=1 을 붙인 사람에게만 보여요 (SHOW_ALL=false). '올려' 뒤 true로.
@@ -26,6 +26,19 @@
   var font = document.createElement('link'); font.rel = 'stylesheet';
   font.href = 'https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap'; document.head.appendChild(font);
   var st = document.createElement('style'); st.textContent = ".dt,.dw-panel{--page:#EFE8DE;--bg:#FCF7E5;--panel:#FFFDF7;--butter:#F4DC92;--butter-2:#F9EBC1;--ink:#4A2410;--ink-2:#7C4223;--line:#EBDDB0;--user:#7C4223;--user-ink:#FFF8EA;--accent:#9F5528;--accent-ink:#FFFBF2;--muted:#8F7052;--kakao:#FEE500;--kakao-ink:#191600;--shadow:0 12px 34px rgba(74,36,16,.22);color-scheme:light}\n.dt,.dt *,.dw,.dw *,.dw-say{box-sizing:border-box}\n.dt{display:flex;flex-direction:column;height:100%;min-height:0;background:var(--bg);color:var(--ink);font-family:\"Gowun Dodum\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",\"Noto Sans KR\",system-ui,sans-serif;font-size:15.5px;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere}\n.dt-top{display:flex;align-items:center;gap:10px;padding:12px 12px 11px 14px;border-bottom:1.5px dashed var(--line)}\n.dt-av{width:40px;height:auto;flex:none}\n.dt-tt{display:flex;flex-direction:column;min-width:0;line-height:1.25}\n.dt-tt b{font-family:\"Jua\",\"Gowun Dodum\",system-ui,sans-serif;font-weight:400;font-size:19px;color:var(--ink-2)}\n.dt-tt span{font-size:12px;color:var(--muted)}\n.dt-badge{margin-left:auto;font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--butter-2);color:var(--ink-2);border:1px solid var(--line);white-space:nowrap}\n.dt-x{flex:none;width:34px;height:34px;border-radius:50%;border:0;background:transparent;color:var(--ink-2);font-size:20px;line-height:1;cursor:pointer}\n.dt-top .dt-x:first-of-type{margin-left:auto}\n.dt-badge~.dt-x{margin-left:2px}\n.dt-x:hover{background:var(--butter-2)}\n.dt-vp{flex:1;min-height:0;overflow-y:auto;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}\n.dt-row{display:flex;gap:8px;align-items:flex-start;min-width:0}\n.dt-row.me{justify-content:flex-end}\n.dt-mini{width:30px;height:auto;flex:none;margin-top:2px}\n.dt-b{padding:10px 13px;border-radius:16px;max-width:84%;min-width:0;white-space:pre-wrap}\n.dt-row.bot .dt-b{background:var(--panel);border:1px solid var(--line);border-top-left-radius:6px}\n.dt-row.me .dt-b{background:var(--user);color:var(--user-ink);border-top-right-radius:6px}\n.dt-row.think .dt-b{color:var(--muted)}\n.dt-dots{display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle}\n.dt-dots i{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:dt-bl 1.1s infinite ease-in-out}\n.dt-dots i:nth-child(2){animation-delay:.15s}.dt-dots i:nth-child(3){animation-delay:.3s}\n@keyframes dt-bl{0%,80%,100%{opacity:.25}40%{opacity:1}}\n.dt-note{font-size:12px;color:var(--muted);text-align:right;margin-top:-7px}\n.dt-chips{display:flex;flex-wrap:wrap;gap:7px;padding-left:38px}\n.dt-chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:inherit;font-size:14px;line-height:1.4;cursor:pointer}\n.dt-chip:hover{background:var(--butter-2)}\n.dt-kk{display:inline-flex;align-items:center;gap:6px;background:var(--kakao);color:var(--kakao-ink);border-radius:999px;padding:7px 13px;font-size:14px;line-height:1.3;text-decoration:none;font-weight:700;white-space:nowrap}\n.dt-kk svg{width:16px;height:16px;flex:none}\n.dt-b .dt-kk{margin-top:9px;white-space:normal}\n.dt-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;border-top:1px solid var(--line);background:var(--butter-2)}\n.dt-bar span{font-size:12px;color:var(--muted);min-width:0}\n.dt-in{display:flex;gap:8px;align-items:flex-end;padding:10px 14px 6px}\n.dt-in textarea{flex:1;min-width:0;resize:none;border:1.5px solid var(--line);border-radius:20px;padding:10px 14px;font:inherit;font-size:15.5px;line-height:1.45;background:var(--panel);color:var(--ink);max-height:120px}\n.dt-in textarea::placeholder{color:var(--muted)}\n.dt-in textarea:focus{outline:none;border-color:var(--accent)}\n.dt-send{flex:none;height:44px;padding:0 17px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:15px;cursor:pointer}\n.dt-send:disabled{opacity:.4;cursor:default}\n.dt-send.stop{background:var(--ink-2)}\n.dt-foot{margin:0;padding:2px 14px 10px;font-size:11.5px;color:var(--muted);text-align:center}\n.dt-fab{display:inline-flex;align-items:center;gap:8px;padding:5px 16px 5px 5px;border-radius:999px;border:0;background:var(--user);color:var(--user-ink);box-shadow:var(--shadow);font-family:\"Jua\",\"Gowun Dodum\",system-ui,sans-serif;font-size:16px;cursor:pointer}\n.dt-fab img{width:42px;height:42px;border-radius:50%;background:var(--butter-2);object-fit:contain;padding:3px}\n\n/* 돌아다니는 도토리 — 자사몰 위에 떠 있는 층 (손님 화면은 가리지 않게 도토리 몸만 눌림) */\n.dw{position:fixed;left:0;top:0;width:64px;height:68px;z-index:2147483000;border:0;padding:0;margin:0;background:transparent;cursor:pointer;will-change:transform;-webkit-tap-highlight-color:transparent}\n.dw:focus-visible{outline:3px solid #9F5528;outline-offset:3px;border-radius:50%}\n.dw-body{position:absolute;inset:0;transform-origin:50% 92%;will-change:transform}\n.dw-body img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none;filter:drop-shadow(0 4px 3px rgba(74,36,16,.22))}\n.dw-rig{position:absolute;inset:0;transform-origin:50% 100%;filter:drop-shadow(0 4px 3px rgba(74,36,16,.22));will-change:transform}.dw-body .dw-rig img{position:absolute;display:block;max-width:none;object-fit:fill;filter:none;pointer-events:none;user-select:none;-webkit-user-drag:none;will-change:transform}.dw-shadow{position:absolute;left:14px;right:14px;bottom:-4px;height:7px;border-radius:50%;background:rgba(74,36,16,.18);transform-origin:50% 50%}\n.dw-mark{position:absolute;top:-14px;right:-6px;font:700 17px/1 \"Jua\",\"Gowun Dodum\",system-ui,sans-serif;color:#9F5528;opacity:0;transform:translateY(4px);transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap}\n.dw-mark.on{opacity:1;transform:none}\n.dw-dust{position:fixed;left:0;top:0;width:10px;height:10px;border-radius:50%;background:rgba(160,120,80,.35);pointer-events:none;z-index:2147482999;animation:dw-dust .55s ease-out forwards}\n@keyframes dw-dust{to{opacity:0;transform:var(--t) scale(2.2)}}\n.dw-say{white-space:pre-line;position:fixed;left:0;top:0;z-index:2147483001;max-width:min(240px,calc(100vw - 32px));background:#FFFDF7;color:#4A2410;border:1px solid #EBDDB0;border-radius:14px;padding:8px 12px;font:15px/1.45 \"Gowun Dodum\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",\"Noto Sans KR\",system-ui,sans-serif;box-shadow:0 8px 20px rgba(74,36,16,.16);pointer-events:none;opacity:0;transition:opacity .25s;word-break:keep-all}\n.dw-say.on{opacity:1}\n.dw-panel{position:fixed;z-index:2147483002;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100vw - 32px));height:min(560px,calc(100dvh - 120px));border-radius:22px;overflow:hidden;box-shadow:0 18px 44px rgba(60,30,10,.32);border:1px solid #EBDDB0;transform-origin:85% 100%;animation:dw-pop .22s ease-out}\n.dw-panel[hidden]{display:none!important}\n@keyframes dw-pop{from{opacity:0;transform:scale(.92) translateY(10px)}}\n@media (max-width:520px){.dw-panel{left:0;right:0;bottom:0;width:100%;height:min(78dvh,620px);border-radius:22px 22px 0 0;border-left:0;border-right:0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom,0px);background:#FCF7E5}}\n.dw-call{position:fixed;z-index:2147483000;right:0;bottom:calc(90px + env(safe-area-inset-bottom,0px));border:0;border-radius:14px 0 0 14px;background:#7C4223;color:#FFF8EA;font:15px/1 \"Jua\",\"Gowun Dodum\",system-ui,sans-serif;padding:10px 10px 10px 12px;box-shadow:0 6px 16px rgba(74,36,16,.25);cursor:pointer}\n.dw-call[hidden]{display:none!important}\n.dw-hide{display:block;margin:0 auto;border:0;background:none;color:#8F7052;font:12px/1.4 inherit;text-decoration:underline;cursor:pointer;padding:0 0 8px}\n.dw[hidden]{display:none!important}\n.dt-mini.typing{width:40px;margin-top:-2px;animation:dt-type .32s steps(2,end) infinite}\n@keyframes dt-type{50%{transform:translateY(-1px) rotate(-2deg)}}\n@media (prefers-reduced-motion:reduce){.dt-mini.typing{animation:none}}\n"; document.head.appendChild(st);
+// v6: 그림만 작게, 투명한 버튼의 실제 터치 영역은 축소된 자리에서도 44px 이상.
+  st.textContent += `
+.dw::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,calc(44px / var(--dw-scale,1)));height:max(100%,calc(44px / var(--dw-scale,1)));transform:translate(-50%,-50%)}
+.dw-say{width:max-content;max-width:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#682301;font:12px/1.4 "Jua","Gowun Dodum",system-ui,sans-serif;white-space:nowrap;transition:none;text-shadow:0 1px 2px #FFFDF7,0 -1px 2px #FFFDF7}
+.dw-say.on{animation:none}
+.dw-say-text{display:block;transform-origin:50% 100%}
+.dw-say.on .dw-say-text{animation:dw-fx 1.6s ease-out both}
+.dw-mark{font-size:11px;top:-8px;right:-3px}
+.dw-shadow{left:22%;right:22%;height:4px;bottom:-2px}
+@keyframes dw-fx{0%{opacity:0;translate:0 5px;rotate:-6deg;scale:.82}16%{opacity:1;translate:0 -3px;rotate:-4deg;scale:1.06}30%,78%{opacity:1;translate:0 0;rotate:-4deg;scale:1}100%{opacity:0;translate:0 -7px;rotate:-2deg;scale:.98}}
+@media(max-width:759px){.dw-say{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.dw-say.on .dw-say-text{animation:none}.dw-dust{display:none}}
+`;
 /* 무무토리 자사몰 '도토리 상담원' 위젯 core — 시험판(아티팩트)과 진짜(자사몰)가 같은 화면을 씀. ask()만 바뀜 */
 (function () {
   var KAKAO = 'https://pf.kakao.com/_lqpZX/chat';
@@ -180,8 +193,8 @@
   function DotoriWander(opts) {
     var IMG = opts.img;
     var RIG = opts.rig || null;                 // { cw, ch, parts:{body,cap,handL,handR}, src:{cap,handL,handR}, faces:{base,...} }
-    var BIG = innerWidth >= 760;                // PC는 조금 크게
-    var W_ = RIG ? (BIG ? 78 : 64) : 64, H_ = RIG ? Math.round(W_ * RIG.ch / RIG.cw) : 68;
+    var BIG = innerWidth >= 760;                // v6 그림 폭: PC 40px · 폰 32px
+    var W_ = BIG ? 40 : 32, H_ = RIG ? Math.round(W_ * RIG.ch / RIG.cw) : 68;
     // 표정 (원본 3D 그대로 · 눈만 바꾼 그림 — AI 안 씀): base · sleep · happy · surprised · tired
     var FACES = (RIG && RIG.faces) || opts.faces || {}; FACES.base = FACES.base || IMG;
     Object.keys(FACES).forEach(function (k) { var p = new Image(); p.src = FACES[k]; });
@@ -189,7 +202,7 @@
     var TIPS = (opts.tips || []).slice();
 
     var btn = document.createElement('button');
-    btn.className = 'dw'; btn.type = 'button'; btn.setAttribute('aria-label', 'AI 도토리 상담 열기');
+    btn.className = 'dw'; btn.dataset.version = 'v6'; btn.type = 'button'; btn.setAttribute('aria-label', 'AI 도토리 상담 열기');
     btn.style.width = W_ + 'px'; btn.style.height = H_ + 'px'; btn.style.transformOrigin = '50% 100%';
     var R = {};
     if (RIG) {
@@ -220,6 +233,8 @@
     }
     var body = btn.querySelector('.dw-body'), shadow = btn.querySelector('.dw-shadow'), mark = btn.querySelector('.dw-mark');
     var say = document.createElement('div'); say.className = 'dw-say'; say.setAttribute('role', 'status');
+    var sayText = document.createElement('span'); sayText.className = 'dw-say-text'; say.appendChild(sayText);
+    var captionSide = '', captionWidth = 0, captionFont = 0;
     var panel = document.createElement('div'); panel.className = 'dw-panel'; panel.hidden = true;
     var call = document.createElement('button'); call.className = 'dw-call'; call.type = 'button'; call.textContent = '도토리 부르기'; call.hidden = true;
     document.body.appendChild(btn); document.body.appendChild(say); document.body.appendChild(panel); document.body.appendChild(call);
@@ -235,7 +250,67 @@
     var markT;
     function showMark(s, ms) { mark.textContent = s; mark.classList.add('on'); clearTimeout(markT); if (ms) markT = setTimeout(function () { mark.classList.remove('on'); }, ms); }
     function hideMark() { mark.classList.remove('on'); }
-    function speak(s, ms) { say.textContent = s; say.classList.add('on'); st.sayUntil = performance.now() + (ms || 2600); st.lastSay = performance.now(); }
+    function speak(s) {
+      say.classList.remove('on'); sayText.textContent = s;
+      say.style.visibility = 'hidden'; captionSide = ''; captionWidth = 0;
+      void say.offsetWidth; // 같은 글씨도 다음 상품에서 다시 톡 튀어나오게.
+      say.classList.add('on'); st.sayUntil = performance.now() + 1600; st.lastSay = performance.now();
+    }
+    // Place the animated text's actual bounds, independently of its parent translation.
+    // The extra 2px beyond the required 8px also leaves room for the text shadow.
+    function captionSpot(a, text, viewport, preferred, bounce) {
+      var pad = 10, gap = 6, left = viewport.left + pad, top = viewport.top + pad;
+      var right = viewport.right - pad, bottom = viewport.bottom - pad;
+      var w = text.width, h = text.height;
+      if (w > right - left || h > bottom - top || a.right < viewport.left ||
+          a.left > viewport.right || a.bottom < viewport.top || a.top > viewport.bottom) return null;
+      var cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2;
+      var x = clamp(cx + bounce.x - w / 2, left, right - w);
+      var y = clamp(cy + bounce.y - h / 2, top, bottom - h);
+      var spots = {
+        right: { left: a.right + gap, top: y }, left: { left: a.left - gap - w, top: y },
+        above: { left: x, top: a.top - gap - h }, below: { left: x, top: a.bottom + gap }
+      };
+      var order = preferred ? [preferred, 'right', 'left', 'above', 'below'] : ['right', 'left', 'above', 'below'];
+      for (var i = 0; i < order.length; i++) {
+        var side = order[i], p = spots[side];
+        if (p.left < left || p.top < top || p.left + w > right || p.top + h > bottom) continue;
+        var dx = Math.max(a.left - (p.left + w), p.left - a.right, 0);
+        var dy = Math.max(a.top - (p.top + h), p.top - a.bottom, 0);
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance >= 4 && distance <= 8) return { left: p.left, top: p.top, side: side };
+      }
+      return null;
+    }
+    function placeCaption() {
+      var vv = window.visualViewport, root = document.documentElement;
+      var vx = vv ? vv.offsetLeft : 0, vy = vv ? vv.offsetTop : 0;
+      var viewport = { left: vx, top: vy,
+        right: Math.min(root.clientWidth, vx + (vv ? vv.width : innerWidth)),
+        bottom: Math.min(root.clientHeight, vy + (vv ? vv.height : innerHeight)) };
+      var width = viewport.right - viewport.left, normalFont = innerWidth >= 760 ? 12 : 11;
+      if (captionWidth !== width || captionFont !== normalFont) {
+        say.style.fontSize = normalFont + 'px'; captionWidth = width; captionFont = normalFont;
+      }
+      // Keep one line; a long caption may shrink by exactly 1px, never more.
+      if (sayText.offsetWidth * 1.08 + sayText.offsetHeight * .12 > width - 20) say.style.fontSize = (normalFont - 1) + 'px';
+      var parts = RIG ? [R.body, R.cap, R.hl, R.hr] : [face_];
+      var a = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+      parts.forEach(function (part) {
+        var r = part.getBoundingClientRect();
+        a.left = Math.min(a.left, r.left); a.top = Math.min(a.top, r.top);
+        a.right = Math.max(a.right, r.right); a.bottom = Math.max(a.bottom, r.bottom);
+      });
+      var text = sayText.getBoundingClientRect(), holder = say.getBoundingClientRect();
+      var bounce = { x: (text.left + text.right - holder.left - holder.right) / 2,
+        y: (text.top + text.bottom - holder.top - holder.bottom) / 2 };
+      var spot = captionSpot(a, text, viewport, captionSide, bounce);
+      if (!spot) { say.style.visibility = 'hidden'; return; }
+      captionSide = spot.side; say.dataset.side = spot.side;
+      say.style.transform = 'translate(' + (holder.left + spot.left - text.left).toFixed(3) + 'px,' +
+        (holder.top + spot.top - text.top).toFixed(3) + 'px)';
+      say.style.visibility = 'visible';
+    }
     function wave(ms) { st.waveUntil = performance.now() + (ms || 1600); }
     function dust(vx, vy, dx, dy) {
       var d = document.createElement('span'); d.className = 'dw-dust';
@@ -247,39 +322,32 @@
     function wake() { st.act = performance.now(); if (st.mode === 'sleep') { hideMark(); mode('idle', 900); face('base'); wave(1200); } }
     addEventListener('scroll', function () { lastScroll = performance.now(); wake(); }, { passive: true });
     addEventListener('pointerdown', function () { st.act = performance.now(); }, { passive: true });
-    // ── 상품 설명 (11/4 사장님 아이디어 '이건 뭐에요!' · '즉석으로 · 자기학습') ──
-    // 상품 위에 마우스(PC) · 스크롤이 멈추면 가운데 상품(휴대폰) → 그 상품 옆으로 쪼르르 → '이건 ○○예요!' + 한 줄
-    // 한 줄 = AI가 가게 설명만 보고 만든 도토리 말투 2개 중 하나(서버가 '보임 · 눌림' 숫자로 덜 눌린 줄을 바꿔 감) · 서버가 안 되면 가게 설명 첫 줄
+    // v6: 상품 설명/blurbs/학습 이벤트 요청 없음. 정해 둔 짧은 감상만 순환.
+    var LINES = ['이거 귀여움 ㅋㅋ', '이거 하찮은거임!!', '이거 뭐임 ㅋㅋ', '데려가셈', '작은데 귀여움', '나 이거 좋아함', '이건 좀 웃김', '괜히 눈길 감', '쪼꼬매 ㅋㅋ', '슬쩍 봐보셈', '여기 좀 보셈', '자꾸 보게 됨', '이 느낌 뭐지', '얘 좀 보셈 ㅋㅋ', '손에 쏙이네', '은근 신경 쓰임', '가만히 못 지나침', '작고 소중함', '표정 봐 ㅋㅋ', '혼자 보기 아까움'];
+    var NAMED_LINES = [
+      { match: /빵/, lines: ['빵인 줄 ㅋㅋ', '빵 모양 뭐임', '빵 좋아하셈?'], next: 0 },
+      { match: /감자/, lines: ['감자 좀 보셈', '감자 표정 ㅋㅋ', '작은 감자 발견'], next: 0 },
+      { match: /카피바라/, lines: ['카피바라 뭐임', '카피바라 졸림', '느긋하네 ㅋㅋ'], next: 0 },
+      { match: /채소|당근|버섯|표고|가지|브로콜리|대파|배추/, lines: ['채소 모였네', '채소인데 귀여움', '이 채소 뭐임'], next: 0 }
+    ];
+    var lineAt = 0, lineCount = 0;
+    function nextLine(name) {
+      var group = NAMED_LINES.filter(function (g) { return g.match.test(name || ''); })[0];
+      var useNamed = lineCount >= 2 && lineCount % 2 === 1 && group; lineCount++;
+      return useNamed ? group.lines[group.next++ % group.lines.length] : LINES[lineAt++ % LINES.length];
+    }
+    var POSES = ['point-right', 'point-left', 'both-hands', 'hop-point', 'peek', 'wave'];
+    st.poseIndex = -1; st.poseUntil = 0; st.poseAt = 0;
     st.tour = null; var tourSeen = {}, tourLast = -1e9, hoverT = 0, hoverA = null, routeAt = location.pathname, introT = 0, tourScroll = -1;
-    var BL = {}, blAsked = {}, lastShown = null;
     var CAN_HOVER = !!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches);
-    function josa(w) { var c = w.charCodeAt(w.length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? '이에요' : '예요'; }
     function cleanName(s) { return String(s || '').replace(/\[[^\]]*\]/g, '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim(); }
     function keyOf(a) { try { return new URL(a.getAttribute('href'), location.href).pathname; } catch (e) { return ''; } }
-    function isMeta(s) { return /원$|^[\d.,()\s]+$|리뷰|품절|^★/.test(s); }
     function cardOf(a) {
-      var li = a.closest('li') || a; var r = li.getBoundingClientRect();
+      var li = a.closest('li') || a, r = li.getBoundingClientRect();
       if (r.width < 90 || r.height < 90) return null;
-      var lines = (li.innerText || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-      if (!lines.length) return null;
-      var name = cleanName(lines[0]), rest = lines.slice(1).filter(function (s) { return !isMeta(s); });
-      var hook = rest[0] || '';
-      if (hook.length > 44) hook = hook.slice(0, 42) + '…';
+      var name = cleanName((li.innerText || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean)[0]);
       if (!name || name.length > 30) return null;
-      return { key: keyOf(a), name: name, hook: hook, desc: rest.slice(0, 3).join(' ').slice(0, 240), el: li };
-    }
-    // 보이는 상품들의 한 줄을 서버에 한 번에 물어 둠 (처음 한 번만 AI가 만들고 다음부터는 그대로)
-    function loadBlurbs(extra) {
-      if (!opts.blurbs) return;
-      var items = [], seen = {};
-      [].slice.call(document.querySelectorAll('a[href*="/products/"]')).forEach(function (a) {
-        var c = cardOf(a); if (!c || seen[c.key] || BL[c.key] || blAsked[c.key] || !/^\/products\/[A-Za-z0-9]+$/.test(c.key)) return;
-        seen[c.key] = 1; items.push({ key: c.key, name: c.name, desc: c.desc });
-      });
-      if (extra && !BL[extra.key] && !blAsked[extra.key]) items.unshift({ key: extra.key, name: extra.name, desc: extra.desc });
-      items = items.slice(0, 24); if (!items.length) return;
-      items.forEach(function (it) { blAsked[it.key] = 1; });
-      opts.blurbs(items).then(function (list) { (list || []).forEach(function (x) { if (x && x.key && x.lines && x.lines.length) BL[x.key] = { h: x.h, lines: x.lines }; }); }).catch(function () {});
+      return { key: keyOf(a), name: name, el: li };
     }
     function goTour(c, now) {
       if (!c || st.open || st.hidden || reduce) return;
@@ -296,7 +364,7 @@
         if (Math.abs(sp.x - lane.x) > 3) { path.push({ x: lane.x, y: sp.y, sc: 1 }); path.push(sp); }   // 길 따라 그 높이로 → 옆으로
         else path.push(sp);
       }
-      wake(); st.chase = false; st.offSince = 0; hideMark();
+      wake(); st.chase = false; st.offSince = 0; hideMark(); say.classList.remove('on'); st.poseUntil = 0;
       st.path = path;
       st.tour = { x: sp.x, y: sp.y, c: c, at: now, arrived: 0, road: !!sp.road, side: !!sp.side, sc: sp.sc || 1 };
       tourSeen[c.key] = now; tourLast = now; tourScroll = lastScroll; mode('idle', 1e9);
@@ -304,41 +372,24 @@
     function arriveTour(now) {
       var c = st.tour.c, r = c.el.getBoundingClientRect(); st.tour.arrived = now;
       st.face = (r.left + r.width / 2) > st.x + W_ / 2 ? 1 : -1;
-      face('happy', 2200); st.waveUntil = now + 1800;
-      var b = BL[c.key], line = c.hook;
-      if (b && b.lines.length) {
-        var i = b.lines.length > 1 && Math.random() < 0.5 ? 1 : 0; line = b.lines[i];
-        if (!c.page && opts.ev) { opts.ev({ key: c.key, h: b.h, i: i, ev: 'show' }); lastShown = { key: c.key, h: b.h, i: i, at: now }; }
-      }
-      speak('이건 ' + c.name + josa(c.name) + '!' + (line ? '\n' + line : ''), 4800);
+      st.poseIndex = (st.poseIndex + 1) % POSES.length;
+      st.poseAt = now; st.poseUntil = now + 1700; btn.dataset.pose = POSES[st.poseIndex];
+      face('happy', 1700); speak(nextLine(c.name));
     }
-    function endTour() { if (!st.tour) return; st.tour = null; st.path = []; mode('idle', 1200); }
-    // 말풍선 뒤 20초 안에 그 상품을 누르면 '눌림' 하나 (숫자만 · 손님 정보 없음)
-    document.addEventListener('click', function (e) {
-      var a = e.target && e.target.closest && e.target.closest('a[href*="/products/"]');
-      if (!a || !lastShown || !opts.ev) return;
-      if (keyOf(a) === lastShown.key && performance.now() - lastShown.at < 20000) { opts.ev({ key: lastShown.key, h: lastShown.h, i: lastShown.i, ev: 'click' }); lastShown = null; }
-    }, true);
+    function endTour() { if (!st.tour) return; st.tour = null; st.path = []; st.poseUntil = 0; say.classList.remove('on'); mode('idle', 1200); }
     function productInfo() {
       if (!/^\/products\/[A-Za-z0-9]+$/.test(location.pathname)) return null;
-      var main = document.querySelector('main') || document.body;
-      var lines = (main.innerText || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-      var name = cleanName((document.title || '').split(/\s[-|·]\s/)[0]); if (!name) return null;
-      var pi = -1; for (var i = 0; i < lines.length && i < 60; i++) { if (/^[\d,]+원$/.test(lines[i])) { pi = i; break; } }
-      var hook = pi >= 0 && lines[pi + 1] && !/배송|원$/.test(lines[pi + 1]) ? lines[pi + 1] : '';
-      var pk = lines.indexOf('MUMUTORI PICK'), pick = [];
-      if (pk >= 0) for (var j = pk + 1; j < lines.length && j < pk + 16 && pick.length < 4; j++) { if (/^0\d$/.test(lines[j]) && lines[j + 1]) pick.push(lines[j + 1]); }
-      return { key: location.pathname, name: name, hook: hook.length > 44 ? hook.slice(0, 42) + '…' : hook, desc: [hook].concat(pick).join(' ').slice(0, 240), pick: pick, page: true };
+      var name = cleanName((document.title || '').split(/\s[-|·]\s/)[0]);
+      return name ? { key: location.pathname, name: name, page: true } : null;
     }
     function productIntro() {
       var info = productInfo(); if (!info || st.open || st.hidden || reduce) return;
-      if (info.pick.length) TIPS = info.pick;
       var main = document.querySelector('main') || document.body, big = null, bw = 0;
       [].slice.call(main.querySelectorAll('img')).forEach(function (im) { var r = im.getBoundingClientRect(); if (r.width > 220 && r.top < innerHeight * 0.7 && r.bottom > 80 && r.width > bw) { bw = r.width; big = im; } });
       if (big) { info.el = big; goTour(info, performance.now()); }
     }
-    function pageReady() { loadBlurbs(productInfo()); clearTimeout(introT); introT = setTimeout(productIntro, 1200); }
-    function routeCheck() { if (location.pathname !== routeAt) { routeAt = location.pathname; tourSeen = {}; lastShown = null; endTour(); clearTimeout(introT); setTimeout(pageReady, 1500); } }
+    function pageReady() { clearTimeout(introT); introT = setTimeout(productIntro, 1200); }
+    function routeCheck() { if (location.pathname !== routeAt) { routeAt = location.pathname; tourSeen = {}; endTour(); clearTimeout(introT); setTimeout(pageReady, 1500); } }
     setInterval(routeCheck, 700); setTimeout(pageReady, 1400);
     if (CAN_HOVER) {
       document.addEventListener('pointerover', function (e) {
@@ -427,7 +478,13 @@
     }
     var REACT = 260, CATCH = 40;
     st.path = [];
-    addEventListener('resize', function () { measureLane(); });
+    addEventListener('resize', function () {
+      W = innerWidth; H = innerHeight; BIG = W >= 760; W_ = BIG ? 40 : 32;
+      H_ = RIG ? Math.round(W_ * RIG.ch / RIG.cw) : Math.round(W_ * 235 / 220);
+      btn.style.width = W_ + 'px'; btn.style.height = H_ + 'px';
+      if (RIG) R.k = W_ / RIG.cw;
+      endTour(); measureLane();
+    });
     st.chase = false; st.reactAt = 0; st.offSince = 0; st.lastBig = -1e9;
     var last = performance.now(), dustAcc = 0;
     function frame(now) {
@@ -470,15 +527,15 @@
         }
         if (st.tour && !onPath()) {
           if (!st.tour.arrived) arriveTour(now);
-          else if (now - st.tour.arrived > 5400) endTour();
+          else if (now - st.tour.arrived > 1900) endTour();
         }
         var scT = onPath() ? (st.path[0].sc || 1) : st.tour ? (st.tour.sc || 1) : 1;   // 좁은 빈 칸에선 살짝 작게
         st.sc = (st.sc || 1) + (scT - (st.sc || 1)) * Math.min(1, dt * 9);
         if (!st.tour && !onPath() && st.chase && dist <= 3 && !scrolling) {
           st.chase = false;
           if (st.offSince && now - st.offSince > 250) {
-            if (now - st.lastBig > 15000) { speak('헉헉… 너무 빨라서 따라잡기 힘들었어요!', 2800); st.lastBig = now; }
-            showMark('💦', 2400); face('tired', 2400); st.tiredUntil = now + 2400;
+            if (now - st.lastBig > 15000) { speak('헉헉 따라옴'); st.lastBig = now; }
+            showMark('💦', 1600); face('tired', 2400); st.tiredUntil = now + 2400;
           }
           st.offSince = 0; mode('idle', 1500);
         }
@@ -498,7 +555,7 @@
             if (now > st.until) { if (Math.random() < 0.4) st.dir *= -1; mode('walk', 2500 + Math.random() * 4000); }
           }
           if (now - st.act > 25000 && st.mode !== 'sleep') { mode('sleep', 1e9); showMark('Zzz'); face('sleep'); }
-          if (TIPS.length && st.mode !== 'sleep' && now - st.lastSay > 75000 && now - st.act > 6000) { speak(TIPS[Math.floor(Math.random() * TIPS.length)], 3200); face('happy', 1100); wave(1400); }
+          if (TIPS.length && st.mode !== 'sleep' && now - st.lastSay > 75000 && now - st.act > 6000) { speak(nextLine('')); face('happy', 1100); wave(1400); }
           if (st.mode !== 'sleep' && faceNow === 'base' && now > (st.blinkAt || 0)) { if (st.blinkAt) face('sleep', 140); st.blinkAt = now + 2600 + Math.random() * 3600; }
         }
         if (!st.tour && st.mode === 'walk' && !running) st.face = st.dir > 0 ? 1 : -1;
@@ -524,6 +581,14 @@
         } else if (now < st.tiredUntil && !reduce) {
           sy = 1 + Math.sin(st.t * 13) * .035; sx = 1 - Math.sin(st.t * 13) * .02;   // 헉헉 숨 고르기
         } else { sy = 1 + Math.sin(st.t * 2.4) * .02; }
+        var posing = !reduce && now < st.poseUntil && !running && !onPath();
+        if (posing) {
+          if (st.poseIndex === 0) rot += st.face * 5;
+          else if (st.poseIndex === 1) rot -= st.face * 5;
+          else if (st.poseIndex === 2) { ty -= 2 * k; sx *= 1.03; }
+          else if (st.poseIndex === 3) ty -= Math.abs(Math.sin((now - st.poseAt) / 1700 * Math.PI * 3)) * 15 * k;
+          else if (st.poseIndex === 4) { rot += st.face * 15; ty += 2 * k; }
+        }
         body.style.transform = 'translateY(' + ty.toFixed(1) + 'px) rotate(' + rot.toFixed(1) + 'deg) scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')';
         shadow.style.transform = 'scale(' + (1 + ty / (60 * k)).toFixed(3) + ')'; shadow.style.opacity = Math.max(.3, 1 + ty / (50 * k)).toFixed(2);
 
@@ -539,6 +604,14 @@
           else if (now < st.tiredUntil) { w = Math.sin(st.t * 13); tl = -16 + 4 * w; tr = 16 + 4 * w; }
           else if (st.mode === 'walk') { w = Math.sin(st.t * 7); tl = 18 * w; tr = 18 * w; }
           else { tl = 5 * Math.sin(st.t * 2.4); tr = 5 * Math.sin(st.t * 2.4 + 1.3); }
+          if (posing) {
+            if (st.poseIndex === 0) { tl = 0; tr = -78; }
+            else if (st.poseIndex === 1) { tl = 88; tr = 0; }
+            else if (st.poseIndex === 2) { tl = 92; tr = -82; }
+            else if (st.poseIndex === 3) { tl = 66; tr = -65; }
+            else if (st.poseIndex === 4) { tl = 24; tr = -36; }
+            else { tl = 72 + 24 * Math.sin(st.t * 15); tr = 6; }
+          }
           if (reduce) { sp.hl.a = tl; sp.hr.a = tr; sp.cy.a = 0; sp.cr.a = 0; }
           else {
             spring(sp.hl, tl, 260, 15, dt); spring(sp.hr, tr, 260, 15, dt);
@@ -560,16 +633,10 @@
           R.cap.style.transform = 'translateY(' + sp.cy.a.toFixed(2) + 'px) rotate(' + sp.cr.a.toFixed(2) + 'deg)';
         }
 
+        btn.style.setProperty('--dw-scale', (st.sc || 1).toFixed(3));
         btn.style.transform = 'translate(' + st.x.toFixed(1) + 'px,' + vy.toFixed(1) + 'px) scale(' + (st.sc || 1).toFixed(3) + ')';
         if (say.classList.contains('on')) {
-          var bw = say.offsetWidth, bh = say.offsetHeight;
-          var bx = Math.max(16, Math.min(W - bw - 16, st.x + W_ / 2 - bw / 2));
-          var by = vy - bh - 10; if (by < 8) by = vy + H_ + 8;
-          if (st.tour && st.tour.road && st.tour.arrived) {             // v4: 빈 줄에선 말풍선도 옆으로 (위 상품 글을 안 가리게)
-            bx = st.x + W_ + 8; if (bx + bw > W - 16) bx = st.x - bw - 8; bx = Math.max(16, bx);
-            by = Math.max(8, Math.min(H - bh - 8, vy + H_ * (1 - (st.sc || 1) / 2) - bh / 2));
-          }
-          say.style.transform = 'translate(' + bx.toFixed(0) + 'px,' + by.toFixed(0) + 'px)';
+          placeCaption();
           if (now > st.sayUntil) say.classList.remove('on');
         }
       }
@@ -587,17 +654,17 @@
       st.open = true; btn.hidden = true; say.classList.remove('on'); panel.hidden = false;
       var ta = panel.querySelector('textarea'); if (ta && innerWidth > 520) ta.focus();
     }
-    function closeChat() { panel.hidden = true; st.open = false; btn.hidden = st.hidden; if (!st.hidden) { st.jump = performance.now(); speak('또 궁금하면 저를 눌러 주세요!', 2200); face('happy', 1600); wave(1600); } }
+    function closeChat() { panel.hidden = true; st.open = false; btn.hidden = st.hidden; if (!st.hidden) { st.jump = performance.now(); speak('또 눌러주셈 ㅋㅋ'); face('happy', 1600); wave(1600); } }
     function hideAll() { st.hidden = true; st.open = false; panel.hidden = true; btn.hidden = true; say.classList.remove('on'); call.hidden = false; try { sessionStorage.setItem('dw-hidden', '1'); } catch (e) {} }
-    call.onclick = function () { st.hidden = false; call.hidden = true; btn.hidden = false; try { sessionStorage.removeItem('dw-hidden'); } catch (e) {} st.y = ground(); st.jump = performance.now(); speak('다시 왔어요!', 1800); face('happy', 1800); wave(1800); };
+    call.onclick = function () { st.hidden = false; call.hidden = true; btn.hidden = false; try { sessionStorage.removeItem('dw-hidden'); } catch (e) {} st.y = ground(); st.jump = performance.now(); speak('다시 왔음 ㅋㅋ'); face('happy', 1800); wave(1800); };
     btn.addEventListener('pointerenter', function () { if (!st.open && st.mode !== 'sleep') { face('happy', 1200); wave(1000); } });
     btn.addEventListener('click', function () {
       var wasSleep = st.mode === 'sleep'; wake(); hideMark();
       st.jump = performance.now(); face('happy', 1400); st.cheerUntil = performance.now() + 600;
-      if (wasSleep) speak('앗, 졸았어요! 무엇이 궁금하세요?', 1500);
+      if (wasSleep) speak('앗 졸았음 ㅋㅋ');
       setTimeout(openChat, wasSleep ? 650 : 380);
     });
-    setTimeout(function () { if (!st.open && !st.hidden) { speak('궁금한 게 있으면 저를 눌러 주세요!', 3400); face('happy', 1600); wave(2000); } }, 3000);
+    setTimeout(function () { if (!st.open && !st.hidden && !st.tour) { speak('나 누르면 상담함'); face('happy', 1600); wave(2000); } }, 3000);
     return { open: openChat, close: closeChat, state: st };
   }
   window.DotoriWander = DotoriWander;
@@ -610,15 +677,6 @@
     if (!j.text || !String(j.text).trim()) throw { code: 'empty' };   // 빈 답은 말풍선 대신 카톡 안내로
     onText(j.text); return j.text;
   }
-  // 상품 한 줄(서버가 AI로 만들어 둔 것) 받기 · '보임 · 눌림' 숫자 보내기 — 손님 정보는 안 보냄
-  async function blurbs(items) {
-    var r = await fetch(EXEC, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ op: 'blurbs', items: items }) });
-    var j = await r.json(); return (j && j.items) || [];
-  }
-  function ev(o) {
-    try { var b = JSON.stringify({ op: 'ev', key: o.key, h: o.h, i: o.i, ev: o.ev });
-      if (!(navigator.sendBeacon && navigator.sendBeacon(EXEC, b))) fetch(EXEC, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: b, keepalive: true }).catch(function () {}); } catch (e) {}
-  }
-  function start() { window.DotoriWander({ img: IMG, rig: RIG, typingImg: TYPING, ask: ask, blurbs: blurbs, ev: ev, tips: ['선물 포장도 돼요 · 1,000원', '2만 원 넘게 사면 배송비가 무료예요', '편지는 타자기로 한 글자씩 쳐서 보내요'] }); }
+  function start() { window.DotoriWander({ img: IMG, rig: RIG, typingImg: TYPING, ask: ask }); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
