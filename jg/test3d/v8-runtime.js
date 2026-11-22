@@ -1,19 +1,22 @@
 import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261122-8b';
-import {createEmotionRig,EMOTIONS} from './v8-emotions.js?v=20261122-8b';
-import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261122-8b';
-import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261122-8b';
+import {createEmotionRig,EMOTIONS} from './v8-emotions.js?v=20261122-8c';
+import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261122-8c';
+import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261122-8c';
 
 export function createV8(config){
   const {scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(/Android/.test(navigator.userAgent)?1:2);
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
-  const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind));
+  const actorScale=config.actorScale || 1;
+  const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
   const mounts=[bazookaGroup,new THREE.Group()];scene.add(mounts[1]);
-  const mountPositions=[new THREE.Vector3(4.1,.66,-.7),new THREE.Vector3(-4.05,.62,-2.65)];
+  const propScale=config.actorScale ? actorScale*.75 : 1;
+  const mountPositions=config.actorScale ? [new THREE.Vector3(5.65,propScale*.5,1.3),new THREE.Vector3(-5.65,propScale*.5,1.3)] :
+    [new THREE.Vector3(4.1,.66,-.7),new THREE.Vector3(-4.05,.62,-2.65)];
   const flashMaterial=new THREE.MeshBasicMaterial({color:0xffe48b,transparent:true,opacity:.9});
   mounts.forEach((g,i)=>{
-    g.clear();g.add(makeAcornBazooka());g.position.copy(mountPositions[i]);
+    g.clear();g.add(makeAcornBazooka());g.scale.setScalar(propScale);g.position.copy(mountPositions[i]);g.userData.isLauncher=true;
     g.lookAt(new THREE.Vector3(i? -2:2,2.4,windowZ));
     const flash=new THREE.Mesh(new THREE.OctahedronGeometry(.16),flashMaterial);flash.position.z=.53;flash.visible=false;g.add(flash);g.userData.flash=flash;g.userData.fireAt=0;g.userData.flashUntil=0;
   });
@@ -24,7 +27,7 @@ export function createV8(config){
   const profile={dotori:{hop:.14,tilt:.08,pace:1},bam:{hop:.07,tilt:-.16,pace:.78},ddangkong:{hop:.06,tilt:.13,pace:1.15},
     byeongari:{hop:.20,tilt:-.1,pace:1.3},wandukong3:{hop:.13,tilt:.08,pace:1.5},haebaragi:{hop:.015,tilt:.02,pace:.45},ssal:{hop:.09,tilt:-.09,pace:.9}};
   function target(i,kind){
-    const spread=kind==='bazooka'?1.7:5.55;
+    const spread=kind==='bazooka'?1.7:windowWidth/2-.65;
     return new THREE.Vector3(THREE.MathUtils.clamp((Math.random()-.5)*spread*2+(kind==='bazooka'?(i? -2.2:2.2):0),-windowWidth/2+.6,windowWidth/2-.6),
       windowBottom+.75+Math.random()*(windowHeight-1.25),windowZ+.05);
   }
@@ -33,7 +36,7 @@ export function createV8(config){
     actor.fireIndex=['dotori','bam','ddangkong','byeongari','wandukong3','ssal'].indexOf(actor.key);
     actor.weapon=null;actor.nextShot=0;
     if(actor.def.canThrow){
-      const gun=makePeaGun();gun.position.set(.31,.61,.17);gun.scale.setScalar(1.35);actor.wrapper.add(gun);gun.visible=false;
+      const gun=makePeaGun();gun.position.set(.31,.61,.17);gun.scale.setScalar(1.35);(actor.visualRoot || actor.wrapper).add(gun);gun.visible=false;
       const flash=new THREE.Mesh(new THREE.OctahedronGeometry(.055),flashMaterial);flash.position.z=.25;flash.visible=false;gun.add(flash);
       actor.weapon=gun;actor.muzzleFlash=flash;actor.flashUntil=0;
     }
@@ -113,7 +116,7 @@ export function createV8(config){
         const aim=target(i,kind);
         a.wrapper.updateMatrixWorld(true);
         if(kind==='gun'){a.weapon.lookAt(aim);a.weapon.updateMatrixWorld(true);}
-        const start=kind==='gun'?a.weapon.localToWorld(new THREE.Vector3(0,0,.25)):a.wrapper.localToWorld(new THREE.Vector3(.16,.7,.18));
+        const start=kind==='gun'?a.weapon.localToWorld(new THREE.Vector3(0,0,.25)):(a.visualRoot || a.wrapper).localToWorld(new THREE.Vector3(.16,.7,.18));
         const shape=kind==='gun'?0:['bam','byeongari','ssal'].includes(a.key)?2:a.key==='wandukong3'?0:1;
         if(projectiles.fire(start,aim,kind,now,shape)){
           a.nextShot=now+(kind==='gun'?.24+(i%3)*.025:1.05+(i%3)*.11);a.flashUntil=now+.085;

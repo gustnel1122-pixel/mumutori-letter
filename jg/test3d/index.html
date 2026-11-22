@@ -130,7 +130,7 @@
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-22-8b · 정본 GLB 7종 · 감정 6종 · 씨앗 장난감 · 자동 화질</div>
+    <div class="ver">버전 2026-11-22-8c · 정본 GLB 7종 · 감정 6종 · 가운데까지 채우는 친구 구도</div>
   </div>
 </div>
 
@@ -146,13 +146,15 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261122-8b';
+import {createV8} from './v8-runtime.js?v=20261122-8c';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-22-8b';
+const VERSION = '2026-11-22-8c';
+// Display transforms only: the canonical GLBs and their proportions stay intact.
+const COMPOSITION = {actorScale:3.4, deskScale:2.3, pitch:28, targetFraction:.36};
 
 // ===================================================================================
 // §0. v8: PBR + 작은 HDR PMREM · 그림자/해상도 자동 조절 · 감지 Worker 분리.
@@ -392,7 +394,7 @@ scene.add(floor);
 // ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
 const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
 const WINDOW_Z = -6.3;
-const WINDOW_WIDTH = 13.6;
+const WINDOW_WIDTH = 16.4;
 const WINDOW_BOTTOM = 0.08;
 const WINDOW_HEIGHT = 4.9;
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 12), wallMat);
@@ -495,7 +497,7 @@ const COFFEE_SPOT = new THREE.Vector3(-3.35, 0, -1.65); // 세 줄 책상 바깥
 // ---- 발밑 동그란 그림자(실시간 그림자 대신) ----
 const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.28, depthWrite:false });
 function makeShadow(){
-  const m = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), shadowMat);
+  const m = new THREE.Mesh(new THREE.CircleGeometry(0.34*COMPOSITION.actorScale, 16), shadowMat);
   m.rotation.x = -Math.PI/2;
   m.position.y = 0.01;
   return m;
@@ -560,7 +562,7 @@ function updateThought(a){
   if (show){
     const fade = a.actionT > 1.3 ? Math.max(0, (1.6 - a.actionT) / 0.3) : 1;
     a.thoughtSprite.material.opacity = fade;
-    a.thoughtSprite.position.set(a.wrapper.position.x, 1.15, a.wrapper.position.z);
+    a.thoughtSprite.position.set(a.wrapper.position.x, a.wrapper.position.y+1.15*COMPOSITION.actorScale, a.wrapper.position.z);
   }
 }
 
@@ -633,13 +635,13 @@ async function loadAllTemplates(){
 // ---- 앞줄 3 / 중간줄 3 / 뒷줄 1. 간격을 벌려 앞은 크게, 뒤는 작고 멀게 보이게 한다. ----
 // +z가 손님 쪽. 빈 책상도 유지해 친구가 2명이어도 사무실은 항상 세 줄이다.
 const LAYOUT_SLOTS = [
-  { dx: 0.00, dz: 1.20, yaw: 0.14, row:'front' },  // 도토리
-  { dx:-1.45, dz:-1.40, yaw: 0.20, row:'middle' }, // 밤 — 앞줄 친구 사이로 얼굴·몸이 보이는 자리
-  { dx:-4.05, dz:-1.40, yaw: 0.12, row:'middle' }, // 땅콩 — 앞줄 병아리콩과 겹치지 않는 왼쪽 자리
-  { dx:-2.15, dz: 1.20, yaw: 0.22, row:'front' },  // 병아리콩
-  { dx: 1.30, dz:-1.40, yaw:-0.12, row:'middle' }, // 완두콩삼형제
-  { dx: 2.10, dz: 1.20, yaw:-0.18, row:'front' },  // 해바라기씨
-  { dx: 2.65, dz:-4.20, yaw:-0.20, row:'back' },   // 쌀
+  { dx: 0.20, dz: 1.80, yaw: 0.14, row:'front' },
+  { dx:-1.60, dz:-2.60, yaw: 0.20, row:'middle' },
+  { dx:-4.65, dz:-2.60, yaw: 0.12, row:'middle' },
+  { dx:-3.05, dz: 1.80, yaw: 0.22, row:'front' },
+  { dx: 1.65, dz:-2.60, yaw:-0.12, row:'middle' },
+  { dx: 4.00, dz: 1.80, yaw:-0.18, row:'front' },
+  { dx: 4.00, dz:-4.90, yaw:-0.20, row:'back' },
 ];
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
@@ -663,7 +665,7 @@ const deskMats = {
 // 일부 책상에만 머그/화분을 보너스로 추가(변화를 주되 가볍게).
 const BONUS_PROP = [null, 'mug', null, 'plant', null, 'mug', null];
 
-function buildDeskForSlot(pos, yaw, bonus){
+function buildDeskForSlot(pos, yaw, bonus, characterKey){
   const g = new THREE.Group();
   g.userData.isDesk = true;
   const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); // 캐릭터가 바라보는 방향(이제 카메라 쪽에 가까움)
@@ -672,7 +674,7 @@ function buildDeskForSlot(pos, yaw, bonus){
 
   // 얇은 상판과 다리로 사무용 책상을 표현. 낮은 흰 상자처럼 보이던 덩어리를 없앤다.
   const desk = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.045, 0.60), deskMats.desk);
-  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 1.0);
+  desk.position.copy(pos).addScaledVector(dir, DESK_FORWARD).addScaledVector(sideVec0, 0.85);
   desk.position.y = DESK_TOP_Y - 0.0225;
   desk.rotation.y = yaw;
   g.add(desk);
@@ -693,10 +695,12 @@ function buildDeskForSlot(pos, yaw, bonus){
   const monScreenMat = new THREE.MeshLambertMaterial({ color: 0xBFE3EA });
   const monScreen = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.19, 0.01), monScreenMat);
   const monStand = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.10, 0.06), deskMats.monFrame);
-  const monBase = desk.position.clone().addScaledVector(dir, 0.08).addScaledVector(sideVec0, 0.30);
+  const monitorSide=characterKey==='wandukong3' ? .46 : .30;
+  const monitorRise=characterKey==='wandukong3' ? .14 : .18;
+  const monBase = desk.position.clone().addScaledVector(dir, 0.08).addScaledVector(sideVec0, monitorSide);
   const monFront = monBase.clone().addScaledVector(dir, -0.02);
-  monFrame.position.set(monBase.x, DESK_TOP_Y + 0.18, monBase.z);
-  monScreen.position.set(monFront.x, DESK_TOP_Y + 0.18, monFront.z);
+  monFrame.position.set(monBase.x, DESK_TOP_Y + monitorRise, monBase.z);
+  monScreen.position.set(monFront.x, DESK_TOP_Y + monitorRise, monFront.z);
   monStand.position.set(monBase.x, DESK_TOP_Y + 0.05, monBase.z);
   monFrame.rotation.y = monScreen.rotation.y = monStand.rotation.y = yaw;
   g.add(monFrame, monScreen, monStand);
@@ -763,7 +767,10 @@ function buildDeskForSlot(pos, yaw, bonus){
   g.add(chair);
 
   g.userData.monScreenMat = monScreenMat;
-  g.position.set(0,0,0); // 전부 이미 절대좌표로 넣었으니 그룹 자체는 원점
+  // Scale the desk about its own character's home, preserving world aisle spacing.
+  const sx=COMPOSITION.deskScale*.78,sz=COMPOSITION.deskScale*.82;
+  g.scale.set(sx,COMPOSITION.deskScale,sz);
+  g.position.set(pos.x*(1-sx),0,pos.z*(1-sz));
   return g;
 }
 
@@ -783,7 +790,9 @@ function createActor(key, slot){
   const tmpl = templates[key];
   const model = tmpl.clone(true);
   const wrapper = new THREE.Group();
-  wrapper.add(model);
+  const visualRoot = new THREE.Group();
+  visualRoot.scale.setScalar(COMPOSITION.actorScale);
+  visualRoot.add(model);wrapper.add(visualRoot);
   const homePos = new THREE.Vector3(slot.dx, 0, slot.dz);
   wrapper.position.copy(homePos);
   wrapper.rotation.y = slot.yaw;
@@ -797,12 +806,12 @@ function createActor(key, slot){
   const cargoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.1), new THREE.MeshLambertMaterial({ color: 0xFCF7E5 }));
   cargoMesh.position.set(0, TARGET_HEIGHT*0.72, 0);
   cargoMesh.visible = false;
-  wrapper.add(cargoMesh);
+  visualRoot.add(cargoMesh);
 
   const thoughtSprite = makeThoughtSprite();
 
   const actor = {
-    key, def, wrapper, model, shadow, homePos, deskYaw: slot.yaw,
+    key, def, wrapper, visualRoot, model, shadow, homePos, deskYaw: slot.yaw,
     phase: Math.random()*Math.PI*2,
     needs: { work: Math.random()*1.5, rest: Math.random()*1.2, chat: Math.random(), coffee: Math.random() },
     action: 'working', lastAction: null, actionT: 0, nextTickAt: 1 + Math.random()*2,
@@ -836,7 +845,7 @@ function setFriendCount(n){
   clearActors();
   LAYOUT_SLOTS.forEach((slot, i) => {
     const homePos = new THREE.Vector3(slot.dx, 0, slot.dz);
-    const deskGroup = buildDeskForSlot(homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length]);
+    const deskGroup = buildDeskForSlot(homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length],FRIEND_ORDER[i]);
     deskGroup.userData.slotIndex = i;
     deskGroup.userData.row = slot.row;
     const oldScreen=deskGroup.userData.monScreenMat;let screen;
@@ -872,13 +881,13 @@ function updateCameraFraming(n){
   for (const a of actors.slice(0, n)){
     const transform = new THREE.Matrix4().compose(a.homePos,
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a.deskYaw),
-      new THREE.Vector3(1, 1, 1));
+      new THREE.Vector3().setScalar(COMPOSITION.actorScale));
     includeBox(new THREE.Box3().setFromObject(templates[a.key]).applyMatrix4(transform));
-    const iconTop = a.homePos.clone().add(new THREE.Vector3(0, 1.34, 0));
+    const iconTop = a.homePos.clone().add(new THREE.Vector3(0, 1.34*COMPOSITION.actorScale, 0));
     bounds.expandByPoint(iconTop); framePoints.push(iconTop); // 생각 아이콘 여유
   }
   for (const obj of scene.children){
-    if (obj.userData.isDesk) includeBox(new THREE.Box3().setFromObject(obj));
+    if (obj.userData.isDesk || obj.userData.isLauncher) includeBox(new THREE.Box3().setFromObject(obj));
   }
   // 적은 인원에서도 커피를 마시러 이동한 친구가 화면 밖으로 사라지지 않게 한다.
   includeBox(new THREE.Box3(
@@ -893,13 +902,13 @@ function updateCameraFraming(n){
   camera.fov = 36;
   const halfVFOV = THREE.MathUtils.degToRad(camera.fov / 2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const pitch = THREE.MathUtils.degToRad(3);
+  const pitch = THREE.MathUtils.degToRad(COMPOSITION.pitch);
   const sin = Math.sin(pitch), cos = Math.cos(pitch);
   const center = bounds.getCenter(new THREE.Vector3());
-  const target = new THREE.Vector3(center.x, bounds.min.y+(bounds.max.y-bounds.min.y)*0.31, center.z);
-  // 앞쪽 끝을 거리 기준으로 삼아 2~3명일 때도 앞줄 친구가 화면 높이의 약 1/3을 유지한다.
-  let distance = (TARGET_HEIGHT / 0.32) / (2 * Math.tan(halfVFOV))
-    + (bounds.max.z - target.z) * cos;
+  const target = new THREE.Vector3(center.x, bounds.min.y+(bounds.max.y-bounds.min.y)*COMPOSITION.targetFraction, center.z);
+  // Fit the actual room bounds. A separate 32%-height distance floor would
+  // back the camera away whenever the characters grow, undoing the closer view.
+  let distance = camera.near;
   for (const point of framePoints){
     const dy = point.y - target.y, dz = point.z - target.z;
     const depthOffset = dy * sin + dz * cos;
@@ -1123,7 +1132,7 @@ function updateMonitorFlicker(t){
 }
 
 const v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
+  bazookaGroup,actorScale:COMPOSITION.actorScale,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
 let lastFpsShown = 0;
@@ -1218,6 +1227,7 @@ window.__jgActors = () => actors.map(a => ({
 // 구도 검증용 읽기 전용 정보. 렌더·감지·행동 상태를 변경하지 않는다.
 window.__jgComposition = () => ({
   version: VERSION, width: canvas.width, height: canvas.height, aspect: camera.aspect,
+  display: {...COMPOSITION},
   camera: camera.position.toArray(),
   bounds: {min: compositionBounds.min.toArray(), max: compositionBounds.max.toArray()},
   desks: scene.children.filter(o => o.userData.isDesk).map(o => {
@@ -1246,7 +1256,8 @@ window.__jgFurniture = () => {
     if (o.userData.isOfficeChair) chairs++;
     if (o.userData.isCaster) casters++;
   });
-  return {desks: desks.length, chairs, casters, deskTopHeight: DESK_TOP_Y};
+  return {desks: desks.length, chairs, casters, deskTopHeight: DESK_TOP_Y*COMPOSITION.deskScale,
+    actorHeight: TARGET_HEIGHT*COMPOSITION.actorScale};
 };
 // 가구가 눈을 가리는지 실제 EyeIris 메시의 표면점으로 확인하는 읽기 전용 검사.
 window.__jgEyeClearance = () => {

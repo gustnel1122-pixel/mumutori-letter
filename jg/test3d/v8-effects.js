@@ -47,8 +47,8 @@ export class WindowMess {
 }
 
 export class SeedProjectiles {
-  constructor(scene,onImpact){
-    this.onImpact=onImpact;this.pool=Array.from({length:28},()=>({active:false,start:new THREE.Vector3(),target:new THREE.Vector3(),kind:'throw',shape:0,t0:0,duration:0,arc:0,size:1}));
+  constructor(scene,onImpact,displayScale=1){
+    this.onImpact=onImpact;this.displayScale=displayScale;this.pool=Array.from({length:28},()=>({active:false,start:new THREE.Vector3(),target:new THREE.Vector3(),kind:'throw',shape:0,t0:0,duration:0,arc:0,size:1}));
     this.meshes=[
       new THREE.InstancedMesh(new THREE.SphereGeometry(.055,8,6),new THREE.MeshStandardMaterial({color:0x91b954,roughness:.7}),28),
       new THREE.InstancedMesh(new THREE.CapsuleGeometry(.048,.075,2,7),new THREE.MeshStandardMaterial({color:0xc59454,roughness:.7}),28),
@@ -60,7 +60,7 @@ export class SeedProjectiles {
   fire(start,target,kind,time,shape=0){
     const s=this.pool.find(s=>!s.active);if(!s)return false;
     s.active=true;s.start.copy(start);s.target.copy(target);s.kind=kind;s.shape=shape;s.t0=time;
-    s.duration=kind==='throw'?.8:kind==='gun'?.46:.66;s.arc=kind==='throw'?1.2:kind==='gun'?.18:.45;s.size=kind==='bazooka'?3.4:kind==='gun'?1:1.2;
+    s.duration=kind==='throw'?.8:kind==='gun'?.46:.66;s.arc=kind==='throw'?1.2:kind==='gun'?.18:.45;s.size=(kind==='bazooka'?3.4:kind==='gun'?1:1.2)*this.displayScale;
     this.shots[kind]++;return true;
   }
   update(time){

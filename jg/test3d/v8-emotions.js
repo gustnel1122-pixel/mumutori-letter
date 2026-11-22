@@ -76,10 +76,11 @@ export function createEmotionRig(actor){
   // Existing canonical prop meshes can pivot; no new limbs, mouths or eyebrows.
   actor.model.traverse(o=>{if(o.isMesh && /^(Pen|Box|Cup|Camera|Sun)$/.test(o.name))props.push({node:o,z:o.rotation.z});});
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthWrite:false}));
-  sprite.position.set(0,1.2,0);sprite.scale.set(.25,.25,1);sprite.visible=false;actor.wrapper.add(sprite);
+  const visualRoot=actor.visualRoot || actor.wrapper;
+  sprite.position.set(0,1.2,0);sprite.scale.set(.25,.25,1);sprite.visible=false;visualRoot.add(sprite);
   let previous;
   return {
-    dispose(){owned.forEach(o=>o.dispose());sprite.material.dispose();actor.wrapper.remove(sprite);},
+    dispose(){owned.forEach(o=>o.dispose());sprite.material.dispose();visualRoot.remove(sprite);},
     eyes:centers.length,eyeMeshes:eyeMeshes.length,
     update(name,t,active=false){
       const e=EMOTIONS[name] || EMOTIONS.working;

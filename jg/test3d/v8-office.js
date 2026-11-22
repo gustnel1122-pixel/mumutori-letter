@@ -70,7 +70,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   const furnishings=new THREE.Group();furnishings.name='v8-authored-office-props';scene.add(furnishings);
   // Side shelving keeps the central window unobstructed.
   for(const side of [-1,1]){
-    const x=side*5.15,z=-3.8;
+    const x=side*5.15,z=-5.5;
     box(furnishings,1.3,.08,.48,x,.12,z,wood);
     for(const y of [.15,.85,1.55])box(furnishings,1.3,.06,.48,x,y,z,wood);
     for(const dx of [-.62,.62])box(furnishings,.06,1.65,.48,x+dx,.83,z,metal);
@@ -79,7 +79,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     plant(furnishings,x,-4.7,.9);
   }
   // Whiteboard, marker tray and abstract work diagrams; no customer letter text.
-  const board=new THREE.Group();board.position.set(-5.25,1.9,-1.45);board.rotation.y=.18;furnishings.add(board);
+  const board=new THREE.Group();board.position.set(-5.25,1.9,-5.45);board.rotation.y=.18;furnishings.add(board);
   box(board,1.4,.88,.06,0,0,0,metal);box(board,1.3,.78,.065,0,0,.01,mat(0xf5f8eb,.35));
   box(board,1.42,.05,.18,0,-.47,.08,metal);
   for(let i=0;i<3;i++){
