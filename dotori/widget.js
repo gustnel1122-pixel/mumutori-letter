@@ -1,3 +1,4 @@
+/* v6 opt-in */ if (new URLSearchParams(location.search).get("dotori") === "v6") { var dotoriV6 = document.createElement("script"); dotoriV6.src = "https://letter.mumutori.com/dotori/widget_v6.js"; document.head.appendChild(dotoriV6); } else
 /* 무무토리 자사몰 '돌아다니는 도토리 상담원' — letter.mumutori.com/dotori/widget.js
  * 식스샵 코드 넣기(본문 끝)에 <script src="https://letter.mumutori.com/dotori/widget.js" defer></script> 한 줄
  * 시험 중엔 주소 끝에 ?dotori=1 을 붙인 사람에게만 보여요 (SHOW_ALL=false). '올려' 뒤 true로.
