@@ -29,6 +29,8 @@
     padding:5px 10px; border-radius:999px; letter-spacing:.2px; pointer-events:none;
   }
 
+  #sceneBadge{position:absolute;left:50%;top:18px;transform:translateX(-50%);display:none;z-index:4;color:#4c3925;background:#fff5dfdf;padding:7px 18px;border:1px solid #dbc49b;border-radius:999px;font-size:13px;font-weight:700;pointer-events:none}
+  #debugPanel select,#debugPanel .previewButton{width:100%;margin-top:6px;border:1px solid #ad997a;border-radius:7px;padding:7px;background:#fcf7e5;color:#682301}
   #startOverlay{
     position:absolute; inset:0; z-index:10; background:rgba(14,14,14,.86);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#FCF7E5;
@@ -85,12 +87,13 @@
   <video id="camVideo" class="srcVideo" muted playsinline webkit-playsinline></video>
 
   <div id="fpsBox">FPS -</div>
+  <div id="sceneBadge"></div>
   <div class="caption">3D 시험판 · noindex · 카메라 화면은 저장되지 않아요</div>
   <div id="camError">카메라 · 얼굴인식을 시작하지 못했어요 (3D 장면은 그대로 동작, 레벨은 항상 0)</div>
 
   <div id="startOverlay">
     <div style="font-size:22px;font-weight:700">진격의 오피스 — 3D 시험판</div>
-    <p>안에서 사는 친구들이 각자 책상에서 일·수다·커피·낮잠 중이에요. 손님이 카메라에 다가오면 그 순간만 놀라서 돌아봐요.
+    <p>친구 일곱이 사무실에서 일하고 있어요. 가까이 오면 씨앗 던지기·깍지 총·도토리 바주카로 장난을 치고, 엉망이 된 유리창은 잠시 뒤 깨끗해져요.
        왼쪽 위 구석을 5번 빠르게 탭하면 숨은 조절 화면(두뇌 보기 포함)이 나와요.</p>
     <div id="loadingMsg"></div>
     <button id="startBtn">탭해서 시작하기</button>
@@ -118,12 +121,16 @@
       <button data-n="7">7</button>
     </div>
 
+    <button id="scenePreview" class="previewButton">장면 미리보기 · 카메라 없이</button>
+    <label>감정 미리보기</label>
+    <select id="emotionPreview"><option value="">자동</option><option value="working">평소 · 일하는 중</option><option value="surprised">깜짝 · 발견</option><option value="determined">결심 · 준비</option><option value="excited">신남</option><option value="proud">뿌듯 · 웃음</option><option value="tired">졸림 · 지침</option></select>
+    <label>화질</label><select id="qualityChoice"><option value="auto">자동 · FPS에 맞춤</option><option value="high">선명함 · 부드러운 그림자</option><option value="medium">균형</option><option value="low">가벼움 · 그림자 끔</option></select>
     <div id="brainView">
       <h4>🧠 두뇌 보기 — 친구마다 지금 하는 일</h4>
       <div id="brainRows"></div>
     </div>
 
-    <div class="ver">버전 2026-11-22-8a · three.js r160 · GLB 정본 7종 · v8(7명 기본·통창 전체 구도)</div>
+    <div class="ver">버전 2026-11-22-8b · 정본 GLB 7종 · 감정 6종 · 씨앗 장난감 · 자동 화질</div>
   </div>
 </div>
 
@@ -139,17 +146,17 @@
 
 <script type="module">
 import * as THREE from "three";
+import {createV8} from './v8-runtime.js?v=20261122-8b';
+import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-22-8a';
+const VERSION = '2026-11-22-8b';
 
 // ===================================================================================
-// §0. 기기 성능 예산 — LG 울트라탭 10A30Q(스냅드래곤680·램4GB) 기준. jg/계획.md §4-1 그대로.
-//    pixelRatio=1 고정 · 안티앨리어싱 끔 · 실시간 그림자 없음(발밑 동그란 그림자로 흉내) ·
-//    재질은 MeshLambertMaterial까지만(PBR 금지) · 같은 모델은 clone()만 사용.
-//    (이 §0 블록은 v1~v3와 동일 — 얼굴/몸 인식 로직을 그대로 재사용)
+// §0. v8: PBR + 작은 HDR PMREM · 그림자/해상도 자동 조절 · 감지 Worker 분리.
+// 정본 GLB 원본은 그대로, 인스턴스의 눈 표면과 자세만 바꾼다.
 // ===================================================================================
 
 function isIOSWebKit(){
@@ -200,9 +207,10 @@ let frameCount = 0;
 let lastFaceRatio = 0, lastBodyRatio = 0;
 let detCountWindow = [];
 let detectTimer = null, detectBusy = false;
+let detectorWorker=null,detectMode='initializing';
 let panelOpen = false;
 
-let currentLevel = 0; // 0 없음(평소 일함) · 1 올려다보기 · 2 씨앗던지기 · 3 도망/숨기
+let currentLevel = 0; // 0 평소 · 1 발견 · 2 가까움 · 3 매우 가까움(v8은 2·3 모두 전체 장면을 시작)
 let prevLevel = 0;    // 레벨이 0으로 "돌아온 순간"을 잡아 전원을 자기 자리로 되돌리는 데 씀(§3)
 
 async function createWithDelegate(createFn, label, forceCPU){
@@ -212,6 +220,18 @@ async function createWithDelegate(createFn, label, forceCPU){
 }
 
 async function initDetectors(){
+  if(typeof Worker!=='undefined' && typeof OffscreenCanvas!=='undefined' && typeof createImageBitmap==='function'){
+    let candidate;
+    try{
+      candidate=new WorkerDetector();
+      const result=await candidate.init({wasmBase:WASM_BASE,faceURL:FACE_MODEL_URL,bodyURL:BODY_MODEL_URL,confidence:.3,forceCPU:FORCE_CPU_DELEGATE,bodyScore:BODY_SCORE_THRESH});
+      detectorWorker=candidate;faceDelegate=result.faceDelegate;detectMode='worker';
+      if(bodyEnabled)await ensureBodyDetector();return;
+    }catch(e){candidate?.close();console.warn('감지 Worker → 그리기 뒤 감지:',e);}
+  }
+  detectMode='main-after-paint';await initMainDetectors();
+}
+async function initMainDetectors(){
   visionCache = await FilesetResolver.forVisionTasks(WASM_BASE);
   const face = await createWithDelegate((delegate) => FaceDetector.createFromOptions(visionCache, {
     baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
@@ -223,6 +243,10 @@ async function initDetectors(){
 }
 async function ensureBodyDetector(){
   if (bodyDetector || bodyInitPromise) return bodyInitPromise;
+  if(detectorWorker){
+    bodyInitPromise=detectorWorker.ensureBody().catch(e=>console.warn('몸 감지 초기화 실패:',e)).finally(()=>bodyInitPromise=null);
+    return bodyInitPromise;
+  }
   if (!visionCache) return null;
   bodyInitPromise = (async () => {
     try {
@@ -292,7 +316,7 @@ function updateLevel(){
   prevLevel = currentLevel;
   if (raw > currentLevel && counts[raw] >= 2) currentLevel = raw;
   else currentLevel = best;
-  if (prevLevel > 0 && currentLevel === 0) onReturnToIdle(); // §3: 사람이 멀어지면 전원 자기 자리로
+  if (prevLevel > 0 && currentLevel === 0 && !v8.active) onReturnToIdle(); // §3: 사람이 멀어지면 전원 자기 자리로
   if (panelOpen){
     document.getElementById('dbgLevel').textContent = currentLevel;
     document.getElementById('dbgFaceRatio').textContent = lastFaceRatio.toFixed(2);
@@ -300,33 +324,35 @@ function updateLevel(){
   }
   window.__jg3dDebug = {
     version: VERSION, level: currentLevel, faceRatio: lastFaceRatio, bodyRatio: lastBodyRatio,
-    faceDelegate, bodyEnabled, friendCount, fps: lastFpsShown, detPerSec: detCountWindow.length,
+    faceDelegate, detectMode, scene:v8.frame.id, quality:v8.quality.id, bodyEnabled, friendCount, fps: lastFpsShown, detPerSec: detCountWindow.length,
     isIOSWebKit: IS_IOS_WEBKIT, isAndroidChrome: IS_ANDROID_CHROME,
   };
 }
 
-function runDetectTick(){
-  if (detectBusy){ scheduleDetectLoop(); return; }
-  detectBusy = true;
-  try {
+async function runDetectTick(){
+  if(detectBusy){scheduleDetectLoop();return;}
+  detectBusy=true;const begin=performance.now();
+  try{
     frameCount++;
-    if (detector && camVideo.readyState >= 2){
-      let result = null;
-      try { result = detector.detectForVideo(camVideo, performance.now()); } catch(e){ result = null; }
-      noteDetectionTick();
-      if (result) handleFaceDetections(result.detections || []);
+    if(!document.hidden && !v8.active && camVideo.readyState>=2){
+      if(detectorWorker){
+        const result=await detectorWorker.detect(camVideo,{timestamp:performance.now(),confidence:.3,crop:false,body:bodyEnabled && frameCount%BODY_CHECK_EVERY_N_FRAMES===0});
+        if(result && !v8.active){handleFaceDetections(result.faces || []);noteDetectionTick();if(result.bodies){handleBodyDetections(result.bodies);noteDetectionTick();}}
+      }else if(detector){
+        await afterPaint();
+        if(!document.hidden && !v8.active){
+          try{const result=detector.detectForVideo(camVideo,performance.now());handleFaceDetections(result.detections || []);noteDetectionTick();}catch(e){console.warn(e);}
+          if(bodyEnabled && bodyDetector && frameCount%BODY_CHECK_EVERY_N_FRAMES===0){try{const result=bodyDetector.detectForVideo(camVideo,performance.now());handleBodyDetections(result.detections || []);noteDetectionTick();}catch(e){console.warn(e);}}
+        }
+      }
+      updateLevel();
     }
-    if (bodyEnabled && bodyDetector && camVideo.readyState >= 2 && frameCount % BODY_CHECK_EVERY_N_FRAMES === 0){
-      let result = null;
-      try { result = bodyDetector.detectForVideo(camVideo, performance.now()); } catch(e){ result = null; }
-      noteDetectionTick();
-      if (result) handleBodyDetections(result.detections || []);
-    }
-    updateLevel();
-  } finally { detectBusy = false; }
-  scheduleDetectLoop();
+  }catch(e){
+    if(detectorWorker){detectorWorker.close();detectorWorker=null;bodyInitPromise=null;detectMode='main-after-paint';try{await initMainDetectors();}catch(error){console.error(error);camError.style.display='block';}}
+    else console.warn(e);
+  }finally{detectBusy=false;scheduleDetectLoop(Math.max(0,DETECT_INTERVAL_MS-(performance.now()-begin)));}
 }
-function scheduleDetectLoop(){ detectTimer = setTimeout(runDetectTick, DETECT_INTERVAL_MS); }
+function scheduleDetectLoop(delay=DETECT_INTERVAL_MS){clearTimeout(detectTimer);detectTimer=setTimeout(runDetectTick,delay);}
 
 // ===================================================================================
 // §1. three.js 장면 — "전판"(실제 매장 2D 영상·20261104_v8_장면6컷.jpg ①번)처럼 보이는 사무실
@@ -347,7 +373,7 @@ scene.background = new THREE.Color(0xBFE3EA); // 전판처럼 창 너머 밝은 
 
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
 
-// 가벼운 조명만(PBR 금지 — Lambert/Basic만 쓰므로 조명도 단순) — 전판처럼 밝은 낮 조명
+// 시작 조명. 모델 로딩 전에 v8-office가 PBR 환경과 품질별 그림자를 구성한다.
 scene.add(new THREE.AmbientLight(0xffffff, 1.65)); // v5: 렌더 결과가 생각보다 어둡게 나와서(색상관리 감쇠) 더 올림
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
 dirLight.position.set(2, 5, 4);
@@ -450,8 +476,6 @@ bazookaGroup.add(bazookaCap);
 bazookaGroup.position.copy(BAZOOKA_POS);
 bazookaGroup.rotation.y = 2.3;
 scene.add(bazookaGroup);
-let bazookaAimT = 0;
-let bazookaNextFire = 0;
 
 // ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
 const COFFEE_SPOT = new THREE.Vector3(-3.35, 0, -1.65); // 세 줄 책상 바깥쪽의 왼쪽 통로
@@ -477,62 +501,6 @@ function makeShadow(){
   return m;
 }
 
-// ---- 씨앗 투사체 풀(동시 최대 5개 — jg/계획.md §4-1 예산) ----
-const SEED_POOL_SIZE = 5;
-const seedMat = new THREE.MeshBasicMaterial({ color: 0xC8955F, transparent: true, opacity: 1 });
-const seedGeo = new THREE.CapsuleGeometry(0.028, 0.05, 2, 6);
-const seedPool = [];
-for (let i = 0; i < SEED_POOL_SIZE; i++){
-  const mesh = new THREE.Mesh(seedGeo, seedMat.clone());
-  mesh.visible = false;
-  scene.add(mesh);
-  seedPool.push({ mesh, active:false, start:new THREE.Vector3(), vel:new THREE.Vector3(), t0:0, dur:0.8, baseScale:1 });
-}
-const GRAVITY = 5.5;
-function currentSeedTarget(){
-  return new THREE.Vector3(0, 1.1, camera.position.z - 1.6);
-}
-function fireSeed(fromPos, big){
-  const slot = seedPool.find(s => !s.active);
-  if (!slot) return false;
-  slot.active = true;
-  slot.t0 = performance.now()/1000;
-  slot.dur = 0.65 + Math.random()*0.12;
-  slot.start.copy(fromPos);
-  const targetPoint = currentSeedTarget();
-  const target = targetPoint.clone().add(new THREE.Vector3((Math.random()-0.5)*1.4, (Math.random()-0.5)*0.4, 0));
-  const T = slot.dur;
-  slot.vel.set(
-    (target.x - fromPos.x)/T,
-    (target.y - fromPos.y)/T + 0.5*GRAVITY*T,
-    (target.z - fromPos.z)/T
-  );
-  slot.mesh.visible = true;
-  slot.baseScale = big ? 1.7 : 1;
-  slot.mesh.scale.setScalar(slot.baseScale);
-  slot.mesh.material.opacity = 1;
-  slot.mesh.position.copy(fromPos);
-  return true;
-}
-function updateSeeds(nowSec){
-  for (const s of seedPool){
-    if (!s.active) continue;
-    const t = nowSec - s.t0;
-    if (t >= s.dur){ s.active = false; s.mesh.visible = false; continue; }
-    s.mesh.position.set(
-      s.start.x + s.vel.x*t,
-      s.start.y + s.vel.y*t - 0.5*GRAVITY*t*t,
-      s.start.z + s.vel.z*t
-    );
-    const frac = t / s.dur;
-    if (frac > 0.8){
-      const fade = 1 - (frac - 0.8) / 0.2;
-      s.mesh.scale.setScalar(s.baseScale * Math.max(0.05, fade));
-      s.mesh.material.opacity = fade;
-    }
-  }
-}
-
 // ---- 떨어뜨린 서류(서류 나르기 도착 때 잠깐 보이는 작은 더미) ----
 const droppedPapers = [];
 const paperDropMat = new THREE.MeshLambertMaterial({ color: 0xFCF7E5 });
@@ -546,6 +514,7 @@ function updateDroppedPapers(nowSec){
   for (let i = droppedPapers.length-1; i >= 0; i--){
     if (nowSec >= droppedPapers[i].until){
       scene.remove(droppedPapers[i].mesh);
+      droppedPapers[i].mesh.geometry.dispose();droppedPapers[i].mesh.material.dispose();
       droppedPapers.splice(i,1);
     }
   }
@@ -665,8 +634,8 @@ async function loadAllTemplates(){
 // +z가 손님 쪽. 빈 책상도 유지해 친구가 2명이어도 사무실은 항상 세 줄이다.
 const LAYOUT_SLOTS = [
   { dx: 0.00, dz: 1.20, yaw: 0.14, row:'front' },  // 도토리
-  { dx:-2.85, dz:-1.40, yaw: 0.20, row:'middle' }, // 밤
-  { dx:-0.80, dz:-1.40, yaw: 0.12, row:'middle' }, // 땅콩
+  { dx:-1.45, dz:-1.40, yaw: 0.20, row:'middle' }, // 밤 — 앞줄 친구 사이로 얼굴·몸이 보이는 자리
+  { dx:-4.05, dz:-1.40, yaw: 0.12, row:'middle' }, // 땅콩 — 앞줄 병아리콩과 겹치지 않는 왼쪽 자리
   { dx:-2.15, dz: 1.20, yaw: 0.22, row:'front' },  // 병아리콩
   { dx: 1.30, dz:-1.40, yaw:-0.12, row:'middle' }, // 완두콩삼형제
   { dx: 2.10, dz: 1.20, yaw:-0.18, row:'front' },  // 해바라기씨
@@ -832,7 +801,7 @@ function createActor(key, slot){
 
   const thoughtSprite = makeThoughtSprite();
 
-  return {
+  const actor = {
     key, def, wrapper, model, shadow, homePos, deskYaw: slot.yaw,
     phase: Math.random()*Math.PI*2,
     needs: { work: Math.random()*1.5, rest: Math.random()*1.2, chat: Math.random(), coffee: Math.random() },
@@ -843,18 +812,21 @@ function createActor(key, slot){
     movePhase: 'idle', moveFrom: null, moveTo: null, moveDur: 0, moveElapsed: 0, busyT: 0, visitKind: null, visitTargetActor: null,
     cargoMesh, monScreenMat: null, thoughtSprite, lastIcon: null,
   };
+  v8.prepareActor(actor);
+  return actor;
 }
 
 function clearActors(){
   for (const a of actors){
+    v8.disposeActor(a);a.shadow.geometry.dispose();a.thoughtSprite.material.dispose();a.cargoMesh.geometry.dispose();a.cargoMesh.material.dispose();
     scene.remove(a.wrapper);
     scene.remove(a.shadow);
     scene.remove(a.thoughtSprite);
   }
   const toRemove = [];
   scene.traverse(o => { if (o.userData && o.userData.isDesk) toRemove.push(o); });
-  for (const o of toRemove) scene.remove(o);
-  for (let i = droppedPapers.length-1; i >= 0; i--){ scene.remove(droppedPapers[i].mesh); }
+  for (const o of toRemove){o.traverse(m=>{if(m.isMesh)m.geometry.dispose();});o.userData.monScreenMat?.dispose();scene.remove(o);}
+  for (let i = droppedPapers.length-1; i >= 0; i--){droppedPapers[i].mesh.geometry.dispose();droppedPapers[i].mesh.material.dispose();scene.remove(droppedPapers[i].mesh);}
   droppedPapers.length = 0;
   actors.length = 0;
 }
@@ -867,6 +839,10 @@ function setFriendCount(n){
     const deskGroup = buildDeskForSlot(homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length]);
     deskGroup.userData.slotIndex = i;
     deskGroup.userData.row = slot.row;
+    const oldScreen=deskGroup.userData.monScreenMat;let screen;
+    deskGroup.traverse(o=>{if(o.isMesh && o.material===oldScreen)screen=o;});
+    v8.office.upgradeTree(deskGroup);
+    if(screen)deskGroup.userData.monScreenMat=screen.material;
     scene.add(deskGroup);
     if (i >= n) return;
     const actor = createActor(FRIEND_ORDER[i], slot);
@@ -917,10 +893,10 @@ function updateCameraFraming(n){
   camera.fov = 36;
   const halfVFOV = THREE.MathUtils.degToRad(camera.fov / 2);
   const halfHFOV = Math.atan(Math.tan(halfVFOV) * camera.aspect);
-  const pitch = THREE.MathUtils.degToRad(10);
+  const pitch = THREE.MathUtils.degToRad(3);
   const sin = Math.sin(pitch), cos = Math.cos(pitch);
   const center = bounds.getCenter(new THREE.Vector3());
-  const target = new THREE.Vector3(center.x, bounds.min.y+(bounds.max.y-bounds.min.y)*0.45, center.z);
+  const target = new THREE.Vector3(center.x, bounds.min.y+(bounds.max.y-bounds.min.y)*0.31, center.z);
   // 앞쪽 끝을 거리 기준으로 삼아 2~3명일 때도 앞줄 친구가 화면 높이의 약 1/3을 유지한다.
   let distance = (TARGET_HEIGHT / 0.32) / (2 * Math.tan(halfVFOV))
     + (bounds.max.z - target.z) * cos;
@@ -1023,24 +999,6 @@ function applyLookup(a, t){
   a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, 0, 0.12);
   a.wrapper.rotation.x += (-0.08 - a.wrapper.rotation.x) * 0.1;
   a.wrapper.position.y = Math.abs(Math.sin(t*2 + a.phase)) * 0.015;
-}
-function applyThrowing(a, t, nowSec){
-  if (!a.def.canThrow){
-    a.wrapper.rotation.y = Math.sin(t*0.8)*0.25;
-    a.wrapper.rotation.x = -0.05;
-    a.wrapper.position.y = Math.abs(Math.sin(t*1.5 + a.phase)) * 0.012;
-    return;
-  }
-  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, 0, 0.18);
-  const cyclePos = (t*1.3 + a.phase) % (Math.PI*2);
-  const lean = Math.max(0, Math.sin(cyclePos));
-  a.wrapper.rotation.x = -0.1 - lean*0.35;
-  a.wrapper.position.y = lean*0.04;
-  a.throwCooldown -= (t - (a._lastT||t)); a._lastT = t;
-  if (a.throwCooldown <= 0 && lean > 0.85){
-    const chestPos = a.wrapper.position.clone(); chestPos.y += 0.85;
-    if (fireSeed(chestPos, false)) a.throwCooldown = 1.0 + Math.random()*0.5;
-  }
 }
 const DUCK_DEPTH = 0.3;
 function applyFleeing(a, t, dt){
@@ -1155,23 +1113,6 @@ function tickUtilityAI(a, dt, t){
   }
 }
 
-function updateBazooka(dt, nowSec, level){
-  if (level >= 2){
-    bazookaAimT = Math.min(1, bazookaAimT + dt*2.2);
-    if (nowSec*1000 >= bazookaNextFire){
-      bazookaNextFire = nowSec*1000 + 1300 + Math.random()*600;
-      const tip = BAZOOKA_POS.clone(); tip.y += 0.22;
-      fireSeed(tip, true);
-      bazookaGroup.rotation.z = -0.25;
-    }
-  } else {
-    bazookaAimT = Math.max(0, bazookaAimT - dt*2.5);
-    bazookaNextFire = 0;
-  }
-  bazookaGroup.rotation.x = -bazookaAimT*0.35;
-  bazookaGroup.rotation.z += (0 - bazookaGroup.rotation.z) * 0.1;
-}
-
 // 모니터 화면 깜빡임(전원 공통, 가볍게) — "모니터 화면이 깜빡이는 효과"
 function updateMonitorFlicker(t){
   for (const a of actors){
@@ -1181,6 +1122,9 @@ function updateMonitorFlicker(t){
   }
 }
 
+const v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
+  bazookaGroup,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
+window.__jgV8=v8.api;
 let clock = new THREE.Clock();
 let lastFpsShown = 0;
 let fpsEMA = 60, fpsAccum = 0, fpsFrames = 0;
@@ -1208,51 +1152,29 @@ function updateBrainPanel(){
 
 function renderLoop(){
   requestAnimationFrame(renderLoop);
-  const dt = Math.min(0.05, clock.getDelta());
-  const t = clock.elapsedTime;
-  const nowSec = performance.now()/1000;
-
-  for (const a of actors){
-    a.actionT += dt;
-    if (currentLevel === 0){
-      applyReturnToNormal(a, dt);
-      if (a.hideAmt <= 0.01) tickUtilityAI(a, dt, t);
-    } else if (currentLevel === 1){
-      a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
-      applyLookup(a, t);
-    } else if (currentLevel === 2){
-      a.hideAmt = Math.max(0, a.hideAmt - dt*2.2);
-      applyThrowing(a, t, nowSec);
-    } else {
-      applyFleeing(a, t, dt);
-    }
-    a.shadow.position.set(a.wrapper.position.x, 0.01, a.wrapper.position.z);
-    a.shadow.scale.setScalar(Math.max(0.3, 1 - Math.abs(a.wrapper.position.y)*3));
-    updateThought(a);
+  const rawDt=clock.getDelta();
+  if(document.hidden)return;
+  const dt=Math.min(.15,rawDt),t=clock.elapsedTime,nowSec=performance.now()/1000;
+  const frame=v8.update(dt,t,rawDt,currentLevel,nowSec);
+  for(const a of actors){
+    a.actionT+=dt;
+    if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);if(a.weapon)a.weapon.visible=false;}
+    else if(frame.id==='lookup' && !v8.preview){applyLookup(a,t);if(a.weapon)a.weapon.visible=false;}
+    else v8.animateActor(a,dt,t);
+    a.shadow.position.set(a.wrapper.position.x,.01,a.wrapper.position.z);
+    a.shadow.scale.setScalar(Math.max(.3,1-Math.abs(a.wrapper.position.y)*3));
+    updateThought(a);v8.updateEmotion(a,t);
   }
-  updateBazooka(dt, nowSec, currentLevel);
-  updateSeeds(nowSec);
-  updateDroppedPapers(nowSec);
-  updateMonitorFlicker(t);
-
-  renderer.render(scene, camera);
-
-  fpsFrames++; fpsAccum += dt;
-  if (fpsAccum >= 0.25){
-    const fps = fpsFrames / fpsAccum;
-    fpsEMA = fpsEMA*0.5 + fps*0.5;
-    lastFpsShown = Math.round(fpsEMA);
-    fpsBox.textContent = 'FPS ' + lastFpsShown;
-    if (panelOpen){
-      dbgFpsEl.textContent = String(lastFpsShown);
-      let tris = 0;
-      scene.traverse(o => { if (o.isMesh && o.geometry && o.geometry.index) tris += o.geometry.index.count/3; });
-      dbgTrisEl.textContent = Math.round(tris);
-    }
-    fpsAccum = 0; fpsFrames = 0;
+  v8.afterActors(t,nowSec);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
+  renderer.render(scene,camera);
+  fpsFrames++;fpsAccum+=rawDt;
+  if(fpsAccum>=.5){
+    const fps=fpsFrames/fpsAccum;fpsEMA=fpsEMA*.3+fps*.7;lastFpsShown=Math.round(fpsEMA);v8.setFPS(fps);
+    fpsBox.textContent='FPS '+lastFpsShown+' · '+v8.quality.label;
+    if(panelOpen){dbgFpsEl.textContent=String(lastFpsShown);dbgTrisEl.textContent=Math.round(renderer.info.render.triangles);}
+    fpsFrames=0;fpsAccum=0;
   }
-  brainAccum += dt;
-  if (panelOpen && brainAccum >= 0.3){ updateBrainPanel(); brainAccum = 0; }
+  brainAccum+=dt;if(panelOpen && brainAccum>=.3){updateBrainPanel();brainAccum=0;}
 }
 
 // ---- 숨은 조절 화면: 왼쪽 위 구석 5번 연속 탭(jg/index.html과 동일 패턴) ----
@@ -1279,6 +1201,9 @@ document.getElementById('bodyToggle').addEventListener('change', (e) => {
 document.querySelectorAll('#countBtns button').forEach(btn => {
   btn.addEventListener('click', () => setFriendCount(Number(btn.dataset.n)));
 });
+document.getElementById('scenePreview').addEventListener('click',()=>v8.api.demo());
+document.getElementById('emotionPreview').addEventListener('change',e=>v8.api.emotion(e.target.value));
+document.getElementById('qualityChoice').addEventListener('change',e=>v8.api.quality(e.target.value));
 // 시험 자동화용 훅(Playwright) — 사장님 손가락 대신 스크립트로 친구 수/두뇌 보기를 조작할 때만 씀.
 window.__jgSetFriendCount = setFriendCount;
 window.__jgOpenBrainPanel = () => setPanelOpen(true);
@@ -1361,6 +1286,7 @@ renderLoop();
   loadingMsg.textContent = '3D 모델 불러오는 중…';
   await loadAllTemplates();
   setFriendCount(7);
+  if(new URLSearchParams(location.search).get('demo')==='1')v8.api.demo();
   loadingMsg.textContent = '';
 })();
 
