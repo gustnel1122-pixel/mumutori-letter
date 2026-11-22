@@ -1131,6 +1131,9 @@ let fpsEMA = 60, fpsAccum = 0, fpsFrames = 0;
 const fpsBox = document.getElementById('fpsBox');
 const dbgFpsEl = document.getElementById('dbgFps');
 const dbgTrisEl = document.getElementById('dbgTris');
+document.addEventListener('visibilitychange',()=>{
+  clock.getDelta();fpsFrames=0;fpsAccum=0;
+});
 
 const ACTION_LABEL = { working:'일하기', carrying:'서류 나르기', chatting:'수다', dozing:'졸기', coffee:'커피', quirk:'버릇' };
 let brainAccum = 0;
