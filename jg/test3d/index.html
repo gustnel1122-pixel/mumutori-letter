@@ -543,9 +543,10 @@ const contactCanvas=document.createElement('canvas');contactCanvas.width=contact
 const contactContext=contactCanvas.getContext('2d'),contactGradient=contactContext.createRadialGradient(64,64,10,64,64,64);
 contactGradient.addColorStop(0,'rgba(35,23,13,.38)');contactGradient.addColorStop(.5,'rgba(35,23,13,.16)');contactGradient.addColorStop(1,'rgba(35,23,13,0)');
 contactContext.fillStyle=contactGradient;contactContext.fillRect(0,0,128,128);
-const shadowMat = new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(contactCanvas),transparent:true,opacity:.65,depthWrite:false });
+// 0224 P34 — 그림자를 못 켜는 대신 발밑 타원 1장만. 카메라가 거의 수평이라 옅으면 안 보인다.
+const shadowMat = new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(contactCanvas),transparent:true,opacity:.82,depthWrite:false });
 function makeShadow(){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(.9*COMPOSITION.actorScale,.9*COMPOSITION.actorScale), shadowMat);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.05*COMPOSITION.actorScale,1.05*COMPOSITION.actorScale), shadowMat);
   m.rotation.x = -Math.PI/2;
   m.position.y = 0.01;
   return m;
@@ -881,6 +882,31 @@ function lerpAngle(a, b, t){
 const CANON_MATERIAL_COLOR = {
   bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다)
 };
+// 0224 P31 — 정본 밤은 아래쪽이 '연베이지 밑동'인데 3D 에서는 거의 안 보였다.
+// GLB 는 그대로 두고, 불러올 때 Belly(밑동) 메시만 몸 높이의 아래 38% 를 덮도록 키운다.
+const CANON_BELLY = { bam: {cover: 0.38, color: 0xE2BC92} };
+function applyCanonBelly(key, model){
+  const want = CANON_BELLY[key];
+  if (!want) return;
+  const body = [], belly = [];
+  model.traverse(o => { if (o.isMesh && o.name === 'Body') body.push(o); if (o.isMesh && o.name === 'Belly') belly.push(o); });
+  if (!body.length || !belly.length) return;
+  const bodyBox = new THREE.Box3().setFromObject(body[0]);
+  const bodyH = bodyBox.max.y - bodyBox.min.y;
+  for (const mesh of belly){
+    for (const material of [mesh.material].flat()) material.color.setHex(want.color);
+    const box = new THREE.Box3().setFromObject(mesh);
+    const have = box.max.y - box.min.y;
+    if (have <= 0.0001) continue;
+    const target = bodyH * want.cover;
+    if (have >= target) continue;                       // 이미 충분하면 손대지 않는다
+    const grow = Math.min(2.2, target / have);
+    const bottom = box.min.y;
+    mesh.scale.multiplyScalar(grow);
+    mesh.position.y = bottom + (mesh.position.y - bottom) * grow;   // 밑면은 그대로 두고 위로만 키움
+    mesh.position.x *= grow; mesh.position.z *= grow;
+  }
+}
 function applyCanonColors(key, model){
   const table = CANON_MATERIAL_COLOR[key];
   if (!table) return;
@@ -897,6 +923,7 @@ function createActor(key, slot){
   const model = tmpl.clone(true);
   model.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone(); });
   applyCanonColors(key, model);
+  applyCanonBelly(key, model);
   const wrapper = new THREE.Group();
   const visualRoot = new THREE.Group();
   visualRoot.scale.setScalar(COMPOSITION.actorScale);
@@ -1235,6 +1262,7 @@ function applyFleeing(a, t, dt){
   a.wrapper.rotation.z = jitter * 2;
 }
 function applyReturnToNormal(a, dt){
+  a.panic = Math.max(0, (a.panic || 0) - dt*0.55);   // 놀란 기운은 천천히 가라앉는다(눈·땀)
   // 숨었다가 돌아오는 양만 센다 — 높이·기울기·크기는 자세층(applyPose)이 한 곳에서 맡는다.
   a.hideAmt = Math.max(0, a.hideAmt - dt*2.4);
   a.wrapper.scale.set(1, 1, 1);

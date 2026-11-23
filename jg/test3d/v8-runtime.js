@@ -28,6 +28,10 @@ export function createV8(config){
   const parked=spots.parked.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
   const deployed=spots.deployed.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
   const operators=['byeongari','ssal'];
+  // P7 — 일곱이 똑같이 반응하지 않도록 사람마다 늦게 반응하는 시간(초).
+  const PANIC_LAG=[0,.08,.13,.21,.28,.36,.45];
+  // P19 — 집어 던지는 물건 네 가지를 번갈아(씨앗·서류·머그·지우개 모양).
+  const THROW_SHAPES=[0,1,2,1];
   const flashMaterial=new THREE.MeshBasicMaterial({color:0xffe48b,transparent:true,opacity:.9});
   mounts.forEach((g,i)=>{
     g.clear();g.add(makeAcornBazooka());g.scale.setScalar(propScale);g.position.copy(parked[i]);g.userData.isLauncher=true;
@@ -38,7 +42,7 @@ export function createV8(config){
       wheel.rotation.z=Math.PI/2;wheel.position.set(x,-.42,z);g.add(wheel);
     }
     const flash=new THREE.Mesh(new THREE.OctahedronGeometry(.16),flashMaterial);flash.position.z=.53;flash.visible=false;g.add(flash);
-    g.userData.flash=flash;g.userData.fireAt=0;g.userData.flashUntil=0;
+    g.userData.flash=flash;g.userData.fireAt=0;g.userData.flashUntil=0;g.userData.restRotation=g.rotation.clone();
   });
   let frame=director.snapshot(),lastScene='work',emotionOverride=null,lastTime=0,lastFPS=0,lastCompleted=null,qualityChanges=[],testLevel=null;
   const phaseEvents=[],pickupEvents=[];
@@ -47,6 +51,24 @@ export function createV8(config){
   document.addEventListener('visibilitychange',()=>quality.resetSamples());
   const profile={dotori:{hop:.14,tilt:.08,pace:1},bam:{hop:.07,tilt:-.16,pace:.78},ddangkong:{hop:.06,tilt:.13,pace:1.15},
     byeongari:{hop:.20,tilt:-.1,pace:1.3},wandukong3:{hop:.13,tilt:.08,pace:1.5},haebaragi:{hop:.015,tilt:.02,pace:.45},ssal:{hop:.09,tilt:-.09,pace:.9}};
+  // P17·P18 — 허겁지겁이라 잘 못 맞힌다. 10번에 4번은 일부러 빗나간다.
+  function panicAim(i,kind,a){
+    const aim=target(i,kind);
+    if(kind!=='throw')return aim;
+    const r=Math.random();
+    if(r<.15)aim.y=windowBottom+windowHeight*(1.02+Math.random()*.12);       // 천장 쪽으로 넘김
+    else if(r<.30)aim.y=windowBottom+windowHeight*(Math.random()*.10);        // 바닥 쪽으로 처짐
+    else if(r<.40){                                                           // 옆 친구 머리 위로
+      const other=getActors()[(i+1+Math.floor(Math.random()*2))%getActors().length];
+      if(other){aim.x=other.wrapper.position.x;aim.y=windowBottom+windowHeight*.22;}
+    }
+    const spread=Math.tan(.384);                                              // ±22°
+    aim.x+=(Math.random()-.5)*2*spread*Math.abs(windowZ-a.wrapper.position.z);
+    aim.y+=(Math.random()-.5)*2*Math.tan(.262)*Math.abs(windowZ-a.wrapper.position.z);  // ±15°
+    aim.x=clamp(aim.x,-windowWidth/2+.5,windowWidth/2-.5);
+    aim.y=clamp(aim.y,windowBottom+.12,windowBottom+windowHeight-.12);
+    return aim;
+  }
   function target(i,kind){
     const spread=kind==='bazooka'?1.7:windowWidth/2-.65;
     return new THREE.Vector3(clamp((Math.random()-.5)*spread*2+(kind==='bazooka'?(i?-2.2:2.2):0),-windowWidth/2+.6,windowWidth/2-.6),windowBottom+.75+Math.random()*(windowHeight-1.25),windowZ+.05);
@@ -71,9 +93,11 @@ export function createV8(config){
     a.weaponRest=a.cratePosition.clone().add(new THREE.Vector3(0,.35,0));
     // 0010: 숨을 때·빼꼼할 때도 화면에서 서로 겹치지 않게 칸을 나눈다(2바퀴 검토 escape·peek·recover).
     // 책장 뒤(왼쪽 -11.9~-6.6 · 오른쪽 6.6~10.0) 안에서 x 를 벌리고 깊이를 번갈아 둔다.
-    // 책장(z -3.93~-3.08) 뒤로 충분히 물러난 자리라야 실제로 그 점까지 갈 수 있다.
-    const covers={byeongari:[-11.6,-5.0],dotori:[-9.9,-7.3],ddangkong:[-8.2,-5.0],bam:[-6.7,-7.3],
-                  wandukong3:[6.7,-5.0],haebaragi:[9.1,-7.3],ssal:[11.2,-5.0]};
+    // 책장(z -3.93~-3.08) 뒤 한 줄로 숨는다. **지나가는 순서(traffic)대로 먼 자리부터** 줘야
+    // 먼저 도착한 친구가 뒤에 오는 친구의 길을 막지 않는다(막히면 길 찾기가 영영 돌았다).
+    // 같은 깊이에 x 만 벌려 화면에서도 서로 겹치지 않는다.
+    const covers={ddangkong:[-11.6,-5.0],byeongari:[-9.9,-5.0],dotori:[-8.2,-5.0],bam:[-6.6,-5.0],
+                  ssal:[11.2,-5.0],haebaragi:[9.1,-5.0],wandukong3:[6.9,-5.0]};
     a.cover=new THREE.Vector3(covers[a.key][0],0,covers[a.key][1]);
     // 빼꼼은 제자리에서 앞으로만 나온다 — 옆으로 몰리면 서로 가린다.
     a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?1.9:-1.9;a.coverPeek.z+=1.05;
@@ -92,10 +116,12 @@ export function createV8(config){
       for(let i=0;i<p.count;i++){vertex.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);radius=Math.max(radius,Math.hypot(vertex.x-a.homePos.x,vertex.z-a.homePos.z));}
     });
     a.bodyRadius=radius+.045;a.facing=a.deskYaw||0;a.motionGoal=a.homePos.clone();
+    a.paceMul=.85+Math.random()*.40;           // P24 친구마다 걷는 빠르기가 다르다
     // 손은 몸 반지름 바깥(+10%)에 둔다 — visualRoot 안 좌표라 actorScale 로 나눠 준다.
     // 총대가 몸을 뚫지 않도록 손을 몸 반지름 바깥으로 충분히 뺀다(3바퀴 불통 '몸 관통').
-    const reach=(a.bodyRadius/(config.actorScale||1))*1.45;
-    a.handLocal=new THREE.Vector3(reach*.70,.42,reach*.78);
+    // 0224 P20 — 몸을 뚫지도, 멀리 떠 있지도 않게: 몸 반지름 **바로 바깥 0.02**.
+    const reach=(a.bodyRadius/(config.actorScale||1))+.02/(config.actorScale||1);
+    a.handLocal=new THREE.Vector3(reach*.62,.40,reach*.70);
     motion.add(a.key,a.homePos,a.bodyRadius);
     for(const root of [a.wrapper,a.equipment])root?.traverse(o=>{for(const material of [o.material].flat())if(material)gradeMaterial(material);});
   }
@@ -106,7 +132,9 @@ export function createV8(config){
   }
   function resetEquipment(){
     getActors().forEach(a=>{a.held=false;a.pickupLogged=false;a.pickupDwell=0;a.pickupBlend=0;a.wrapper.visible=true;if(a.equipment){a.equipment.position.copy(a.weaponRest);a.equipment.visible=true;a.equipment.rotation.set(0,0,0);}if(a.muzzleFlash)a.muzzleFlash.visible=false;});
-    mounts.forEach((g,i)=>{g.position.copy(parked[i]);g.userData.flash.visible=false;g.userData.fetched=false;});
+    // 4바퀴 ④ — 처음 자리·각도·높이를 그대로 되돌린다(화분에 박히거나 뜨지 않게).
+    mounts.forEach((g,i)=>{g.position.copy(parked[i]);g.rotation.copy(g.userData.restRotation);
+      g.userData.flash.visible=false;g.userData.fetched=false;});
   }
   function changeScene(id){
     if(id===lastScene)return;lastScene=id;
@@ -136,10 +164,13 @@ export function createV8(config){
     });
     const fetchWaiting=frame.id==='fetch' && frame.progress>.4 && mounts.some((g,i)=>getActors().some(a=>a.key===operators[i]) && !g.userData.fetched);
     const firingWaiting=frame.id==='fetch' && frame.progress>.9 && operators.some((key,i)=>{const p=motion.agents.get(key)?.position;return p && Math.hypot(p.x-deployed[i].x,p.z-deployed[i].z-1.8)>.15;});
-    const waiting=equipWaiting || fetchWaiting || firingWaiting || travelling && getActors().some(a=>{
+    // 0224: 기다림에는 **한계 시간**을 둔다. 한 명이 길이 막혀 못 가면 장면이 영영 안 넘어가
+    // 손님 화면이 '도망' 에서 멈춘다(영상·캡처에서 실제로 그렇게 됐다).
+    const stuckLimit=frame.age>4.5;
+    const waiting=!stuckLimit && (equipWaiting || fetchWaiting || firingWaiting || travelling && getActors().some(a=>{
       const p=motion.agents.get(a.key)?.position,target=frame.id==='escape'?a.cover:a.homePos;
-      return !p || Math.hypot(p.x-target.x,p.z-target.z)>.15;
-    });
+      return !p || Math.hypot(p.x-target.x,p.z-target.z)>.40;
+    }));
     frame=director.update(loaded && !waiting?dt:0,loaded?(testLevel??level):0);changeScene(frame.id);mess.fade(frame.id==='recover'?frame.clean:0);
     const badge=document.getElementById('sceneBadge');if(badge){badge.textContent=frame.label || '';badge.style.display=frame.active?'block':'none';}
     const emotionChoice=document.getElementById('emotionPreview');if(emotionChoice){emotionChoice.disabled=frame.active;if(frame.active)emotionChoice.value='';}
@@ -158,10 +189,15 @@ export function createV8(config){
     const active=new Set(getActors().map(actor=>actor.key));
     const order=traffic.find(group=>group.includes(a.key)).filter(key=>active.has(key));
     if(returning)order.reverse();
-    return order.slice(0,order.indexOf(a.key)).every(key=>{
-      const actor=getActors().find(other=>other.key===key),p=motion.agents.get(key)?.position,target=returning?actor.homePos:actor.cover;
-      return p && Math.hypot(p.x-target.x,p.z-target.z)<.15;
-    });
+    const idx=order.indexOf(a.key);
+    if(idx<=0)return true;
+    // 0224 P27 — 앞의 '모든' 친구가 다 숨을 때까지 기다리면 뒤 두 명(해바라기씨·쌀)이 아예 안 움직인다.
+    // **바로 앞 한 명**만 길을 비우면 출발하고, 그래도 막히면 차례대로 조금씩 늦게 출발한다.
+    const ahead=getActors().find(other=>other.key===order[idx-1]);
+    const p=ahead&&motion.agents.get(ahead.key)?.position;
+    const target=ahead?(returning?ahead.homePos:ahead.cover):null;
+    if(p&&target&&Math.hypot(p.x-target.x,p.z-target.z)<.35)return true;
+    return frame.age>.55+idx*.30;
   }
   function animateActor(a,dt,t){
     const p=profile[a.key],phase=t*p.pace+a.phase,i=getActors().indexOf(a),id=frame.id;
@@ -173,8 +209,24 @@ export function createV8(config){
     a.seatBlend=emotionOverride?1:Math.max(0,(a.seatBlend??1)-dt*3.2);
     if(emotionOverride){a.wrapper.position.y+=(a.seatY||0)*a.seatBlend;a.visualRoot.rotation.set(0,0,0);return;}
     if(id==='notice'){
-      const u=clamp(frame.age/.35,0,1);a.wrapper.rotation.y=(i%2?1:-1)*Math.sin(u*Math.PI)*.25;
-      a.wrapper.scale.y=1-.08*u;a.wrapper.rotation.x=-.12*u;a.wrapper.position.y=Math.sin(u*Math.PI)*p.hop;
+      // 0224 영상분석 P1·P2·P5·P6·P7 — "너무 놀라서" 가 보이게.
+      // 지금까지는 7명이 같은 0.04초에 같은 자세로, 점프 0, 오히려 가라앉기까지 했다.
+      const lag=PANIC_LAG[i%PANIC_LAG.length];                 // P7 0.00~0.45초 어긋나게
+      const age=Math.max(0,frame.age-lag);
+      const up=clamp(age/.12,0,1),down=clamp((age-.12)/.18,0,1);
+      const jump=Math.sin(up*Math.PI/2)*(1-down)*.18;          // P1 점프 0 → 0.18
+      a.wrapper.position.y=Math.max(0,jump);                   // P2 평소보다 낮아지지 않게
+      const rise=up*(1-down);
+      a.wrapper.scale.y=1+.25*rise;a.wrapper.scale.x=a.wrapper.scale.z=1-.15*rise;   // P5 늘어남
+      if(down>=1){                                             // 착지 뒤 눌림 → 떨림
+        const land=clamp((age-.30)/.08,0,1);
+        a.wrapper.scale.y=1-.20*(1-land);a.wrapper.scale.x=a.wrapper.scale.z=1+.20*(1-land);
+        const shake=clamp(1-(age-.38)/.6,0,1);                 // P6 0.6초 ±0.035 · 9회/초
+        a.wrapper.position.x=a.homePos.x+Math.sin(age*Math.PI*2*9+i)*.035*shake;
+      }
+      a.wrapper.rotation.y=(i%2?1:-1)*Math.sin(up*Math.PI)*.18;
+      a.wrapper.rotation.x=-.16*rise;
+      a.panic=Math.max(a.panic||0,clamp(age/.1,0,1));          // 눈 크게(P3)·땀방울(P11) 신호
     }else if(id==='equip'){
       // All move within 0.24 seconds; every pickup has a visible bend/reach.
       const age=Math.max(0,frame.age-(i%4)*.1),u=age/4.7;
@@ -190,7 +242,19 @@ export function createV8(config){
       if(a.held && !a.pickupLogged){a.pickupLogged=true;pickupEvents.push({key:a.key,kind:a.def.canThrow?'gun':'ammunition',at:frame.elapsed,from:a.weaponRest.toArray(),atActor:[physical.x,0,physical.z]});}
     }else if(['ready','throw','gun','fetch','bazooka','mess'].includes(id)){
       a.held=true;a.wrapper.rotation.x=-.08;a.wrapper.rotation.z=p.tilt*.25;
-      if(['throw','gun'].includes(id)){const beat=Math.max(0,Math.sin(phase*7));a.wrapper.position.y=beat*p.hop*.35;a.wrapper.rotation.x-=beat*.10;}
+      if(['throw','gun'].includes(id)){
+        // 0224 P14·P15·P22 — 1초에 3번 던지는 몸짓. 팔 뼈대가 있는 친구는 도토리뿐이라
+        // 나머지는 "뒤로 젖혔다 앞으로 숙이기 + 찌그러짐" 으로 던지는 동작을 만든다.
+        // 한 번에 0.33초: 뒤로 0.12 · 앞으로 0.08 · 돌아오기 0.13.
+        const cycle=(t*3+a.phase*.37)%1;
+        const back=clamp(cycle/.36,0,1),fwd=clamp((cycle-.36)/.24,0,1),back2=clamp((cycle-.60)/.40,0,1);
+        const lean=back<1?-.17*back:(fwd<1?(-.17+.49*fwd):(.32*(1-back2)));   // 뒤 10° → 앞 18°
+        a.wrapper.rotation.x=-.08+lean;
+        a.wrapper.position.y=Math.max(0,Math.sin(cycle*Math.PI)*.055);
+        const snap=fwd<1&&fwd>0?Math.sin(fwd*Math.PI):0;
+        a.wrapper.scale.x=a.wrapper.scale.z=1+.12*snap;a.wrapper.scale.y=1-.10*snap;   // P22
+        a.wrapper.rotation.z=p.tilt*.25+Math.sin(cycle*Math.PI*2)*.07;
+      }
       if(id==='mess')a.wrapper.position.y=Math.abs(Math.sin(phase*4))*p.hop*.5;
       const operator=operators.indexOf(a.key);
       if(operator<0 && ['ready','throw','gun','fetch','bazooka','mess'].includes(id))a.motionGoal=battleStation(a);
@@ -205,7 +269,13 @@ export function createV8(config){
     }else if(id==='escape'){
       const go=turnToMove(a);a.motionGoal=go?a.cover:a.escapeFrom;
       const u=clamp((frame.age-i*.26)/2.65,0,1);
-      walk(a,a.escapeFrom || a.homePos,a.cover,u,t);a.wrapper.rotation.x=-.15;
+      walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
+      // 0224 P25·P26 — 1초에 6걸음 통통(±0.03) + 앞으로 12° 숙이고 돌 때 안쪽으로 기울기.
+      const run=u>0&&u<1?1:0;
+      a.wrapper.position.y+=Math.abs(Math.sin(t*Math.PI*7+a.phase))*.03*run;
+      a.wrapper.rotation.x=-.21*run-.15*(1-run);
+      a.wrapper.rotation.z=(a.cover.x<0?1:-1)*.14*run;
+      a.panic=Math.max(a.panic||0,.8);
       const p=motion.agents.get(a.key)?.position,d=p?Math.hypot(p.x-a.cover.x,p.z-a.cover.z):10;
       const crouch=smooth(1-d);a.wrapper.scale.y=1-.55*crouch;a.wrapper.rotation.y=(a.cover.x<0?1:-1)*Math.PI/2*crouch;
     }else if(id==='hide'){
@@ -244,7 +314,11 @@ export function createV8(config){
     for(const a of actors){
       let goal=frame.active?a.motionGoal:a.homePos;
       if(!frame.active && !emotionOverride && ['going','busy','returning'].includes(a.movePhase))goal=a.movePhase==='returning'?a.moveFrom:a.moveTo;
-      goals.set(a.key,{x:goal.x,z:goal.z,speed:frame.id==='escape'||frame.id==='recover'?5:frame.id==='fetch'?4.8:3});
+      // 0224 P23·P24 — 도망은 '종종걸음'(보폭 절반)으로, 속도는 친구마다 0.85~1.25배 다르게.
+      // 보폭 자체는 이동 담당이 '속도' 하나로만 움직여서 따로 못 준다 → 겁먹은 종종걸음은
+      // **빠른 속도 + 1초 7번 통통 + 앞으로 숙이기**로 만든다(P23 의 뜻). 너무 늦추면 도망이 늘어진다.
+      const base=frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.8:3;
+      goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
     const launcherBoxes=mounts.map((g,i)=>{g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:frame.id==='fetch' && g.userData.fetched?[operators[i]]:[]};});
     motion.obstacles=[...furnitureObstacles,...launcherBoxes];motion.step(goals,dt);
@@ -295,12 +369,22 @@ export function createV8(config){
         a.weapon.lookAt(new THREE.Vector3(a.homePos.x,2.8,windowZ));
         a.muzzleFlash.visible=frame.id==='gun' && now<a.flashUntil;
       }
-      if(!emotionOverride && ['throw','gun'].includes(frame.id) && a.def.canThrow && a.held && now>=a.nextShot){
-        const kind=frame.id;if(kind==='gun' && !a.gunActive)return;
-        const aim=target(i,kind);if(kind==='gun'){a.weapon.lookAt(aim);a.weapon.updateMatrixWorld(true);}
-        const start=kind==='gun'?a.weapon.localToWorld(new THREE.Vector3(0,0,.25)):heldPosition;
-        const shape=kind==='gun'?0:['bam','byeongari','ssal'].includes(a.key)?2:a.key==='wandukong3'?0:1;
-        if(projectiles.fire(start,aim,kind,now,shape)){a.nextShot=now+(kind==='gun'?.24+(i%3)*.025:1.05+(i%3)*.11);a.flashUntil=now+.085;}
+      // 0224 P16·P17·P18·P19·P21 — 화면에 늘 4~7개가 날아다니게, 친구마다 다른 간격으로,
+      // 일부러 40%는 빗나가게(천장·바닥·옆 친구 머리 위), 던지는 물건도 네 가지를 섞는다.
+      if(!emotionOverride && ['throw','gun'].includes(frame.id) && a.held && now>=a.nextShot){
+        const kind=frame.id;
+        if(kind==='gun' && (!a.def.canThrow || !a.gunActive)){/* 총은 쏠 수 있는 친구만 */}
+        else{
+          const aim=panicAim(i,kind,a);
+          if(kind==='gun' && a.weapon){a.weapon.lookAt(aim);a.weapon.updateMatrixWorld(true);}
+          const start=(kind==='gun' && a.weapon)?a.weapon.localToWorld(new THREE.Vector3(0,0,.25)):heldPosition;
+          const shape=kind==='gun'?0:THROW_SHAPES[(a.throwCount=(a.throwCount||0)+1)%THROW_SHAPES.length];
+          if(projectiles.fire(start,aim,kind,now,shape)){
+            // P21 친구마다 0.5~1.1초 무작위(총은 그대로 빠르게)
+            a.nextShot=now+(kind==='gun'?.20+(i%3)*.02:.38+Math.random()*.45);
+            a.flashUntil=now+.085;
+          }
+        }
       }
     });
     mounts.forEach((g,i)=>{

@@ -13,22 +13,27 @@ export class WindowMess {
   impact(point,kind='throw'){
     this.hits++;this.byKind[kind]=(this.byKind[kind] || 0)+1;
     const x=(point.x/this.width+.5)*this.canvas.width,y=(1-(point.y-this.bottom)/this.height)*this.canvas.height;
-    const ctx=this.ctx,r=(kind==='bazooka'?.85:kind==='gun'?.23:.36)*this.canvas.width/this.width;
+    // 0224 P36 — 크기 0.6배(가시 돋친 공처럼 보이지 않게).
+    const ctx=this.ctx,r=(kind==='bazooka'?.85:kind==='gun'?.23:.36)*.6*this.canvas.width/this.width;
     ctx.save();ctx.translate(x,y);
     // Rounded pea/cream stains, no blood, harsh blast or character injury.
     const tint=kind==='bazooka'?'166,119,65':kind==='gun'?'125,160,66':'214,184,121';
     const gradient=ctx.createRadialGradient(0,0,r*.12,0,0,r);
     gradient.addColorStop(0,`rgba(${tint},.63)`);gradient.addColorStop(.62,`rgba(${tint},.35)`);gradient.addColorStop(1,`rgba(${tint},0)`);
     ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
-    for(let i=0;i<7;i++){
-      const a=i*.9+this.hits,b=r*(.6+Math.random()*.65);
-      ctx.fillStyle=`rgba(${tint},.40)`;ctx.beginPath();ctx.ellipse(Math.cos(a)*b,Math.sin(a)*b,r*.15,r*.09,a,0,7);ctx.fill();
+    // P36 — 가시처럼 뻗은 길쭉한 조각 7개 → **둥근 작은 방울 3~4개**로(두 가지 색).
+    const drops=3+(this.hits%2);
+    const tint2=kind==='bazooka'?'198,156,104':kind==='gun'?'154,186,96':'232,208,158';
+    for(let i=0;i<drops;i++){
+      const a=i*2.1+this.hits*.6,b=r*(.52+Math.random()*.42);
+      ctx.fillStyle=`rgba(${i%2?tint2:tint},.42)`;
+      ctx.beginPath();ctx.arc(Math.cos(a)*b,Math.sin(a)*b,r*(.16+Math.random()*.08),0,7);ctx.fill();
     }
-    if(kind==='bazooka' || this.hits%4===0){
+    if(kind==='bazooka'){
       const crackR=r*(kind==='bazooka'?1.8:1.4);
       ctx.strokeStyle='rgba(104,143,161,.75)';ctx.lineWidth=1.5;
-      for(let i=0;i<7;i++){
-        const a=i*Math.PI*2/7+this.hits*.13;
+      for(let i=0;i<4;i++){
+        const a=i*Math.PI*2/4+this.hits*.13;
         ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a+.18)*crackR*.4,Math.sin(a+.18)*crackR*.4);
         ctx.lineTo(Math.cos(a)*crackR,Math.sin(a)*crackR);ctx.stroke();
         ctx.strokeStyle='rgba(250,255,255,.93)';ctx.lineWidth=.7;ctx.stroke();ctx.strokeStyle='rgba(104,143,161,.75)';ctx.lineWidth=1.5;
