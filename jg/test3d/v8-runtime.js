@@ -18,8 +18,11 @@ export function createV8(config){
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
   const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
   const mounts=[bazookaGroup,new THREE.Group()];scene.add(mounts[1]);
-  const parked=[new THREE.Vector3(-8,propScale*.5,3.1),new THREE.Vector3(0,propScale*.5,-6.2)];
-  const deployed=[new THREE.Vector3(-8,propScale*.5,-.8),new THREE.Vector3(0,propScale*.5,-6.8)];
+  // 두 바주카는 각자 주인(병아리·쌀) 자리에 매여 있다. 자리를 옆으로 옮기면
+  // 세워 두는 곳·쏘는 곳도 같은 만큼 옮겨야 가지러 가는 지점이 책상에 막히지 않는다.
+  const launcherShift=config.launcherShift||[0,0];
+  const parked=[new THREE.Vector3(-8+launcherShift[0],propScale*.5,3.1),new THREE.Vector3(0+launcherShift[1],propScale*.5,-6.2)];
+  const deployed=[new THREE.Vector3(-8+launcherShift[0],propScale*.5,-.8),new THREE.Vector3(0+launcherShift[1],propScale*.5,-6.8)];
   const operators=['byeongari','ssal'];
   const flashMaterial=new THREE.MeshBasicMaterial({color:0xffe48b,transparent:true,opacity:.9});
   mounts.forEach((g,i)=>{

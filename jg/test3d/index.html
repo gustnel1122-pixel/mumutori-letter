@@ -149,15 +149,27 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261123-8e';
+import {createV8} from './v8-runtime.js?v=20261123-8f';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-23-8e';
+const VERSION = '2026-11-23-8f';
+// ---- v8f: 화면(카메라) 각도 단계. 사장님 11/23 13:10 "여기서 화면 각도를 아래로좀 내려봐
+//      카메라가 정면을 바라볼거야" — 내려다보는 각(pitch)만 낮추고 다른 구도 값은 그대로 둔다.
+//      ?cam=0 v8e 그대로(되돌리기·비교) · ?cam=1 조금 내림 · ?cam=2 많이 내림(거의 정면, 기본).
+const CAMERA_LEVELS = {
+  '0': {pitch:32, targetFraction:.36},
+  '1': {pitch:17, targetFraction:.36},
+  '2': {pitch:6,  targetFraction:.38},
+};
+const CAMERA_LEVEL = (() => {
+  const asked = new URLSearchParams(location.search).get('cam');
+  return Object.prototype.hasOwnProperty.call(CAMERA_LEVELS, asked) ? asked : '2';
+})();
 // Display transforms only: the canonical GLBs and their proportions stay intact.
-const COMPOSITION = {actorScale:1.65, deskScale:1.2, pitch:32, targetFraction:.36};
+const COMPOSITION = {actorScale:1.65, deskScale:1.2, camLevel:CAMERA_LEVEL, ...CAMERA_LEVELS[CAMERA_LEVEL]};
 
 // ===================================================================================
 // §0. v8e: 정적 베이크 + Lambert · 단일 그리기 · 충돌 회피 · 감지 Worker 분리.
@@ -641,15 +653,33 @@ async function loadAllTemplates(){
 
 // ---- 앞줄 3 / 중간줄 3 / 뒷줄 1. 간격을 벌려 앞은 크게, 뒤는 작고 멀게 보이게 한다. ----
 // +z가 손님 쪽. 빈 책상도 유지해 친구가 2명이어도 사무실은 항상 세 줄이다.
-const LAYOUT_SLOTS = [
-  { dx: 0.00, dz: 3.10, yaw: 0, row:'front' },
-  { dx:-2.00, dz:-1.70, yaw: 0, row:'middle' },
-  { dx:-6.00, dz:-1.70, yaw: 0, row:'middle' },
-  { dx:-6.00, dz: 3.10, yaw: 0, row:'front' },
-  { dx: 3.00, dz:-1.70, yaw: 0, row:'middle' },
-  { dx: 6.00, dz: 3.10, yaw: 0, row:'front' },
-  { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },
-];
+// v8f: 카메라를 내리면 깊이 차가 줄어 같은 x의 앞/뒷줄이 화면에서 겹친다(cam=0 32°에서는 안 겹쳤다).
+//      줄(깊이)과 수는 그대로 두고 x만 벌려 일곱 명이 화면에서 각자 칸을 갖게 한다.
+//      화면 x = dx / ((카메라z - dz) · tan(수평 반화각)) 로 계산해 이웃 간 NDC 간격 0.18 이상을 목표로 잡았다.
+const LAYOUT_SLOTS_BY_CAM = {
+  '0': [
+    { dx: 0.00, dz: 3.10, yaw: 0, row:'front' },
+    { dx:-2.00, dz:-1.70, yaw: 0, row:'middle' },
+    { dx:-6.00, dz:-1.70, yaw: 0, row:'middle' },
+    { dx:-6.00, dz: 3.10, yaw: 0, row:'front' },
+    { dx: 3.00, dz:-1.70, yaw: 0, row:'middle' },
+    { dx: 6.00, dz: 3.10, yaw: 0, row:'front' },
+    { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },
+  ],
+  lowered: [
+    { dx: 2.40, dz: 3.10, yaw: 0, row:'front' },
+    { dx:-1.50, dz:-1.70, yaw: 0, row:'middle' },
+    { dx:-5.10, dz:-1.70, yaw: 0, row:'middle' },
+    { dx:-6.10, dz: 3.10, yaw: 0, row:'front' },
+    { dx: 5.60, dz:-1.70, yaw: 0, row:'middle' },
+    { dx: 6.80, dz: 3.10, yaw: 0, row:'front' },
+    { dx: 0.60, dz:-4.20, yaw: Math.PI, row:'back' },
+  ],
+};
+const LAYOUT_SLOTS = LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered;
+// 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다. 그 자리를 옮긴 만큼 바주카 자리도 옮긴다.
+const LAUNCHER_OWNER_SLOTS = [3, 6];
+const LAUNCHER_SHIFT = LAUNCHER_OWNER_SLOTS.map(i => LAYOUT_SLOTS[i].dx - LAYOUT_SLOTS_BY_CAM['0'][i].dx);
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -1143,7 +1173,8 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
+  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,launcherShift:LAUNCHER_SHIFT,
+  getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
 let lastFpsShown = 0;
