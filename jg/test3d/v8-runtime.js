@@ -9,7 +9,10 @@ import {MotionWorld} from './v8-motion.js?v=20261123-8e';
 
 const smooth=x=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const clamp=THREE.MathUtils.clamp;
+// 0010: 무기를 몸 바깥 손 위치에 둔다. v8f 의 (.40,.38,.30) 은 몸 안쪽이라 총대가 몸을 뚫었다.
+// 실제 몸 반지름은 친구마다 다르므로 prepareActor 에서 잰 값으로 바깥쪽으로 더 민다.
 const hand=new THREE.Vector3(.40,.38,.30);
+function handOffset(a){return a.handLocal||hand;}
 export function createV8(config){
   const {scene,renderer,camera,dirLight,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(),pipeline=createRenderPipeline(renderer,scene,camera);
@@ -61,14 +64,19 @@ export function createV8(config){
       a.pickupPosition=a.homePos.clone().add(new THREE.Vector3(0,0,.25));
     }else{
       a.cratePosition=a.homePos.clone()
-        .addScaledVector(face,.86*deskScale).addScaledVector(left,-.38*deskScale);
+        .addScaledVector(face,1.12*deskScale).addScaledVector(left,.42*deskScale);
       a.cratePosition.y=.42*deskScale;
       a.pickupPosition=a.homePos.clone().addScaledVector(face,.30);
     }
     a.weaponRest=a.cratePosition.clone().add(new THREE.Vector3(0,.35,0));
-    const covers={dotori:[-9.5,-5.1],bam:[-7.6,-5.1],ddangkong:[-8.8,-7.3],byeongari:[-11.4,-5.1],wandukong3:[7.1,-5.1],haebaragi:[9.2,-7.3],ssal:[9.2,-5.1]};
+    // 0010: 숨을 때·빼꼼할 때도 화면에서 서로 겹치지 않게 칸을 나눈다(2바퀴 검토 escape·peek·recover).
+    // 책장 뒤(왼쪽 -11.9~-6.6 · 오른쪽 6.6~10.0) 안에서 x 를 벌리고 깊이를 번갈아 둔다.
+    // 책장(z -3.93~-3.08) 뒤로 충분히 물러난 자리라야 실제로 그 점까지 갈 수 있다.
+    const covers={byeongari:[-11.6,-5.0],dotori:[-9.9,-7.3],ddangkong:[-8.2,-5.0],bam:[-6.7,-7.3],
+                  wandukong3:[6.7,-5.0],haebaragi:[9.1,-7.3],ssal:[11.2,-5.0]};
     a.cover=new THREE.Vector3(covers[a.key][0],0,covers[a.key][1]);
-    a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?2.2:-2.2;a.coverPeek.z+=1.2;
+    // 빼꼼은 제자리에서 앞으로만 나온다 — 옆으로 몰리면 서로 가린다.
+    a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?1.9:-1.9;a.coverPeek.z+=1.05;
     const crate=office.assets.model('cardboardBoxOpen',[.65,.35,.55]);
     if(crate){crate.position.copy(a.cratePosition);crate.userData.ownerKey=a.key;scene.add(crate);a.crate=crate;}
     const item=a.def.canThrow?makePeaGun():office.assets.model('cardboardBoxClosed',[.18,.16,.14]);
@@ -83,7 +91,11 @@ export function createV8(config){
       const p=o.geometry.attributes.position;
       for(let i=0;i<p.count;i++){vertex.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);radius=Math.max(radius,Math.hypot(vertex.x-a.homePos.x,vertex.z-a.homePos.z));}
     });
-    a.bodyRadius=radius+.045;a.facing=0;a.motionGoal=a.homePos.clone();
+    a.bodyRadius=radius+.045;a.facing=a.deskYaw||0;a.motionGoal=a.homePos.clone();
+    // 손은 몸 반지름 바깥(+10%)에 둔다 — visualRoot 안 좌표라 actorScale 로 나눠 준다.
+    // 총대가 몸을 뚫지 않도록 손을 몸 반지름 바깥으로 충분히 뺀다(3바퀴 불통 '몸 관통').
+    const reach=(a.bodyRadius/(config.actorScale||1))*1.45;
+    a.handLocal=new THREE.Vector3(reach*.70,.42,reach*.78);
     motion.add(a.key,a.homePos,a.bodyRadius);
     for(const root of [a.wrapper,a.equipment])root?.traverse(o=>{for(const material of [o.material].flat())if(material)gradeMaterial(material);});
   }
@@ -119,7 +131,8 @@ export function createV8(config){
     // detour must finish before hiding/resting is announced.
     const travelling=['escape','recover'].includes(frame.id) && frame.progress>.90;
     const equipWaiting=frame.id==='equip' && frame.progress>.90 && getActors().some(a=>{
-      const p=motion.agents.get(a.key)?.position;return !a.held || !p || Math.hypot(p.x-a.homePos.x,p.z-a.homePos.z)>.15;
+      const p=motion.agents.get(a.key)?.position,want=operators.includes(a.key)?a.homePos:battleStation(a);
+      return !a.held || !p || Math.hypot(p.x-want.x,p.z-want.z)>.25;
     });
     const fetchWaiting=frame.id==='fetch' && frame.progress>.4 && mounts.some((g,i)=>getActors().some(a=>a.key===operators[i]) && !g.userData.fetched);
     const firingWaiting=frame.id==='fetch' && frame.progress>.9 && operators.some((key,i)=>{const p=motion.agents.get(key)?.position;return p && Math.hypot(p.x-deployed[i].x,p.z-deployed[i].z-1.8)>.15;});
@@ -165,7 +178,9 @@ export function createV8(config){
     }else if(id==='equip'){
       // All move within 0.24 seconds; every pickup has a visible bend/reach.
       const age=Math.max(0,frame.age-(i%4)*.1),u=age/4.7;
-      a.motionGoal=a.held?a.homePos:a.pickupPosition;
+      // 장비를 챙기고 나면 바로 책상 앞 전투 자리로 나와 선다 — 'ready' 에서야 움직이면
+      // 공격 시작 사진에서 아직 책상 뒤에 있다(2바퀴 검토 지적).
+      a.motionGoal=a.held?(operators.includes(a.key)?a.homePos:battleStation(a)):a.pickupPosition;
       if(u<.40)walk(a,a.homePos,a.pickupPosition,u/.40,t);
       else if(u<.70){a.wrapper.position.copy(a.pickupPosition);const bend=Math.sin((u-.40)/.30*Math.PI);a.wrapper.rotation.x=-.26*bend;a.wrapper.scale.y=1-.12*bend;}
       else walk(a,a.pickupPosition,a.homePos,(u-.70)/.30,t);
@@ -189,7 +204,7 @@ export function createV8(config){
       }
     }else if(id==='escape'){
       const go=turnToMove(a);a.motionGoal=go?a.cover:a.escapeFrom;
-      const u=clamp((frame.age-(i%4)*.1)/2.65,0,1);
+      const u=clamp((frame.age-i*.26)/2.65,0,1);
       walk(a,a.escapeFrom || a.homePos,a.cover,u,t);a.wrapper.rotation.x=-.15;
       const p=motion.agents.get(a.key)?.position,d=p?Math.hypot(p.x-a.cover.x,p.z-a.cover.z):10;
       const crouch=smooth(1-d);a.wrapper.scale.y=1-.55*crouch;a.wrapper.rotation.y=(a.cover.x<0?1:-1)*Math.PI/2*crouch;
@@ -244,7 +259,11 @@ export function createV8(config){
       // v8g: 평소엔 저마다 자기 책상(a.idleYaw)을 본다 — 예전처럼 전원 0(정면)으로 맞추지 않는다.
       // 걸을 땐 가는 쪽을 보고(미끄러지듯 가지 않게), 수다 중엔 상대를 본다.
       const moving=Math.hypot(dx,dz)>.004;
-      const idleFace=a.poseGoal?.lookYaw!==undefined?a.poseGoal.lookYaw:(a.idleYaw??0);
+      // 0010 답 1: 뒤돌아 싸우는 건 그대로 두되, **전투 전(놀람)** 에는 손님 쪽을 본다 —
+      // 그래야 돌아서기 직전에 얼굴이 보인다.
+      const faceCamera=Math.atan2(camera.position.x-state.position.x,camera.position.z-state.position.z);
+      const idleFace=frame.id==='notice'?faceCamera
+        :(a.poseGoal?.lookYaw!==undefined?a.poseGoal.lookYaw:(a.idleYaw??0));
       const yaw=attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)
         :['work','recover','notice'].includes(frame.id)?(moving?Math.atan2(dx,dz):idleFace)
         :moving?Math.atan2(dx,dz):a.facing;
@@ -259,7 +278,7 @@ export function createV8(config){
     actors.forEach((a,i)=>{
       if(!a.equipment)return;
       a.wrapper.updateMatrixWorld(true);
-      const heldPosition=(a.visualRoot || a.wrapper).localToWorld(hand.clone());
+      const heldPosition=(a.visualRoot || a.wrapper).localToWorld(handOffset(a).clone());
       if(frame.id==='equip')a.equipment.position.copy(a.weaponRest).lerp(heldPosition,a.pickupBlend || 0);
       else if(a.held)a.equipment.position.copy(heldPosition);
       else if(['escape','hide','peek','recover'].includes(frame.id)){
@@ -268,7 +287,10 @@ export function createV8(config){
       }else a.equipment.position.copy(a.weaponRest);
       // v8g: 평소엔 씨앗 장난감을 상자 안에 둔 것으로 치고 숨긴다 — 책상 위에 둥둥 떠 있으면
       // 귀엽지도 자연스럽지도 않다(사장님 11/23 22:03). 손님을 보고 챙길 때부터 보인다.
-      a.equipment.visible=!emotionOverride && !['work','lookup'].includes(frame.id);
+      // 한 번에 무기 하나만: 바주카를 맡은 친구는 바주카를 미는 동안 씨앗총을 감춘다(3바퀴 ⑥).
+      // 숨는 동안에도 감춘다 — 상자에 무기만 꽂혀 보이던 것(3바퀴 ⑦).
+      const pushingLauncher=operators.includes(a.key) && ['fetch','bazooka','mess'].includes(frame.id);
+      a.equipment.visible=!emotionOverride && !['work','lookup','escape','hide','peek'].includes(frame.id) && !pushingLauncher;
       if(a.weapon){
         a.weapon.lookAt(new THREE.Vector3(a.homePos.x,2.8,windowZ));
         a.muzzleFlash.visible=frame.id==='gun' && now<a.flashUntil;

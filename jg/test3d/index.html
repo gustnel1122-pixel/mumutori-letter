@@ -421,21 +421,41 @@ const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
 const WINDOW_Z = -8.8;
 const WINDOW_WIDTH = 28.8;
 const WINDOW_BOTTOM = 0.08;
-const WINDOW_HEIGHT = 8.4;
+// 0010 답 4: "유리창이 훨씬더 커야해" + "무조건 다나오게" → 위로 키워 빈 회색을 채운다.
+// v8f 8.4 → 12.6. 맞춤(fit)이 창 전체를 화면에 담으므로 잘리지 않는다.
+const WINDOW_HEIGHT = COMPOSITION.variant === 'f' ? 8.4 : 12.6;
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), wallMat);
 backWall.position.set(0, 12, WINDOW_Z - 0.1);
 scene.add(backWall);
 
 // 작은 그라데이션 텍스처로 창 너머의 밝은 하늘을 표현한다.
+// 0010 답 3: 렉이 먼저다 — 반사·그림자·HDR 은 되살리지 않고 **미리 그린 창밖 그림 한 장**만 쓴다.
+// 캔버스 텍스처 1개 · 재질 1개 · 그리는 횟수 그대로라 FPS 에 거의 영향이 없다(아래 실측으로 확인).
 const skyCanvas = document.createElement('canvas');
-skyCanvas.width = 64; skyCanvas.height = 256;
+skyCanvas.width = 256; skyCanvas.height = 256;
 const skyContext = skyCanvas.getContext('2d');
 const skyGradient = skyContext.createLinearGradient(0, 0, 0, 256);
-skyGradient.addColorStop(0, '#E4EDFF');
-skyGradient.addColorStop(0.65, '#F2F6FF');
-skyGradient.addColorStop(1, '#F9FCFF');
+skyGradient.addColorStop(0, '#CFE2FA');
+skyGradient.addColorStop(0.55, '#E8F1FD');
+skyGradient.addColorStop(1, '#FBF7EE');
 skyContext.fillStyle = skyGradient;
-skyContext.fillRect(0, 0, 64, 256);
+skyContext.fillRect(0, 0, 256, 256);
+(() => {
+  // 멀리 보이는 건물 그림자와 구름 — 납작한 흰 벽처럼 보이지 않게 아주 연하게만.
+  skyContext.fillStyle = 'rgba(255,255,255,.55)';
+  for (const [x, y, r] of [[48, 54, 20], [66, 50, 26], [88, 56, 18], [172, 86, 16], [190, 82, 21], [208, 88, 14]]){
+    skyContext.beginPath(); skyContext.arc(x, y, r, 0, 7); skyContext.fill();
+  }
+  skyContext.fillStyle = 'rgba(150,170,195,.22)';
+  let x = -10;
+  while (x < 266){
+    const w = 16 + ((x * 37) % 23), h = 26 + ((x * 53) % 46);
+    skyContext.fillRect(x, 256 - h, w, h);
+    x += w + 4 + ((x * 17) % 9);
+  }
+  skyContext.fillStyle = 'rgba(120,145,175,.16)';
+  skyContext.fillRect(0, 232, 256, 24);          // 먼 지평선
+})();
 const skyTexture = new THREE.CanvasTexture(skyCanvas);
 skyTexture.colorSpace = THREE.SRGBColorSpace;
 const windowMat = new THREE.MeshBasicMaterial({ map: skyTexture });
@@ -554,12 +574,17 @@ function updateDroppedPapers(nowSec){
 const iconTextureCache = {};
 function getIconTexture(emoji){
   if (iconTextureCache[emoji]) return iconTextureCache[emoji];
-  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+  const cv = document.createElement('canvas'); cv.width = 96; cv.height = 96;
   const ctx = cv.getContext('2d');
-  ctx.clearRect(0,0,64,64);
-  ctx.font = '42px sans-serif';
+  ctx.clearRect(0,0,96,96);
+  // 생각풍선: 하얀 동그라미 + 작은 꼬리 방울. 아이콘만 띄우면 '떠 있는 컵'처럼 보인다(3바퀴 지적).
+  ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.strokeStyle = 'rgba(120,100,80,.45)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(48, 40, 33, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(31, 76, 8, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(20, 90, 4.5, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.font = '38px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, 32, 34);
+  ctx.fillText(emoji, 48, 42);
   const tex = new THREE.CanvasTexture(cv);
   iconTextureCache[emoji] = tex;
   return tex;
@@ -567,7 +592,7 @@ function getIconTexture(emoji){
 function makeThoughtSprite(){
   const mat = new THREE.SpriteMaterial({ map: null, transparent: true, depthTest: false });
   const spr = new THREE.Sprite(mat);
-  spr.scale.set(0.34, 0.34, 1);
+  spr.scale.set(0.40, 0.40, 1);
   spr.visible = false;
   scene.add(spr);
   return spr;
@@ -688,7 +713,9 @@ const LAYOUT_SLOTS_BY_CAM = {
 // v8g: 일곱이 저마다 자기 책상·화면 쪽으로 몸을 돌려 앉는다(2208 ①-1).
 // 얼굴이 보여야 귀여우니 카메라 축에서 25~55°만 돌린다 — 90°면 옆얼굴만 남는다.
 // 순서는 FRIEND_ORDER(도토리·밤·땅콩·병아리·완두콩·해바라기씨·쌀)와 같다.
-const SEAT_YAW_DEG = [-34, 41, 26, 52, -29, -46, 33];
+// 0010 답 2: 안경은 정본이라 그대로 두고, **머리 밖으로 떨어져 보이지 않는 각도**까지만 돌린다.
+// 병아리콩(둥근 안경)은 많이 돌리면 먼 쪽 알이 머리 테두리 밖으로 나간다 — 실측해서 각도를 낮췄다.
+const SEAT_YAW_DEG = [-34, 41, 26, 28, -29, -46, 33];
 const LAYOUT_SLOTS = (LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered)
   .map((slot, i) => VARIANT === 'f' ? slot : {...slot, yaw: THREE.MathUtils.degToRad(SEAT_YAW_DEG[i])});
 // 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다.
@@ -846,10 +873,30 @@ function lerpAngle(a, b, t){
   return a + diff*t;
 }
 
+// 0010 답 5: 정본 색상표대로 — **GLB 파일은 건드리지 않고** 불러온 재질의 색만 바꾼다.
+// 밤 몸 #BA511F · 그늘 #7D300E · 밝은 #E27941 · 아래 베이지 띠(Belly)는 그대로 둔다.
+// 화면에는 대비 1.12·채도 1.10 보정이 걸려 있어서, 재질에 정본 색을 그대로 넣으면
+// 화면에서는 더 붉고 진하게 나온다(실측: #BA511F 넣으면 화면 (210,63,2)).
+// 그래서 **화면 결과가 정본 #BA511F 가 되도록** 보정을 되돌린 값을 넣는다(아래 결과에 실측 기록).
+const CANON_MATERIAL_COLOR = {
+  bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다)
+};
+function applyCanonColors(key, model){
+  const table = CANON_MATERIAL_COLOR[key];
+  if (!table) return;
+  model.traverse(o => {
+    const want = o.isMesh ? table[o.name] : undefined;
+    if (want === undefined) return;
+    for (const material of [o.material].flat()) material.color.setHex(want);
+  });
+}
+
 function createActor(key, slot){
   const def = FRIEND_DEFS[key];
   const tmpl = templates[key];
   const model = tmpl.clone(true);
+  model.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone(); });
+  applyCanonColors(key, model);
   const wrapper = new THREE.Group();
   const visualRoot = new THREE.Group();
   visualRoot.scale.setScalar(COMPOSITION.actorScale);
@@ -921,7 +968,10 @@ function setFriendCount(n){
     actor.monScreenMat = deskGroup.userData.monScreenMat;
     // v8g: 앉는 높이는 의자 모델을 실제로 재서 얻은 값(v8-office 에서 광선으로 잼).
     actor.deskGroup = deskGroup;
-    actor.seatY = COMPOSITION.seated ? (deskGroup.userData.seatY || 0) : 0;
+    // 키 작은 친구(완두콩 3알)는 방석을 깔고 앉은 것처럼 조금 높인다 —
+    // 안 그러면 몸 아래쪽이 책상 상판 뒤로 묻혀 '책상 속에 있다'로 보인다(3바퀴 불통).
+    const SEAT_LIFT = { wandukong3: 0.20 };
+    actor.seatY = COMPOSITION.seated ? ((deskGroup.userData.seatY || 0) + (SEAT_LIFT[actor.key] || 0)) : 0;
     actor.wrapper.position.y = actor.seatY;
     actor.idleYaw = actor.deskYaw;
     actor.facing = actor.deskYaw;              // 첫 프레임부터 제 책상을 본다(0도에서 돌아오지 않게)
@@ -1021,6 +1071,7 @@ function damp(current, goal, rate, dt){ return current + (goal - current) * (1 -
 const IDLE_ACTIONS = {
   working:   {dur:[4.5, 8]},
   lookAside: {dur:[2.2, 3.6]},
+  lookFront: {dur:[2.6, 3.2]},   // 장난 끝나고 손님 돌아보기(전투 후). 스스로 고르지는 않는다.
   stretch:   {dur:[2.4, 3.4]},
   yawn:      {dur:[2.6, 3.6]},
   chairSpin: {dur:[3.2, 4.6]},
@@ -1084,8 +1135,18 @@ function idlePose(a, t){
     case 'chairSpin': {
       // 바퀴 의자를 한쪽으로 쭉 돌렸다가 돌아오기. 한 바퀴를 다 돌면 등받이가
       // 얼굴을 가려 안 귀여우므로 100° 정도까지만 돌린다.
-      g.yawOffset = (a.spinDir || 1) * 1.75 * arc(u, 0.4, 0.4);
+      g.yawOffset = clampFacingToCamera(a, (a.spinDir || 1) * 1.75) * arc(u, 0.4, 0.4);
       g.tiltZ = (a.spinDir || 1) * Math.sin(u*Math.PI)*0.07;
+      break;
+    }
+    case 'lookFront': {
+      // 0010 답 1: 장난이 끝나면 손님을 돌아보며 뿌듯하게 — 전투 '후'에 얼굴이 보이는 순간.
+      const toCamera = Math.atan2(camera.position.x - a.homePos.x, camera.position.z - a.homePos.z);
+      let d = ((toCamera - a.deskYaw + Math.PI) % (Math.PI*2)) - Math.PI;
+      if (d < -Math.PI) d += Math.PI*2;
+      g.yawOffset = d * arc(u, 0.25, 0.4);
+      g.tiltX = 0.05 * arc(u, 0.25, 0.4);
+      g.lift = Math.abs(Math.sin(t*3 + a.phase)) * 0.02;
       break;
     }
     case 'quirk': quirkPose(a, t, g); break;
@@ -1254,6 +1315,19 @@ function beginVisit(a, kind){
 }
 
 // 옆 친구를 돌아볼 때 몇 도를 돌면 되는지(자기 책상 각도 기준).
+// 평소에 얼굴이 보여야 하므로, 자리에서 돌아보는 각도는 '손님(카메라) 축에서 ±MAX' 안으로 자른다.
+const FACE_LIMIT = THREE.MathUtils.degToRad(80);
+// 안경을 '쓴' 친구는 많이 돌리면 먼 쪽 알이 머리 테두리 밖으로 나간다(3바퀴 불통). 더 좁게 자른다.
+const FACE_LIMIT_BY_KEY = { byeongari: THREE.MathUtils.degToRad(42) };
+function clampFacingToCamera(a, offset){
+  const toCamera = Math.atan2(camera.position.x - a.homePos.x, camera.position.z - a.homePos.z);
+  const wrap = x => { let v = ((x + Math.PI) % (Math.PI*2)) - Math.PI; if (v < -Math.PI) v += Math.PI*2; return v; };
+  const off = wrap(a.deskYaw + offset - toCamera);
+  const limit = FACE_LIMIT_BY_KEY[a.key] ?? FACE_LIMIT;
+  const limited = THREE.MathUtils.clamp(off, -limit, limit);
+  return wrap(toCamera + limited - a.deskYaw);
+}
+
 // 다음에 누군가 자리를 비워도 되는 시각(초). 늘 누군가 돌아다니지 않게 한다.
 let nextTripAllowedAt = 6;
 function lookOffsetToNeighbour(a){
@@ -1267,7 +1341,8 @@ function lookOffsetToNeighbour(a){
                           other.wrapper.position.z - a.wrapper.position.z);
   let d = ((want - a.deskYaw + Math.PI) % (Math.PI*2)) - Math.PI;
   if (d < -Math.PI) d += Math.PI*2;
-  return THREE.MathUtils.clamp(d, -1.25, 1.25);   // 몸을 완전히 틀지는 않는다(얼굴이 보여야 함)
+  // 0010: 돌아본 **최종** 각도가 손님 쪽에서 85°를 넘으면 뒤통수가 된다 — 거기서 자른다.
+  return clampFacingToCamera(a, d);
 }
 
 function tickUtilityAI(a, dt, t){
@@ -1373,12 +1448,19 @@ function updateBrainPanel(){
   rowsEl.innerHTML = html;
 }
 
+let lastFrameId=null;
 function renderLoop(){
   requestAnimationFrame(renderLoop);
   const rawDt=clock.getDelta();
   if(document.hidden)return;
   const dt=Math.min(.15,rawDt),t=clock.elapsedTime,nowSec=performance.now()/1000;
   const frame=v8.update(dt,t,rawDt,currentLevel,nowSec);
+  if(frame.id==='work' && lastFrameId && lastFrameId!=='work' && !v8.preview){
+    // 장난이 끝나고 평소로 돌아온 순간 — 다 같이 손님을 한 번 돌아본다(답 1 '전투 후').
+    actors.forEach((a,i)=>{a.action='lookFront';a.lastAction='lookFront';a.actionT=-i*0.12;
+      a.actionDur=2.8;a.nextTickAt=3.2+i*0.12;});
+  }
+  lastFrameId=frame.id;
   for(const a of actors){
     a.actionT+=dt;
     if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);applyPose(a,dt);if(a.weapon)a.weapon.visible=false;}
