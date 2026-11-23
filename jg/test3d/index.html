@@ -155,7 +155,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
 import { FilesetResolver, FaceDetector, ObjectDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 
-const VERSION = '2026-11-23-8f';
+const VERSION = '2026-11-23-8g';
 // ---- v8f: 화면(카메라) 각도 단계. 사장님 11/23 13:10 "여기서 화면 각도를 아래로좀 내려봐
 //      카메라가 정면을 바라볼거야" — 내려다보는 각(pitch)만 낮추고 다른 구도 값은 그대로 둔다.
 //      ?cam=0 v8e 그대로(되돌리기·비교) · ?cam=1 조금 내림 · ?cam=2 많이 내림(거의 정면, 기본).
@@ -168,8 +168,17 @@ const CAMERA_LEVEL = (() => {
   const asked = new URLSearchParams(location.search).get('cam');
   return Object.prototype.hasOwnProperty.call(CAMERA_LEVELS, asked) ? asked : '2';
 })();
+// ---- v8g: 사장님 11/23 22:03 "하나도 안귀엽고 하나도 자연스럽지가 않아" · 22:07 "다 정면만
+//      보고일하고있는데 움직임도 자연스러워야지" → 자기 의자에 앉아 자기 화면을 보고,
+//      저마다 다른 동작을 한다. 11/22 "애들이 너무크고" 에 맞춰 친구를 줄이고 책상·의자를 키웠다.
+//      `?ver=f` 면 v8f(66cd66a) 비율·자세 그대로 — 되돌려 보기용.
+const VARIANT = new URLSearchParams(location.search).get('ver') === 'f' ? 'f' : 'g';
+// fitX·fitY = 화면 가로·세로를 얼마나 채울지(1에 가까울수록 더 당겨 본다).
+const SHAPE = VARIANT === 'f'
+  ? {actorScale:1.65, deskScale:1.20, seated:false, fitX:0.90, fitY:0.88}  // v8f 그대로
+  : {actorScale:1.20, deskScale:1.30, seated:true,  fitX:0.97, fitY:0.94}; // v8g 자기 의자에 앉음
 // Display transforms only: the canonical GLBs and their proportions stay intact.
-const COMPOSITION = {actorScale:1.65, deskScale:1.2, camLevel:CAMERA_LEVEL, ...CAMERA_LEVELS[CAMERA_LEVEL]};
+const COMPOSITION = {...SHAPE, variant:VARIANT, camLevel:CAMERA_LEVEL, ...CAMERA_LEVELS[CAMERA_LEVEL]};
 
 // ===================================================================================
 // §0. v8e: 정적 베이크 + Lambert · 단일 그리기 · 충돌 회피 · 감지 Worker 분리.
@@ -676,10 +685,23 @@ const LAYOUT_SLOTS_BY_CAM = {
     { dx: 0.60, dz:-4.20, yaw: Math.PI, row:'back' },
   ],
 };
-const LAYOUT_SLOTS = LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered;
-// 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다. 그 자리를 옮긴 만큼 바주카 자리도 옮긴다.
+// v8g: 일곱이 저마다 자기 책상·화면 쪽으로 몸을 돌려 앉는다(2208 ①-1).
+// 얼굴이 보여야 귀여우니 카메라 축에서 25~55°만 돌린다 — 90°면 옆얼굴만 남는다.
+// 순서는 FRIEND_ORDER(도토리·밤·땅콩·병아리·완두콩·해바라기씨·쌀)와 같다.
+const SEAT_YAW_DEG = [-34, 41, 26, 52, -29, -46, 33];
+const LAYOUT_SLOTS = (LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered)
+  .map((slot, i) => VARIANT === 'f' ? slot : {...slot, yaw: THREE.MathUtils.degToRad(SEAT_YAW_DEG[i])});
+// 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다.
+// v8f 까지는 주인 자리를 따라 옮겼는데, 쌀은 바주카가 바로 뒤에 서서 화면에서 겹쳐 보였다.
+// v8g 는 양쪽 끝 빈자리(친구 화면 칸 밖)에 세워 두고, 가지러 갈 때만 앞으로 끌고 나온다.
 const LAUNCHER_OWNER_SLOTS = [3, 6];
-const LAUNCHER_SHIFT = LAUNCHER_OWNER_SLOTS.map(i => LAYOUT_SLOTS[i].dx - LAYOUT_SLOTS_BY_CAM['0'][i].dx);
+const LAUNCHER_SPOTS = VARIANT === 'f'
+  ? {parked:[[-8 + (LAYOUT_SLOTS[3].dx - LAYOUT_SLOTS_BY_CAM['0'][3].dx), 3.1],
+             [ 0 + (LAYOUT_SLOTS[6].dx - LAYOUT_SLOTS_BY_CAM['0'][6].dx), -6.2]],
+     deployed:[[-8 + (LAYOUT_SLOTS[3].dx - LAYOUT_SLOTS_BY_CAM['0'][3].dx), -0.8],
+               [ 0 + (LAYOUT_SLOTS[6].dx - LAYOUT_SLOTS_BY_CAM['0'][6].dx), -6.8]]}
+  // 쏘는 자리도 화면에서 다른 친구 칸과 겹치지 않는 곳으로 — 8.0,-0.8 은 해바라기씨와 같은 칸이었다.
+  : {parked:[[-10.5, 3.0], [10.5, 3.0]], deployed:[[-8.0, -0.8], [9.5, 2.6]]};
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -703,7 +725,7 @@ const deskMats = {
 const BONUS_PROP = [null, 'mug', null, 'plant', null, 'mug', null];
 
 function buildDeskForSlot(pos, yaw, bonus, characterKey){
-  const furnished=v8.office.desk({pos,yaw,bonus,key:characterKey,deskScale:COMPOSITION.deskScale});
+  const furnished=v8.office.desk({pos,yaw,bonus,key:characterKey,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated});
   if(furnished){furnished.userData.cc0=true;return furnished;}
   const g = new THREE.Group();
   g.userData.isDesk = true;
@@ -850,7 +872,7 @@ function createActor(key, slot){
   const thoughtSprite = makeThoughtSprite();
 
   const actor = {
-    key, def, wrapper, visualRoot, model, shadow, homePos, deskYaw: slot.yaw,
+    key, def, wrapper, visualRoot, model, shadow, homePos, deskYaw: slot.yaw, slotIndex: slot.index,
     phase: Math.random()*Math.PI*2,
     needs: { work: Math.random()*1.5, rest: Math.random()*1.2, chat: Math.random(), coffee: Math.random() },
     action: 'working', lastAction: null, actionT: 0, nextTickAt: 1 + Math.random()*2,
@@ -883,10 +905,12 @@ function setFriendCount(n){
   friendCount = n;
   clearActors();
   LAYOUT_SLOTS.forEach((slot, i) => {
+    slot.index = i;
     const homePos = new THREE.Vector3(slot.dx, 0, slot.dz);
     const deskGroup = buildDeskForSlot(homePos, slot.yaw, BONUS_PROP[i % BONUS_PROP.length],FRIEND_ORDER[i]);
     deskGroup.userData.slotIndex = i;
     deskGroup.userData.row = slot.row;
+    deskGroup.userData.ownerKey = FRIEND_ORDER[i];   // 자기 책상은 자기에게 막힘이 아니다
     const oldScreen=deskGroup.userData.monScreenMat;let screen;
     deskGroup.traverse(o=>{if(o.isMesh && o.material===oldScreen)screen=o;});
     if(!deskGroup.userData.cc0)v8.office.upgradeTree(deskGroup);
@@ -895,6 +919,13 @@ function setFriendCount(n){
     if (i >= n) return;
     const actor = createActor(FRIEND_ORDER[i], slot);
     actor.monScreenMat = deskGroup.userData.monScreenMat;
+    // v8g: 앉는 높이는 의자 모델을 실제로 재서 얻은 값(v8-office 에서 광선으로 잼).
+    actor.deskGroup = deskGroup;
+    actor.seatY = COMPOSITION.seated ? (deskGroup.userData.seatY || 0) : 0;
+    actor.wrapper.position.y = actor.seatY;
+    actor.idleYaw = actor.deskYaw;
+    actor.facing = actor.deskYaw;              // 첫 프레임부터 제 책상을 본다(0도에서 돌아오지 않게)
+    actor.wrapper.rotation.y = actor.deskYaw;
     actors.push(actor);
   });
   actors.forEach((a, i) => { a.partnerIndex = (i+1) % actors.length; });
@@ -954,8 +985,8 @@ function updateCameraFraming(n){
     const depthOffset = dy * sin + dz * cos;
     const viewY = dy * cos - dz * sin;
     distance = Math.max(distance,
-      Math.abs(point.x - target.x) / (Math.tan(halfHFOV) * 0.90) + depthOffset,
-      Math.abs(viewY) / (Math.tan(halfVFOV) * 0.88) + depthOffset);
+      Math.abs(point.x - target.x) / (Math.tan(halfHFOV) * COMPOSITION.fitX) + depthOffset,
+      Math.abs(viewY) / (Math.tan(halfVFOV) * COMPOSITION.fitY) + depthOffset);
   }
   camera.position.set(target.x, target.y + distance * sin, target.z + distance * cos);
   camera.lookAt(target);
@@ -978,31 +1009,111 @@ new ResizeObserver(onResize).observe(document.getElementById('stageWrap'));
 // §3. 행동 — 뼈대 없이 몸 전체 변형 + 실제 위치 이동만 사용(팔 없음 제약 그대로).
 //    두뇌(욕구 점수)는 tickUtilityAI가 3~6초(또는 이동 끝난 뒤)마다 행동을 고름 — §4 두뇌 보기에 표시.
 // ===================================================================================
-function applyWorkingBounce(a, t){
-  const bob = Math.abs(Math.sin(t*9 + a.phase)) * 0.03;
-  a.wrapper.position.set(a.homePos.x, bob, a.homePos.z);
-  a.wrapper.rotation.z = Math.sin(t*9 + a.phase) * 0.03;
-  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.08);
-  a.wrapper.rotation.x = lerpAngle(a.wrapper.rotation.x, 0, 0.1);
-}
-function applyDozing(a, t){
-  a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
-  a.wrapper.rotation.z = 0.28 + Math.sin(t*0.8 + a.phase) * 0.05;
-  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.06);
-}
-function applyQuirk(a, t){
-  a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
-  a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, a.deskYaw, 0.08);
+// ---- v8g 자세층 -------------------------------------------------------------
+// 행동은 "이렇게 있고 싶다"(목표 자세)만 말하고, 실제 몸은 그 목표를 **부드럽게 따라간다**.
+// 2208 ③ "동작 사이 이어짐이 뚝뚝 끊기지 않게". 지수 감쇠라 프레임이 흔들려도 속도가 같다.
+// 몸통 기울기·늘이기는 visualRoot 에만 건다 — wrapper 의 x·z·회전은 이동 담당(v8-runtime)이 쓴다.
+const POSE_RATE = {lift:9, tilt:7, squash:6, seat:7};
+function damp(current, goal, rate, dt){ return current + (goal - current) * (1 - Math.exp(-rate*dt)); }
+
+// 평소 동작표 — 저마다 다르게, 같은 걸 동시에 하지 않게(2208 ①-2).
+// trip 이 있는 것만 자리를 비운다(한 번에 한 명).
+const IDLE_ACTIONS = {
+  working:   {dur:[4.5, 8]},
+  lookAside: {dur:[2.2, 3.6]},
+  stretch:   {dur:[2.4, 3.4]},
+  yawn:      {dur:[2.6, 3.6]},
+  chairSpin: {dur:[3.2, 4.6]},
+  drawer:    {trip:'drawer'},
+  quirk:     {dur:[3.5, 5.5]},
+  coffee:    {trip:'coffee'},
+  chatting:  {trip:'chat'},
+  carrying:  {trip:'carry'},
+  shelf:     {trip:'shelf'},
+};
+const smooth01 = x => { x = Math.min(1, Math.max(0, x)); return x*x*(3-2*x); };
+// 0 → 1 → 0 (들어갔다 나오는 한 박자)
+const arc = (u, rise = 0.25, fall = 0.25) =>
+  u < rise ? smooth01(u/rise) : u > 1-fall ? smooth01((1-u)/fall) : 1;
+
+// 친구 성격대로 작은 버릇 하나씩(원본 그림은 그대로, 자세만 바뀐다).
+function quirkPose(a, t, g){
   switch(a.key){
-    case 'dotori': a.wrapper.rotation.z = Math.sin(t*5 + a.phase) * 0.1; break; // 단어 고르는 갸웃
-    case 'ddangkong': a.wrapper.rotation.x = -0.14 + Math.sin(t*2 + a.phase) * 0.06; break; // 돋보기 품평
-    case 'bam': a.wrapper.position.y = Math.abs(Math.sin(t*4.5 + a.phase)) * 0.04; break; // 상자 톡톡 정리
-    case 'byeongari': a.wrapper.rotation.z = -0.08 + Math.sin(t*3 + a.phase) * 0.12; break; // 편지 들어보이기
-    case 'wandukong3': a.wrapper.position.y = Math.abs(Math.sin(t*6 + a.phase)) * 0.025; break; // 촬영 자세
-    case 'haebaragi': a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.PI, 0.02); break; // 태연히 창밖
-    case 'ssal': a.wrapper.rotation.x = Math.sin(t*2 + a.phase) * 0.09; break; // 차 홀짝
+    case 'dotori':     g.tiltZ = Math.sin(t*2.6 + a.phase)*0.11; break;                 // 낱말 고르며 갸웃
+    case 'ddangkong':  g.tiltX = -0.13 + Math.sin(t*1.6 + a.phase)*0.05; break;         // 돋보기 들여다보기
+    case 'bam':        g.lift  = Math.abs(Math.sin(t*3.2 + a.phase))*0.035; break;      // 상자 톡톡
+    case 'byeongari':  g.tiltZ = -0.07 + Math.sin(t*2.2 + a.phase)*0.13; break;         // 편지 들어 보이기
+    case 'wandukong3': g.lift  = Math.abs(Math.sin(t*4.2 + a.phase))*0.03;
+                       g.squash = 1 + Math.sin(t*4.2 + a.phase)*0.03; break;            // 찰칵 자세
+    case 'haebaragi':  g.yawOffset = 0.5 + Math.sin(t*0.5 + a.phase)*0.12; break;       // 느긋하게 창 쪽
+    case 'ssal':       g.tiltX = 0.06 + Math.sin(t*1.5 + a.phase)*0.07; break;          // 차 홀짝
     default: break;
   }
+}
+
+// 지금 행동이 바라는 자세. 숫자는 라디안·미터(아주 작은 값들).
+function idlePose(a, t){
+  const g = {lift:0, tiltX:0, tiltZ:0, squash:1, yawOffset:0, seated:true};
+  const u = a.actionDur > 0 ? Math.min(1, a.actionT / a.actionDur) : 1;
+  switch(a.action){
+    case 'working': {
+      // 화면 쪽으로 살짝 숙이고 자판 치는 작은 들썩임.
+      g.tiltX = -0.07 + Math.sin(t*7.5 + a.phase)*0.018;
+      g.lift = Math.abs(Math.sin(t*7.5 + a.phase))*0.012;
+      g.tiltZ = Math.sin(t*3.6 + a.phase)*0.012;
+      break;
+    }
+    case 'lookAside': {
+      // 옆 친구를 돌아봤다가 다시 화면으로. 고개만 홱 돌리지 않게 arc 로 들어갔다 나온다.
+      g.yawOffset = (a.lookYawOffset || 0) * arc(u, 0.3, 0.35);
+      g.tiltX = -0.02;
+      g.tiltZ = Math.sin(t*2 + a.phase)*0.02;
+      break;
+    }
+    case 'stretch': {
+      // 기지개 — 쭉 늘이며 뒤로 젖혔다가 돌아온다.
+      const k = arc(u, 0.35, 0.3);
+      g.squash = 1 + 0.10*k; g.tiltX = 0.18*k; g.lift = 0.045*k;
+      break;
+    }
+    case 'yawn': {
+      const k = arc(u, 0.3, 0.4);
+      g.tiltX = 0.13*k; g.squash = 1 + 0.05*k; g.tiltZ = 0.04*k;
+      break;
+    }
+    case 'chairSpin': {
+      // 바퀴 의자를 한쪽으로 쭉 돌렸다가 돌아오기. 한 바퀴를 다 돌면 등받이가
+      // 얼굴을 가려 안 귀여우므로 100° 정도까지만 돌린다.
+      g.yawOffset = (a.spinDir || 1) * 1.75 * arc(u, 0.4, 0.4);
+      g.tiltZ = (a.spinDir || 1) * Math.sin(u*Math.PI)*0.07;
+      break;
+    }
+    case 'quirk': quirkPose(a, t, g); break;
+    default: break;   // 이동 중(coffee·chat·carry·shelf)은 updateMovement 가 채운다
+  }
+  return g;
+}
+
+// 목표 자세를 실제 몸에 부드럽게 입힌다.
+function applyPose(a, dt){
+  const g = a.poseGoal || {lift:0, tiltX:0, tiltZ:0, squash:1, yawOffset:0, seated:true};
+  const seatTarget = (COMPOSITION.seated && g.seated) ? 1 : 0;
+  a.poseSeat   = damp(a.poseSeat ?? seatTarget, seatTarget, POSE_RATE.seat, dt);
+  a.poseLift   = damp(a.poseLift ?? 0, g.lift, POSE_RATE.lift, dt);
+  a.poseTiltX  = damp(a.poseTiltX ?? 0, g.tiltX, POSE_RATE.tilt, dt);
+  a.poseTiltZ  = damp(a.poseTiltZ ?? 0, g.tiltZ, POSE_RATE.tilt, dt);
+  a.poseSquash = damp(a.poseSquash ?? 1, g.squash, POSE_RATE.squash, dt);
+  a.seatBlend = a.poseSeat;   // 전투로 넘어갈 때 이 높이에서 이어받는다
+  const duck = DUCK_DEPTH * (0.92 + (a.phase % 1) * 0.16) * a.hideAmt;
+  a.wrapper.position.y = (a.seatY || 0) * a.poseSeat + a.poseLift - duck;
+  a.visualRoot.rotation.x = a.poseTiltX;
+  a.visualRoot.rotation.z = a.poseTiltZ;
+  const base = COMPOSITION.actorScale;
+  a.visualRoot.scale.set(base, base * a.poseSquash * (1 - a.hideAmt*0.12), base);
+  a.idleYaw = a.deskYaw + (g.yawOffset || 0);
+  // 앉아 있는 바퀴 의자는 주인을 따라 돈다.
+  const chair = a.deskGroup?.userData?.chair;
+  if (chair) chair.rotation.y = damp(chair.rotation.y, (g.yawOffset || 0) * a.poseSeat, POSE_RATE.tilt, dt);
 }
 function updateMovement(a, dt, t){
   if (a.movePhase === 'going' || a.movePhase === 'returning'){
@@ -1010,34 +1121,34 @@ function updateMovement(a, dt, t){
     const prog = a.moveDur > 0 ? Math.min(1, a.moveElapsed/a.moveDur) : 1;
     const from = a.movePhase === 'going' ? a.moveFrom : a.moveTo;
     const to   = a.movePhase === 'going' ? a.moveTo   : a.moveFrom;
-    const eased = prog < 0.5 ? 2*prog*prog : 1 - Math.pow(-2*prog+2, 2)/2;
-    const pos = from.clone().lerp(to, eased);
-    const hop = Math.abs(Math.sin(t*8 + a.phase)) * 0.06;
-    a.wrapper.position.set(pos.x, hop, pos.z);
-    const dir = to.clone().sub(from);
-    if (dir.lengthSq() > 1e-6){
-      a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.atan2(dir.x, dir.z), 0.22);
-    }
+    // 실제 x·z 는 이동 담당(v8-runtime)이 정한다. 여기서는 걷는 '모습'만 만든다.
+    const hop = Math.abs(Math.sin(t*8 + a.phase)) * 0.045;
+    a.poseGoal = {lift:hop, tiltX:-0.10, tiltZ:Math.sin(t*8 + a.phase)*0.05,
+      squash:1 - hop*0.25, yawOffset:0, seated:false, walking:true};
     if (prog >= 1){
       if (a.movePhase === 'going'){
         a.movePhase = 'busy'; a.busyT = 0;
         if (a.visitKind === 'carry'){ a.cargoMesh.visible = false; spawnDroppedPapers(a.moveTo); }
       } else {
         a.movePhase = 'idle';
-        a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
         a.action = 'working';
+        a.actionT = 0;
+        a.actionDur = 3 + Math.random()*3;
         a.nextTickAt = 1.4 + Math.random()*2;
       }
     }
   } else if (a.movePhase === 'busy'){
     a.busyT += dt;
-    const dur = a.visitKind === 'chat' ? 2.2 : 1.1;
-    const hop = Math.abs(Math.sin(t*7 + a.phase)) * 0.045;
-    a.wrapper.position.set(a.moveTo.x, hop, a.moveTo.z);
+    const dur = a.visitKind === 'chat' ? 2.2 : a.visitKind === 'drawer' ? 1.5 : 1.1;
+    const hop = Math.abs(Math.sin(t*5 + a.phase)) * 0.03;
+    let yawOffset = 0;
     if (a.visitKind === 'chat' && a.visitTargetActor){
       const dir = a.visitTargetActor.wrapper.position.clone().sub(a.wrapper.position);
-      if (dir.lengthSq() > 1e-6) a.wrapper.rotation.y = lerpAngle(a.wrapper.rotation.y, Math.atan2(dir.x, dir.z), 0.15);
+      if (dir.lengthSq() > 1e-6) a.lookYaw = Math.atan2(dir.x, dir.z);
     }
+    const bend = a.visitKind === 'drawer' ? -0.34 : a.visitKind === 'chat' ? 0.05 : -0.18;
+    a.poseGoal = {lift:hop, tiltX:bend, tiltZ:Math.sin(t*2.4 + a.phase)*0.05,
+      squash:a.visitKind === 'drawer' ? 0.94 : 1, yawOffset, seated:false, walking:false, lookYaw:a.lookYaw};
     if (a.busyT >= dur){
       a.movePhase = 'returning';
       a.moveElapsed = 0;
@@ -1063,18 +1174,15 @@ function applyFleeing(a, t, dt){
   a.wrapper.rotation.z = jitter * 2;
 }
 function applyReturnToNormal(a, dt){
+  // 숨었다가 돌아오는 양만 센다 — 높이·기울기·크기는 자세층(applyPose)이 한 곳에서 맡는다.
   a.hideAmt = Math.max(0, a.hideAmt - dt*2.4);
-  const duck = DUCK_DEPTH * (0.92 + (a.phase % 1) * 0.16);
-  a.wrapper.position.y = -a.hideAmt*duck;
-  a.wrapper.scale.set(1, 1 - a.hideAmt*0.12, 1);
-  a.wrapper.rotation.x += (0 - a.wrapper.rotation.x) * 0.25;
-  a.wrapper.rotation.z += (0 - a.wrapper.rotation.z) * 0.25;
+  a.wrapper.scale.set(1, 1, 1);
 }
 
 // 사람이 멀어져 레벨이 0으로 돌아온 "그 순간" — 전원 자기 자리로 바로 되돌림(지시사항 그대로)
 function onReturnToIdle(){
   for (const a of actors){
-    a.wrapper.position.set(a.homePos.x, 0, a.homePos.z);
+    a.wrapper.position.set(a.homePos.x, (a.seatY || 0), a.homePos.z);
     a.wrapper.rotation.set(0, a.deskYaw, 0);
     a.wrapper.scale.set(1,1,1);
     a.hideAmt = 0;
@@ -1082,6 +1190,9 @@ function onReturnToIdle(){
     a.cargoMesh.visible = false;
     a.action = 'working';
     a.actionT = 0;
+    a.actionDur = 3 + Math.random()*3;
+    a.idleYaw = a.deskYaw;
+    a.poseGoal = null;
     a.nextTickAt = 1 + Math.random()*2;
   }
 }
@@ -1091,20 +1202,45 @@ function pickOtherActor(a){
   if (!others.length) return null;
   return others[Math.floor(Math.random()*others.length)];
 }
+// 찾아갈 땐 주인 책상 **반대쪽**, 손님(카메라) 쪽으로 비스듬히 선다.
+// 책상 뒤에 서면 모니터가 찾아간 친구 얼굴을 가린다(실측에서 걸렸다).
+function besideFriend(other, dist){
+  const side = other.deskYaw > 0 ? -1 : 1;
+  const ang = side * 0.95;
+  return other.homePos.clone().add(new THREE.Vector3(Math.sin(ang)*dist, 0, Math.cos(ang)*dist));
+}
 function beginVisit(a, kind){
   a.moveFrom = new THREE.Vector3(a.homePos.x, 0, a.homePos.z);
   let target = null;
   if (kind === 'carry'){
     const other = pickOtherActor(a);
     if (!other){ a.action = 'working'; return false; }
-    target = other.homePos.clone().addScaledVector(new THREE.Vector3(Math.sin(other.deskYaw+1.6),0,Math.cos(other.deskYaw+1.6)), 0.5);
+    target = besideFriend(other, 1.00);
     a.visitTargetActor = other;
     a.cargoMesh.visible = true;
   } else if (kind === 'chat'){
     const other = actors[a.partnerIndex];
     if (!other || other === a){ a.action = 'working'; return false; }
-    target = other.homePos.clone().addScaledVector(new THREE.Vector3(Math.sin(other.deskYaw+2.2),0,Math.cos(other.deskYaw+2.2)), 0.55);
+    target = besideFriend(other, 1.10);
     a.visitTargetActor = other;
+  } else if (kind === 'drawer'){
+    // 일어나 책상 옆 서랍으로 한 발. 책상 뒤에 선 채로 숙이면 모니터에 얼굴이 가린다.
+    // 어느 쪽으로 나갈지는 짐작하지 말고 **화면에서 옆 친구와 더 멀어지는 쪽**으로 고른다
+    // (한 발 나갔다가 옆 친구와 붙어 보이는 일이 실측에서 나왔다).
+    const screenX = v => { const q = v.clone(); q.y = 0.6; return q.project(camera).x; };
+    const others = actors.filter(o => o !== a).map(o => screenX(o.wrapper.position));
+    const pick = side => {
+      const t = a.homePos.clone().add(new THREE.Vector3(side*1.05, 0, 1.75));
+      return {t, gap: others.length ? Math.min(...others.map(o => Math.abs(o - screenX(t)))) : 1};
+    };
+    const left = pick(-1), right = pick(1);
+    target = (right.gap > left.gap ? right : left).t;
+    a.visitTargetActor = null;
+  } else if (kind === 'shelf'){
+    // 책장에 책 꽂으러 — 가까운 쪽 책장 앞으로(2208 ①-2 '책장 가기').
+    const side = a.homePos.x < 0 ? -1 : 1;
+    target = new THREE.Vector3(side*8.3 + (Math.random()-0.5)*0.6, 0, -3.5 + 1.35);
+    a.visitTargetActor = null;
   } else { // coffee
     target = COFFEE_SPOT.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0, 1.4));
     a.visitTargetActor = null;
@@ -1117,6 +1253,23 @@ function beginVisit(a, kind){
   return true;
 }
 
+// 옆 친구를 돌아볼 때 몇 도를 돌면 되는지(자기 책상 각도 기준).
+// 다음에 누군가 자리를 비워도 되는 시각(초). 늘 누군가 돌아다니지 않게 한다.
+let nextTripAllowedAt = 6;
+function lookOffsetToNeighbour(a){
+  const others = actors.filter(o => o !== a);
+  if (!others.length) return 0;
+  // 화면에서 가장 가까운 친구를 본다 — 멀리 있는 친구를 보면 그냥 딴 데 보는 것처럼 보인다.
+  others.sort((x, y) => a.wrapper.position.distanceToSquared(x.wrapper.position)
+                      - a.wrapper.position.distanceToSquared(y.wrapper.position));
+  const other = others[0];
+  const want = Math.atan2(other.wrapper.position.x - a.wrapper.position.x,
+                          other.wrapper.position.z - a.wrapper.position.z);
+  let d = ((want - a.deskYaw + Math.PI) % (Math.PI*2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI*2;
+  return THREE.MathUtils.clamp(d, -1.25, 1.25);   // 몸을 완전히 틀지는 않는다(얼굴이 보여야 함)
+}
+
 function tickUtilityAI(a, dt, t){
   if (a.movePhase !== 'idle'){ updateMovement(a, dt, t); return; }
   a.nextTickAt -= dt;
@@ -1125,42 +1278,58 @@ function tickUtilityAI(a, dt, t){
     a.needs.rest += a.needs.work > 3 ? 0.8 : 0.25;
     a.needs.chat += 0.3 + Math.random()*0.3;
     a.needs.coffee += 0.25 + Math.random()*0.25;
-    const canMove = actors.length > 1;
+    // 2208 ①-2: 같은 동작을 둘이 동시에 하지 않는다 · 2206 ①-2: 자리를 비우는 건 한 번에 한 명
+    //           (화면에서 친구끼리 겹쳐 보이는 일을 줄인다).
+    const busyNow = new Set(actors.filter(o => o !== a && o.movePhase === 'idle').map(o => o.action));
+    const someoneAway = actors.some(o => o !== a && o.movePhase !== 'idle');
+    // 자리를 비우는 건 가끔이어야 한다 — 늘 누군가 돌아다니면 빈 책상이 생겨
+    // "책상·의자가 비어 있다"(2206 총괄 지적 ①)로 보인다. 한 번에 한 명 + 쉬는 시간.
+    const canStep   = !someoneAway;                                              // 자기 책상 옆 한 발(서랍)
+    const canTravel = canStep && actors.length > 1 && t >= nextTripAllowedAt;    // 멀리 다녀오기
     const candidates = [
-      { k:'working', v:a.needs.work + Math.random()*0.4 },
-      { k:'dozing',  v:a.needs.rest + Math.random()*0.3 },
-      { k:'quirk',   v:0.7 + Math.random()*0.7 },
+      { k:'working',   v:a.needs.work + Math.random()*0.4 },
+      { k:'lookAside', v:0.9 + Math.random()*0.8 },
+      { k:'stretch',   v:a.needs.rest*0.7 + Math.random()*0.6 },
+      { k:'yawn',      v:a.needs.rest*0.6 + Math.random()*0.5 },
+      { k:'chairSpin', v:0.6 + Math.random()*0.8 },
+      { k:'quirk',     v:0.8 + Math.random()*0.8 },
     ];
-    if (canMove){
-      candidates.push({ k:'carrying', v:a.needs.work*0.4 + Math.random()*0.6 });
-      candidates.push({ k:'chatting', v:a.needs.chat + Math.random()*0.4 });
+    if (canStep) candidates.push({ k:'drawer', v:0.7 + Math.random()*0.7 });
+    if (canTravel){
+      candidates.push({ k:'carrying', v:0.25 + Math.random()*0.45 });
+      candidates.push({ k:'chatting', v:0.30 + Math.random()*0.50 });
+      candidates.push({ k:'coffee',   v:0.30 + Math.random()*0.50 });
+      candidates.push({ k:'shelf',    v:0.25 + Math.random()*0.45 });
     }
-    candidates.push({ k:'coffee', v:a.needs.coffee + Math.random()*0.4 });
-    // 지시사항: 같은 행동이 연속으로 반복되지 않게
-    const filtered = candidates.filter(c => c.k !== a.lastAction);
-    const pool = filtered.length ? filtered : candidates;
-    pool.sort((x,y)=>y.v-x.v);
-    const chosen = pool[0].k;
+    // 바로 전에 한 것·지금 남이 하는 것은 뺀다. 다 빠지면 그냥 일한다.
+    const free = candidates.filter(c => c.k !== a.lastAction && !busyNow.has(c.k));
+    const pool = free.length ? free : candidates.filter(c => c.k !== a.lastAction);
+    (pool.length ? pool : candidates).sort((x, y) => y.v - x.v);
+    const chosen = (pool.length ? pool : candidates)[0].k;
     a.lastAction = chosen;
     a.action = chosen;
     a.actionT = 0;
     if (chosen === 'working') a.needs.work = 0;
-    else if (chosen === 'dozing') a.needs.rest = 0;
+    else if (chosen === 'stretch' || chosen === 'yawn') a.needs.rest = 0;
     else if (chosen === 'chatting') a.needs.chat = 0;
     else if (chosen === 'coffee') a.needs.coffee = 0;
-    if (chosen === 'carrying' || chosen === 'chatting' || chosen === 'coffee'){
-      const ok = beginVisit(a, chosen === 'carrying' ? 'carry' : chosen === 'chatting' ? 'chat' : 'coffee');
+    if (chosen === 'lookAside') a.lookYawOffset = lookOffsetToNeighbour(a);
+    if (chosen === 'chairSpin' || chosen === 'drawer') a.spinDir = a.homePos.x < 0 ? -1 : 1;
+    const trip = IDLE_ACTIONS[chosen]?.trip;
+    if (trip){
+      a.actionDur = 0;
+      const ok = beginVisit(a, trip);
+      // 멀리 다녀오는 건 가끔만. 서랍은 자기 책상 옆이라 쉬는 시간을 걸지 않는다(한 번에 한 명 규칙만).
+      if (ok && trip !== 'drawer') nextTripAllowedAt = t + 16 + Math.random()*10;
       if (!ok) a.nextTickAt = 2 + Math.random()*2;
     } else {
-      a.nextTickAt = 3 + Math.random()*3;
+      const [lo, hi] = IDLE_ACTIONS[chosen]?.dur || [3, 6];
+      a.actionDur = lo + Math.random()*(hi - lo);
+      // 다음에 고를 때까지 조금 여유를 둬서 모두가 동시에 바뀌지 않게 한다.
+      a.nextTickAt = a.actionDur + Math.random()*1.2;
     }
   }
-  switch(a.action){
-    case 'dozing': applyDozing(a, t); break;
-    case 'quirk': applyQuirk(a, t); break;
-    case 'working': applyWorkingBounce(a, t); break;
-    default: break; // carrying/chatting/coffee는 movePhase가 'going'으로 이미 바뀐 뒤 updateMovement가 처리
-  }
+  if (a.movePhase === 'idle') a.poseGoal = idlePose(a, t);
 }
 
 // 모니터 화면 깜빡임(전원 공통, 가볍게) — "모니터 화면이 깜빡이는 효과"
@@ -1173,7 +1342,7 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,launcherShift:LAUNCHER_SHIFT,
+  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,
   getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
@@ -1212,11 +1381,13 @@ function renderLoop(){
   const frame=v8.update(dt,t,rawDt,currentLevel,nowSec);
   for(const a of actors){
     a.actionT+=dt;
-    if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);if(a.weapon)a.weapon.visible=false;}
+    if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);applyPose(a,dt);if(a.weapon)a.weapon.visible=false;}
     else if(frame.id==='lookup' && !v8.preview){applyLookup(a,t);if(a.weapon)a.weapon.visible=false;}
     else v8.animateActor(a,dt,t);
     a.shadow.position.set(a.wrapper.position.x,.01,a.wrapper.position.z);
-    a.shadow.scale.setScalar(Math.max(.3,1-Math.abs(a.wrapper.position.y)*3));
+    const contact = (a.seatY || 0) * (a.poseSeat ?? 0);          // 의자에 앉아 있으면 의자가 바닥에 닿아 있다
+    const lift = Math.max(0, a.wrapper.position.y - contact);
+    a.shadow.scale.setScalar(Math.max(.45, 1 - lift*2.2));
     updateThought(a);v8.updateEmotion(a,t);
   }
   v8.afterActors(t,nowSec,dt);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
@@ -1292,6 +1463,17 @@ window.__jgComposition = () => ({
     return { key: a.key, left: Math.min(...points.map(p => p.x)), right: Math.max(...points.map(p => p.x)),
       bottom: Math.min(...points.map(p => p.y)), top: Math.max(...points.map(p => p.y)) };
   }),
+});
+// v8g 검증용 읽기 전용 훅 — 앉은 높이·보는 방향·지금 동작.
+window.__jgSeat = (a) => ({
+  seatY: +(a.seatY || 0).toFixed(3),
+  seated: !!(a.poseSeat > 0.5),
+  deskYawDeg: +THREE.MathUtils.radToDeg(a.deskYaw).toFixed(1),
+  offScreenAxisDeg: +THREE.MathUtils.radToDeg(Math.abs(Math.atan2(
+    Math.sin(a.wrapper.rotation.y - Math.atan2(camera.position.x - a.wrapper.position.x,
+                                               camera.position.z - a.wrapper.position.z)),
+    Math.cos(a.wrapper.rotation.y - Math.atan2(camera.position.x - a.wrapper.position.x,
+                                               camera.position.z - a.wrapper.position.z))))).toFixed(1),
 });
 window.__jgFurniture = () => {
   const desks = scene.children.filter(o => o.userData.isDesk);

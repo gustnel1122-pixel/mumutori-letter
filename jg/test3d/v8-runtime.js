@@ -18,11 +18,12 @@ export function createV8(config){
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
   const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
   const mounts=[bazookaGroup,new THREE.Group()];scene.add(mounts[1]);
-  // 두 바주카는 각자 주인(병아리·쌀) 자리에 매여 있다. 자리를 옆으로 옮기면
-  // 세워 두는 곳·쏘는 곳도 같은 만큼 옮겨야 가지러 가는 지점이 책상에 막히지 않는다.
-  const launcherShift=config.launcherShift||[0,0];
-  const parked=[new THREE.Vector3(-8+launcherShift[0],propScale*.5,3.1),new THREE.Vector3(0+launcherShift[1],propScale*.5,-6.2)];
-  const deployed=[new THREE.Vector3(-8+launcherShift[0],propScale*.5,-.8),new THREE.Vector3(0+launcherShift[1],propScale*.5,-6.8)];
+  // 두 바주카는 각자 주인(병아리·쌀)이 가지러 간다. 세워 두는 곳은 화면에서 친구와
+  // 겹쳐 보이지 않는 양쪽 끝 빈자리로 둔다 — v8f 에서는 쌀 바로 뒤에 서 있어서
+  // 쌀이 바주카를 안고 있는 것처럼 보였다(2206 총괄 지적 ②).
+  const spots=config.launcherSpots||{parked:[[-8,3.1],[0,-6.2]],deployed:[[-8,-.8],[0,-6.8]]};
+  const parked=spots.parked.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
+  const deployed=spots.deployed.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
   const operators=['byeongari','ssal'];
   const flashMaterial=new THREE.MeshBasicMaterial({color:0xffe48b,transparent:true,opacity:.9});
   mounts.forEach((g,i)=>{
@@ -52,14 +53,24 @@ export function createV8(config){
     a.nextShot=0;a.flashUntil=0;a.held=false;a.pickupLogged=false;a.weapon=null;a.equipment=null;
     // Small equipment boxes share the desk footprint; they do not wall off
     // the walking aisles behind the seven workstations.
-    a.cratePosition=a.homePos.clone().add(new THREE.Vector3(Math.cos(a.deskYaw)*1.6,config.deskScale*.42,Math.cos(a.deskYaw)*.3));
-    a.pickupPosition=a.homePos.clone().add(new THREE.Vector3(0,0,.25));
+    // v8g: 책상이 친구 '앞'으로 바뀌었다 — 장비 상자도 그 책상 왼쪽 위에 놓는다.
+    const deskScale=config.deskScale||1,face=new THREE.Vector3(Math.sin(a.deskYaw),0,Math.cos(a.deskYaw));
+    const left=new THREE.Vector3(face.z,0,-face.x);
+    if(config.seated===false){   // ?ver=f 되돌리기 — v8f 자리 그대로
+      a.cratePosition=a.homePos.clone().add(new THREE.Vector3(Math.cos(a.deskYaw)*1.6,deskScale*.42,Math.cos(a.deskYaw)*.3));
+      a.pickupPosition=a.homePos.clone().add(new THREE.Vector3(0,0,.25));
+    }else{
+      a.cratePosition=a.homePos.clone()
+        .addScaledVector(face,.86*deskScale).addScaledVector(left,-.38*deskScale);
+      a.cratePosition.y=.42*deskScale;
+      a.pickupPosition=a.homePos.clone().addScaledVector(face,.30);
+    }
     a.weaponRest=a.cratePosition.clone().add(new THREE.Vector3(0,.35,0));
     const covers={dotori:[-9.5,-5.1],bam:[-7.6,-5.1],ddangkong:[-8.8,-7.3],byeongari:[-11.4,-5.1],wandukong3:[7.1,-5.1],haebaragi:[9.2,-7.3],ssal:[9.2,-5.1]};
     a.cover=new THREE.Vector3(covers[a.key][0],0,covers[a.key][1]);
     a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?2.2:-2.2;a.coverPeek.z+=1.2;
     const crate=office.assets.model('cardboardBoxOpen',[.65,.35,.55]);
-    if(crate){crate.position.copy(a.cratePosition);scene.add(crate);a.crate=crate;}
+    if(crate){crate.position.copy(a.cratePosition);crate.userData.ownerKey=a.key;scene.add(crate);a.crate=crate;}
     const item=a.def.canThrow?makePeaGun():office.assets.model('cardboardBoxClosed',[.18,.16,.14]);
     if(item){
       item.scale.multiplyScalar(a.def.canThrow?actorScale*1.35:actorScale);scene.add(item);a.equipment=item;
@@ -144,7 +155,10 @@ export function createV8(config){
     a.wrapper.position.copy(a.homePos);a.wrapper.scale.set(1,1,1);a.wrapper.rotation.set(0,0,0);a.wrapper.visible=true;a.cargoMesh.visible=false;
     a.action=id;a.movePhase='idle';a.gunActive=id==='gun' && a.fireIndex%2===(frame.progress<.5?0:1);
     a.motionGoal=a.homePos;
-    if(emotionOverride)return;
+    // v8g: 평소엔 의자에 앉아 있다 — 손님을 보고 일어서는 동안 높이를 서서히 내린다
+    // (갑자기 바닥으로 뚝 떨어지지 않게). 감정 미리보기는 평소 장면이라 앉은 채로 둔다.
+    a.seatBlend=emotionOverride?1:Math.max(0,(a.seatBlend??1)-dt*3.2);
+    if(emotionOverride){a.wrapper.position.y+=(a.seatY||0)*a.seatBlend;a.visualRoot.rotation.set(0,0,0);return;}
     if(id==='notice'){
       const u=clamp(frame.age/.35,0,1);a.wrapper.rotation.y=(i%2?1:-1)*Math.sin(u*Math.PI)*.25;
       a.wrapper.scale.y=1-.08*u;a.wrapper.rotation.x=-.12*u;a.wrapper.position.y=Math.sin(u*Math.PI)*p.hop;
@@ -164,6 +178,7 @@ export function createV8(config){
       if(['throw','gun'].includes(id)){const beat=Math.max(0,Math.sin(phase*7));a.wrapper.position.y=beat*p.hop*.35;a.wrapper.rotation.x-=beat*.10;}
       if(id==='mess')a.wrapper.position.y=Math.abs(Math.sin(phase*4))*p.hop*.5;
       const operator=operators.indexOf(a.key);
+      if(operator<0 && ['ready','throw','gun','fetch','bazooka','mess'].includes(id))a.motionGoal=battleStation(a);
       if(operator>=0 && ['fetch','bazooka','mess'].includes(id)){
         const dock=parked[operator].clone().add(new THREE.Vector3(0,-parked[operator].y,1.8));
         const firing=deployed[operator].clone().add(new THREE.Vector3(0,-deployed[operator].y,1.8));
@@ -189,11 +204,21 @@ export function createV8(config){
       a.motionGoal=turnToMove(a,true)?a.homePos:a.cover;
       walk(a,a.coverPeek,a.homePos,clamp((frame.age-(i%3)*.12)/2.5,0,1),t);
     }
+    a.wrapper.position.y+=(a.seatY||0)*a.seatBlend;
   }
   function updateEmotion(a,t){
     const name=frame.active?frame.emotion:emotionOverride || (a.action==='dozing'?'tired':'working');
     a.emotionRig?.update(name,t,frame.active,frame.id==='notice'?'notice':null);
     if(frame.active || emotionOverride)a.thoughtSprite.visible=false;
+  }
+  // 전투 자리 = 자기 자리에서 손님 쪽으로 한 발. 자리 간격은 그대로라 서로 더 가까워지지 않는다.
+  const stations=new Map();
+  function battleStation(a){
+    if(config.seated===false)return a.homePos;
+    let s=stations.get(a.key);
+    // 책상은 자리에서 앞으로 1.17, 깊이 0.39 — 그보다 더 손님 쪽으로 나와야 몸이 안 가린다.
+    if(!s){s=a.homePos.clone();s.z+=1.70;stations.set(a.key,s);}
+    return s;
   }
   function afterActors(t,now,dt){
     const actors=getActors();
@@ -216,8 +241,17 @@ export function createV8(config){
       // an equip bend cannot lean outside that cylinder into a desk/crate.
       a.wrapper.rotation.x=0;a.wrapper.rotation.z=0;
       const attacking=['ready','throw','gun','fetch','bazooka','mess'].includes(frame.id);
-      const yaw=attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z):['work','recover','notice'].includes(frame.id)?0:Math.hypot(dx,dz)>.001?Math.atan2(dx,dz):a.facing;
-      a.facing+=Math.atan2(Math.sin(yaw-a.facing),Math.cos(yaw-a.facing))*Math.min(1,dt*8);a.wrapper.rotation.y=a.facing;
+      // v8g: 평소엔 저마다 자기 책상(a.idleYaw)을 본다 — 예전처럼 전원 0(정면)으로 맞추지 않는다.
+      // 걸을 땐 가는 쪽을 보고(미끄러지듯 가지 않게), 수다 중엔 상대를 본다.
+      const moving=Math.hypot(dx,dz)>.004;
+      const idleFace=a.poseGoal?.lookYaw!==undefined?a.poseGoal.lookYaw:(a.idleYaw??0);
+      const yaw=attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)
+        :['work','recover','notice'].includes(frame.id)?(moving?Math.atan2(dx,dz):idleFace)
+        :moving?Math.atan2(dx,dz):a.facing;
+      // 걷기 시작할 때는 더 빨리 돌아선다 — 천천히 돌면 몸이 옆으로 미끄러지는 것처럼 보인다
+      // (2208 ③ "걷다가 미끄러지듯 미끄럼 X").
+      const turnRate=moving?16:8;
+      a.facing+=Math.atan2(Math.sin(yaw-a.facing),Math.cos(yaw-a.facing))*Math.min(1,dt*turnRate);a.wrapper.rotation.y=a.facing;
       a.lastPhysical={...state.position};a.shadow.position.set(state.position.x,.01,state.position.z);
       const operator=operators.indexOf(a.key);
       if(operator>=0 && frame.id==='fetch' && Math.hypot(state.position.x-parked[operator].x,state.position.z-(parked[operator].z+1.8))<.18)mounts[operator].userData.fetched=true;
@@ -232,7 +266,9 @@ export function createV8(config){
         const drop=a.weaponRest.clone();
         a.equipment.position.copy(a.dropPosition || a.weaponRest).lerp(drop,smooth(frame.id==='escape'?frame.age/.55:1));
       }else a.equipment.position.copy(a.weaponRest);
-      a.equipment.visible=!emotionOverride;
+      // v8g: 평소엔 씨앗 장난감을 상자 안에 둔 것으로 치고 숨긴다 — 책상 위에 둥둥 떠 있으면
+      // 귀엽지도 자연스럽지도 않다(사장님 11/23 22:03). 손님을 보고 챙길 때부터 보인다.
+      a.equipment.visible=!emotionOverride && !['work','lookup'].includes(frame.id);
       if(a.weapon){
         a.weapon.lookAt(new THREE.Vector3(a.homePos.x,2.8,windowZ));
         a.muzzleFlash.visible=frame.id==='gun' && now<a.flashUntil;
