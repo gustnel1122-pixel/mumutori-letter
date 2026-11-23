@@ -11,9 +11,9 @@ test('any detected person starts the same determined battle within one frame',()
 });
 test('battle emotions never include tired or working, and all attack stages run',()=>{
   const d=new SceneDirector();d.begin();const stages=new Set();
-  for(let t=0;t<28;t+=.02){const s=d.update(.02,3);stages.add(s.id);if(s.mode==='battle')assert.ok(!['tired','working'].includes(s.emotion));}
+  for(let t=0;t<33;t+=.02){const s=d.update(.02,3);stages.add(s.id);if(s.mode==='battle')assert.ok(!['tired','working'].includes(s.emotion));}
   for(const id of ['equip','ready','throw','gun','fetch','bazooka','mess','escape'])assert.ok(stages.has(id),id);
-  assert.equal(ATTACK_SECONDS,12.5);
+  assert.equal(ATTACK_SECONDS,17);   // 0224: 공격을 12.5초 → 17초로 늘림
 });
 test('persistent visitor keeps the group hidden; two seconds absent releases them',()=>{
   const d=new SceneDirector();d.begin();assert.equal(advance(d,80,2).id,'hide');assert.equal(d.encounters,1);
@@ -21,11 +21,11 @@ test('persistent visitor keeps the group hidden; two seconds absent releases the
   advance(d,8,0);assert.equal(d.snapshot().id,'work');d.update(.02,1);assert.equal(d.encounters,2);
 });
 test('a returning visitor during peek sends everyone back to cover',()=>{
-  const d=new SceneDirector();d.begin();advance(d,31,0);assert.equal(d.snapshot().id,'peek');
+  const d=new SceneDirector();d.begin();advance(d,35.5,0);assert.equal(d.snapshot().id,'peek');
   assert.equal(d.update(.02,1).id,'escape');assert.equal(d.encounters,1);
 });
 test('camera-free demo follows all stages and completes without a presence feed',()=>{
-  const d=new SceneDirector();d.begin(true);const seen=new Set();for(let t=0;t<40;t+=.02)seen.add(d.update(.02,0).id);
+  const d=new SceneDirector();d.begin(true);const seen=new Set();for(let t=0;t<45;t+=.02)seen.add(d.update(.02,0).id);
   for(const s of SCENES)assert.ok(seen.has(s.id),s.id);assert.equal(d.snapshot().id,'work');
 });
 test('quality preserves native resolution without real-time effects, even when fixed high',()=>{

@@ -54,7 +54,9 @@ function eyeCenters(geometry){
 
 // 0224 P28·P30·P32·P33 — 친구별 눈 보정(정본 모양은 그대로, 기운 각도만 수평으로).
 const EYE_TUNE={
-  bam:       {size:1.30, fix:0.26, open:1.18},
+  // 밤은 눈동자(검은 부분)가 큰 편이라 **눈을 키우면 검은 덩어리**가 된다.
+  // 크기는 조금만, 대신 세로로 더 열어 둥글게 만들고 기운 각도를 되돌린다.
+  bam:       {size:1.10, fix:0.30, open:1.34},
   wandukong3:{size:1.26, fix:0.20, open:1.14},
   ddangkong: {size:1.34, fix:0.12, open:1.22},
   byeongari: {size:1.22, fix:0.06, open:1.06},
@@ -133,8 +135,10 @@ export function createEmotionRig(actor){
       for(const h of highlights){
         h.visible=uniforms.open.value>.48;
         if(h.userData.jgBase===undefined){h.userData.jgBase=h.position.clone();h.userData.jgScale=h.scale.clone();}
-        h.position.set(h.userData.jgBase.x-0.012,h.userData.jgBase.y+0.030,h.userData.jgBase.z+0.004);
-        h.scale.set(h.userData.jgScale.x*0.72,h.userData.jgScale.y*0.72,h.userData.jgScale.z);
+        // 눈 크기에 맞춰 **눈 반지름의 40% 만큼 왼쪽 위로** 올리고, 둥근 점처럼 작게.
+        const eyeR=centers[0]?centers[0].radius:0.05;
+        h.position.set(h.userData.jgBase.x-eyeR*0.42,h.userData.jgBase.y+eyeR*0.78,h.userData.jgBase.z+eyeR*0.18);
+        h.scale.set(h.userData.jgScale.x*0.42,h.userData.jgScale.y*0.42,h.userData.jgScale.z);
       }
       for(const arm of arms)arm.node.rotation.z=arm.z+(active?Math.sin(t*8+actor.phase)*.35:Math.sin(t*4+actor.phase)*.05);
       for(const prop of props)prop.node.rotation.z=prop.z+(name==='excited'?Math.sin(t*8+actor.phase)*.02:0);

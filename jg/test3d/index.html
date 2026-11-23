@@ -885,6 +885,24 @@ const CANON_MATERIAL_COLOR = {
 // 0224 P31 — 정본 밤은 아래쪽이 '연베이지 밑동'인데 3D 에서는 거의 안 보였다.
 // GLB 는 그대로 두고, 불러올 때 Belly(밑동) 메시만 몸 높이의 아래 38% 를 덮도록 키운다.
 const CANON_BELLY = { bam: {cover: 0.38, color: 0xE2BC92} };
+// 5바퀴까지 남은 유일한 정본 불통 — 병아리콩 안경알이 고개를 돌리면 머리 밖 허공에 뜬다.
+// 각도 제한으로는 0 이 안 되므로, 불러올 때 **안경을 머리 중심 쪽으로 줄여 얼굴에 붙인다**
+// (GLB 파일은 그대로. 정면에서 보이는 모양은 거의 그대로고, 돌려도 머리 테두리 안에 남는다).
+const CANON_ACCESSORY = { byeongari: {mesh:'Gold', shrink:0.76, pull:0.42} };
+function applyCanonAccessory(key, model){
+  const want = CANON_ACCESSORY[key];
+  if (!want) return;
+  let body = null, acc = null;
+  model.traverse(o => { if (o.isMesh && o.name === 'Body') body = o; if (o.isMesh && o.name === want.mesh) acc = o; });
+  if (!body || !acc) return;
+  const head = new THREE.Box3().setFromObject(body).getCenter(new THREE.Vector3());
+  acc.updateMatrixWorld(true);
+  const centre = new THREE.Box3().setFromObject(acc).getCenter(new THREE.Vector3());
+  acc.scale.multiplyScalar(want.shrink);
+  // 머리 중심 쪽으로 당겨 얼굴에 붙인다(가로로만 — 앞뒤·높이는 그대로).
+  acc.position.x += (head.x - centre.x) * want.pull;
+  acc.position.z += (head.z - centre.z) * want.pull * 0.35;
+}
 function applyCanonBelly(key, model){
   const want = CANON_BELLY[key];
   if (!want) return;
@@ -900,7 +918,7 @@ function applyCanonBelly(key, model){
     if (have <= 0.0001) continue;
     const target = bodyH * want.cover;
     if (have >= target) continue;                       // 이미 충분하면 손대지 않는다
-    const grow = Math.min(2.2, target / have);
+    const grow = Math.min(6.0, target / have);
     const bottom = box.min.y;
     mesh.scale.multiplyScalar(grow);
     mesh.position.y = bottom + (mesh.position.y - bottom) * grow;   // 밑면은 그대로 두고 위로만 키움
@@ -917,6 +935,24 @@ function applyCanonColors(key, model){
   });
 }
 
+// 0224 P34 — 정본 그림의 '굵은 진갈색 테두리'가 귀여움의 절반인데 3D 에는 0 이었다.
+// 그림자·반사를 못 켜는 대신(렉 우선), **뒤집힌 껍질** 방식으로 외곽선만 그린다.
+// 조명 계산이 없는 가장 싼 재질 하나를 공유하므로 그리는 횟수만 조금 는다(아래 FPS 실측).
+const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({color:0x4A2C1A, side:THREE.BackSide});
+const OUTLINE_MESHES = /^(Body|Belly|Cap|CapLine|Leaf|Stem|Beak|Petal|Sun|Scarf|Gold|Lens|Handle)$/;
+function addOutline(model){
+  const add=[];
+  model.traverse(o => { if (o.isMesh && OUTLINE_MESHES.test(o.name)) add.push(o); });
+  for (const mesh of add){
+    const line = new THREE.Mesh(mesh.geometry, OUTLINE_MATERIAL);
+    line.name = mesh.name + '_Outline';
+    line.position.copy(mesh.position); line.quaternion.copy(mesh.quaternion);
+    line.scale.copy(mesh.scale).multiplyScalar(1.045);
+    line.renderOrder = -1; line.userData.jgOutline = true;
+    mesh.parent.add(line);
+  }
+}
+
 function createActor(key, slot){
   const def = FRIEND_DEFS[key];
   const tmpl = templates[key];
@@ -924,6 +960,8 @@ function createActor(key, slot){
   model.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone(); });
   applyCanonColors(key, model);
   applyCanonBelly(key, model);
+  applyCanonAccessory(key, model);
+  if (VARIANT === 'g') addOutline(model);   // ?ver=f 되돌리기는 v8f 그대로(테두리 없음)
   const wrapper = new THREE.Group();
   const visualRoot = new THREE.Group();
   visualRoot.scale.setScalar(COMPOSITION.actorScale);
@@ -1117,10 +1155,11 @@ const arc = (u, rise = 0.25, fall = 0.25) =>
 // 친구 성격대로 작은 버릇 하나씩(원본 그림은 그대로, 자세만 바뀐다).
 function quirkPose(a, t, g){
   switch(a.key){
-    case 'dotori':     g.tiltZ = Math.sin(t*2.6 + a.phase)*0.11; break;                 // 낱말 고르며 갸웃
-    case 'ddangkong':  g.tiltX = -0.13 + Math.sin(t*1.6 + a.phase)*0.05; break;         // 돋보기 들여다보기
-    case 'bam':        g.lift  = Math.abs(Math.sin(t*3.2 + a.phase))*0.035; break;      // 상자 톡톡
-    case 'byeongari':  g.tiltZ = -0.07 + Math.sin(t*2.2 + a.phase)*0.13; break;         // 편지 들어 보이기
+    case 'dotori':     g.tiltZ = Math.sin(t*2.6 + a.phase)*0.20; break;                 // 낱말 고르며 갸웃
+    case 'ddangkong':  g.tiltX = -0.16 + Math.sin(t*1.6 + a.phase)*0.12; break;         // 돋보기 들여다보기
+    case 'bam':        g.lift  = Math.abs(Math.sin(t*3.2 + a.phase))*0.075;
+                       g.tiltZ = Math.sin(t*3.2 + a.phase)*0.10; break;      // 상자 톡톡
+    case 'byeongari':  g.tiltZ = -0.08 + Math.sin(t*2.2 + a.phase)*0.22; break;         // 편지 들어 보이기
     case 'wandukong3': g.lift  = Math.abs(Math.sin(t*4.2 + a.phase))*0.03;
                        g.squash = 1 + Math.sin(t*4.2 + a.phase)*0.03; break;            // 찰칵 자세
     case 'haebaragi':  g.yawOffset = 0.5 + Math.sin(t*0.5 + a.phase)*0.12; break;       // 느긋하게 창 쪽
@@ -1136,9 +1175,9 @@ function idlePose(a, t){
   switch(a.action){
     case 'working': {
       // 화면 쪽으로 살짝 숙이고 자판 치는 작은 들썩임.
-      g.tiltX = -0.07 + Math.sin(t*7.5 + a.phase)*0.018;
-      g.lift = Math.abs(Math.sin(t*7.5 + a.phase))*0.012;
-      g.tiltZ = Math.sin(t*3.6 + a.phase)*0.012;
+      g.tiltX = -0.09 + Math.sin(t*7.5 + a.phase)*0.055;
+      g.lift = Math.abs(Math.sin(t*7.5 + a.phase))*0.035;
+      g.tiltZ = Math.sin(t*3.6 + a.phase)*0.045;
       break;
     }
     case 'lookAside': {
@@ -1151,12 +1190,12 @@ function idlePose(a, t){
     case 'stretch': {
       // 기지개 — 쭉 늘이며 뒤로 젖혔다가 돌아온다.
       const k = arc(u, 0.35, 0.3);
-      g.squash = 1 + 0.10*k; g.tiltX = 0.18*k; g.lift = 0.045*k;
+      g.squash = 1 + 0.16*k; g.tiltX = 0.30*k; g.lift = 0.085*k;
       break;
     }
     case 'yawn': {
       const k = arc(u, 0.3, 0.4);
-      g.tiltX = 0.13*k; g.squash = 1 + 0.05*k; g.tiltZ = 0.04*k;
+      g.tiltX = 0.22*k; g.squash = 1 + 0.09*k; g.tiltZ = 0.09*k;
       break;
     }
     case 'chairSpin': {
@@ -1346,7 +1385,7 @@ function beginVisit(a, kind){
 // 평소에 얼굴이 보여야 하므로, 자리에서 돌아보는 각도는 '손님(카메라) 축에서 ±MAX' 안으로 자른다.
 const FACE_LIMIT = THREE.MathUtils.degToRad(80);
 // 안경을 '쓴' 친구는 많이 돌리면 먼 쪽 알이 머리 테두리 밖으로 나간다(3바퀴 불통). 더 좁게 자른다.
-const FACE_LIMIT_BY_KEY = { byeongari: THREE.MathUtils.degToRad(42) };
+const FACE_LIMIT_BY_KEY = { byeongari: THREE.MathUtils.degToRad(55) };
 function clampFacingToCamera(a, offset){
   const toCamera = Math.atan2(camera.position.x - a.homePos.x, camera.position.z - a.homePos.z);
   const wrap = x => { let v = ((x + Math.PI) % (Math.PI*2)) - Math.PI; if (v < -Math.PI) v += Math.PI*2; return v; };

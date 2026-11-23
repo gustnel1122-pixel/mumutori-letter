@@ -25,8 +25,9 @@ export function createV8(config){
   // 겹쳐 보이지 않는 양쪽 끝 빈자리로 둔다 — v8f 에서는 쌀 바로 뒤에 서 있어서
   // 쌀이 바주카를 안고 있는 것처럼 보였다(2206 총괄 지적 ②).
   const spots=config.launcherSpots||{parked:[[-8,3.1],[0,-6.2]],deployed:[[-8,-.8],[0,-6.8]]};
-  const parked=spots.parked.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
-  const deployed=spots.deployed.map(([x,z])=>new THREE.Vector3(x,propScale*.5,z));
+  const GROUND_Y=propScale*.5;                      // 바퀴가 바닥에 닿는 높이
+  const parked=spots.parked.map(([x,z])=>new THREE.Vector3(x,GROUND_Y,z));
+  const deployed=spots.deployed.map(([x,z])=>new THREE.Vector3(x,GROUND_Y,z));
   const operators=['byeongari','ssal'];
   // P7 — 일곱이 똑같이 반응하지 않도록 사람마다 늦게 반응하는 시간(초).
   const PANIC_LAG=[0,.08,.13,.21,.28,.36,.45];
@@ -268,7 +269,7 @@ export function createV8(config){
       }
     }else if(id==='escape'){
       const go=turnToMove(a);a.motionGoal=go?a.cover:a.escapeFrom;
-      const u=clamp((frame.age-i*.26)/2.65,0,1);
+      const u=clamp((frame.age-i*.34)/2.65,0,1);
       walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
       // 0224 P25·P26 — 1초에 6걸음 통통(±0.03) + 앞으로 12° 숙이고 돌 때 안쪽으로 기울기.
       const run=u>0&&u<1?1:0;
@@ -320,7 +321,7 @@ export function createV8(config){
       const base=frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.8:3;
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
-    const launcherBoxes=mounts.map((g,i)=>{g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:frame.id==='fetch' && g.userData.fetched?[operators[i]]:[]};});
+    const launcherBoxes=mounts.map((g,i)=>{g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:[operators[i]]};});   // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게
     motion.obstacles=[...furnitureObstacles,...launcherBoxes];motion.step(goals,dt);
     for(const a of actors){
       const state=motion.agents.get(a.key),old=a.lastPhysical || state.position;
@@ -391,7 +392,18 @@ export function createV8(config){
       const operator=actors.find(a=>a.key===operators[i]);
       const pushed=!operator?0:frame.id==='fetch'?smooth((frame.progress-.45)/.55):['bazooka','mess','escape','hide','peek','recover'].includes(frame.id)?1:0;
       g.position.copy(parked[i]).lerp(deployed[i],pushed);
-      if(frame.id==='fetch' && g.userData.fetched && operator){g.position.x=operator.wrapper.position.x;g.position.z=operator.wrapper.position.z-1.8;}
+      // 5바퀴 불통: 통나무 뒤끝이 미는 친구 몸에 박히고 받침다리가 떴다.
+      // 미는 사람 **앞쪽 옆**(몸 반지름 + 0.35)에 두고 바퀴 높이를 바닥에 맞춘다.
+      // 5바퀴 불통: 통나무가 미는 친구 몸에 박히고 받침다리가 떴다.
+      // 바깥쪽 **옆**(화면에서 겹치지 않는 쪽)으로 몸 반지름 + 0.8 만큼 떨어뜨리고
+      // 바퀴 높이는 바닥에 맞춘다. 미는 동안엔 길 계산에서 주인만 이 통나무를 무시한다.
+      if(['fetch','bazooka','mess'].includes(frame.id) && g.userData.fetched && operator){
+        const out=operator.wrapper.position.x<0?-1:1;
+        const gap=(operator.bodyRadius||.6)+2.00;
+        g.position.x=operator.wrapper.position.x+out*gap;
+        g.position.z=operator.wrapper.position.z-.80;
+        g.position.y=GROUND_Y;
+      }
       if(frame.id==='bazooka' && operator && !emotionOverride && now>=g.userData.fireAt){
         const aim=target(i,'bazooka');g.lookAt(aim);g.updateMatrixWorld(true);
         if(projectiles.fire(g.localToWorld(new THREE.Vector3(0,0,.57)),aim,'bazooka',now,1)){g.userData.fireAt=now+1.3;g.userData.flashUntil=now+.16;}
@@ -402,7 +414,9 @@ export function createV8(config){
     // after both moved, rather than comparing a new actor to yesterday's cart.
     motion.obstacles=[...furnitureObstacles,...mounts.map((g,i)=>{
       g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
-      return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z};
+      // 여기서도 '주인은 자기 바주카를 들고 민다'를 그대로 적어 줘야 한다 —
+      // 안 적으면 바로 이 검사에서만 겹쳤다고 나온다(5바퀴에서 실제로 그랬다).
+      return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:[operators[i]]};
     })];
     if(motion.overlaps().length && motion.overlapFrames===overlapFramesBefore)motion.overlapFrames++;
     projectiles.update(now);

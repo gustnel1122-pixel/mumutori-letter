@@ -3,10 +3,10 @@ export const SCENES = Object.freeze([
   {id:'notice',emotion:'determined',duration:.5,label:'다 같이 전투 준비!'},
   {id:'equip',emotion:'determined',duration:5,label:'씨앗 보관함으로!'},
   {id:'ready',emotion:'determined',duration:1,label:'모두 자리 잡기'},
-  {id:'throw',emotion:'excited',duration:3,label:'씨앗 던지기'},
-  {id:'gun',emotion:'excited',duration:4.5,label:'완두콩 깍지 총'},
+  {id:'throw',emotion:'excited',duration:4.5,label:'씨앗 던지기'},
+  {id:'gun',emotion:'excited',duration:6,label:'완두콩 깍지 총'},
   {id:'fetch',emotion:'determined',duration:3.5,label:'도토리 바주카 가져오기'},
-  {id:'bazooka',emotion:'excited',duration:5,label:'도토리 바주카'},
+  {id:'bazooka',emotion:'excited',duration:6.5,label:'도토리 바주카'},   // 0224: 공격을 12.5초 → 17초로
   {id:'mess',emotion:'proud',duration:2,label:'창문이 엉망!'},
   {id:'escape',emotion:'surprised',duration:3,label:'들켰다, 다 같이 숨자!'},
   {id:'hide',emotion:'surprised',duration:2,label:'쉿… 손님이 지나가길 기다려요'},
