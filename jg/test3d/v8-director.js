@@ -1,6 +1,9 @@
 // One shared encounter clock drives every friend's pose, expression and props.
 export const SCENES = Object.freeze([
-  {id:'notice',emotion:'determined',duration:.5,label:'다 같이 전투 준비!'},
+  // 1241 ②: 손님을 발견한 순간은 '결심(눈 0.58·기울기 0.35)' 이 아니라 **놀람**이어야 한다.
+  // 0224 P30 "무서움을 눈 각도로 내지 말 것" — determined 가 눈을 가늘게·기울게 만들고 있었다.
+  // 7바퀴 ③ — 0.5초면 반응 시차(0~0.45초)가 끝나기도 전에 장면이 넘어가 '일곱이 동시에' 놀란 것처럼 보였다.
+  {id:'notice',emotion:'surprised',duration:1,label:'앗, 손님이다!'},
   {id:'equip',emotion:'determined',duration:5,label:'씨앗 보관함으로!'},
   {id:'ready',emotion:'determined',duration:1,label:'모두 자리 잡기'},
   {id:'throw',emotion:'excited',duration:4.5,label:'씨앗 던지기'},

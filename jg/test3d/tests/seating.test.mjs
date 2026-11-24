@@ -12,7 +12,15 @@ const has = (src, needle, why) => assert.ok(src.includes(needle), why + ' — �
 const shapeOf = which => {
   const line = html.split('\n').find(l => l.includes('actorScale:') && l.includes('deskScale:') && l.includes(which === 'f' ? '// v8f' : '// v8g'));
   assert.ok(line, which + ' 비율 줄을 못 찾음');
-  const n = key => Number(line.split(key + ':')[1].split(/[,}]/)[0]);
+  // 1319 — v8g 친구 크기는 `?scale=` 로도 바꿀 수 있게 상수로 뺐다. 그 기본값을 읽어 온다.
+  const named = key => {
+    const raw = line.split(key + ':')[1].split(/[,}]/)[0].trim();
+    if (!Number.isNaN(Number(raw))) return Number(raw);
+    const m = html.match(/\?\s*SCALE_REQUEST\s*:\s*([0-9.]+)/);
+    assert.ok(m, raw + ' 의 기본값을 못 찾음');
+    return Number(m[1]);
+  };
+  const n = named;
   return {actorScale: n('actorScale'), deskScale: n('deskScale'), seated: /seated:true/.test(line)};
 };
 const SEAT_YAW_DEG = JSON.parse(html.match(/const SEAT_YAW_DEG = (\[[^\]]+\]);/)[1]);
@@ -76,6 +84,8 @@ test('the idle action list covers the actions the owner asked for', () => {
 
 test('the battle the owner asked for is still in place', () => {
   has(runtime, "attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)", '공격 땐 유리창을 본다');
-  has(runtime, "operators=['byeongari','ssal']", '바주카는 가지러 가는 주인이 있다');
+  // 1241 ⑦ — 오른쪽 통나무는 가장 가까운 해바라기씨가 가져온다(쌀이 가져오면 두 친구 앞을
+  // 가로질러 화면에서 겹쳤다). 왼쪽은 그대로 병아리콩.
+  has(runtime, "operators=['byeongari','haebaragi']", '바주카는 가지러 가는 주인이 있다');
   has(html, 'VARIANT === \'f\'', '?ver=f 되돌리기가 있어야 한다');
 });
