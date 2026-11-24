@@ -12,7 +12,20 @@ const clamp=THREE.MathUtils.clamp;
 // 0010: 무기를 몸 바깥 손 위치에 둔다. v8f 의 (.40,.38,.30) 은 몸 안쪽이라 총대가 몸을 뚫었다.
 // 실제 몸 반지름은 친구마다 다르므로 prepareActor 에서 잰 값으로 바깥쪽으로 더 민다.
 const hand=new THREE.Vector3(.40,.38,.30);
-function handOffset(a){return a.handLocal||hand;}
+const handSwing=new THREE.Vector3();
+function handOffset(a){
+  const base=a.handLocal||hand;
+  const s=a.throwSwing;
+  if(s==null)return base;
+  // 8바퀴 — 팔 뼈대가 없는 친구가 많아 **쥔 물건이 그리는 길**로 던지는 동작을 만든다.
+  // 뒤로 당김(0~0.36) → 앞으로 뿌림(0.36~0.60) → 제자리(0.60~1).
+  const back=THREE.MathUtils.clamp(s/.36,0,1);
+  const fwd=THREE.MathUtils.clamp((s-.36)/.24,0,1);
+  const rest=THREE.MathUtils.clamp((s-.60)/.40,0,1);
+  const ext=1-.42*back+1.15*fwd-1.15*rest;      // 0.58 → 1.73 → 1
+  const lift=.30*back-.38*fwd+.08*rest;
+  return handSwing.set(base.x*ext,base.y+lift,base.z*ext);
+}
 export function createV8(config){
   const {scene,renderer,camera,dirLight,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(),pipeline=createRenderPipeline(renderer,scene,camera);
@@ -226,6 +239,10 @@ export function createV8(config){
   function animateActor(a,dt,t){
     const p=profile[a.key],phase=t*p.pace+a.phase,i=getActors().indexOf(a),id=frame.id;
     a.wrapper.position.copy(a.homePos);a.wrapper.scale.set(1,1,1);a.wrapper.rotation.set(0,0,0);a.wrapper.visible=true;a.cargoMesh.visible=false;
+    // 8바퀴 — 전투 자세(앞뒤 숙임·좌우 흔들기)는 **visualRoot** 에 적는다. wrapper 에 적으면
+    // 아래 길 계산이 매 프레임 `rotation.x=0; rotation.z=0` 으로 지워 버려서
+    // 1~7바퀴 내내 던지는 몸짓이 화면에 **한 번도 안 보였다**(검토 두 곳이 같은 지적).
+    a.battleTiltX=0;a.battleTiltZ=0;a.throwSwing=null;
     a.action=id;a.movePhase='idle';a.gunActive=id==='gun' && a.fireIndex%2===(frame.progress<.5?0:1);
     a.motionGoal=a.homePos;
     // v8g: 평소엔 의자에 앉아 있다 — 손님을 보고 일어서는 동안 높이를 서서히 내린다
@@ -265,7 +282,7 @@ export function createV8(config){
       a.pickupBlend=smooth((a.pickupDwell || 0)/.45);a.held=a.pickupBlend>=1;
       if(a.held && !a.pickupLogged){a.pickupLogged=true;pickupEvents.push({key:a.key,kind:a.def.canThrow?'gun':'ammunition',at:frame.elapsed,from:a.weaponRest.toArray(),atActor:[physical.x,0,physical.z]});}
     }else if(['ready','throw','gun','fetch','bazooka','mess'].includes(id)){
-      a.held=true;a.wrapper.rotation.x=-.08;a.wrapper.rotation.z=p.tilt*.25;
+      a.held=true;a.battleTiltX=-.08;a.battleTiltZ=p.tilt*.25;
       if(['throw','gun'].includes(id) || (['bazooka','mess'].includes(id) && !operators.includes(a.key))){
         // 0224 P14·P15·P22 — 1초에 3번 던지는 몸짓. 팔 뼈대가 있는 친구는 도토리뿐이라
         // 나머지는 "뒤로 젖혔다 앞으로 숙이기 + 찌그러짐" 으로 던지는 동작을 만든다.
@@ -277,11 +294,12 @@ export function createV8(config){
         const back=clamp(cycle/.36,0,1),fwd=clamp((cycle-.36)/.24,0,1),back2=clamp((cycle-.60)/.40,0,1);
         const lean=back<1?-.17*back:(fwd<1?(-.17+.49*fwd):(.32*(1-back2)));   // 뒤 10° → 앞 18°
         const side=i%2?1:-1;
-        a.wrapper.rotation.x=-.08+lean;
+        a.battleTiltX=-.08+lean;                                               // P15 뒤 10° → 앞 18°
+        a.throwSwing=cycle;                                                    // 손(무기)도 같이 휘두른다
         a.wrapper.position.y=Math.max(0,Math.sin(cycle*Math.PI)*.17);          // 던질 때마다 들썩
         const snap=fwd<1&&fwd>0?Math.sin(fwd*Math.PI):0;
         a.wrapper.scale.x=a.wrapper.scale.z=1+.18*snap;a.wrapper.scale.y=1-.15*snap;   // P22
-        a.wrapper.rotation.z=p.tilt*.25+Math.sin(cycle*Math.PI*2)*.24*side;    // 좌우로 크게
+        a.battleTiltZ=p.tilt*.25+Math.sin(cycle*Math.PI*2)*.24*side;           // 좌우로 크게
         a.wrapper.rotation.y=Math.sin(cycle*Math.PI*2+.6)*.26*side;            // 던지는 쪽으로 몸 비틀기
       }
       // 유리창 엉망일 때 통통 뛰기 — 던지는 몸짓이 만든 들썩임을 **덮어쓰지 않게** 더한다
@@ -369,6 +387,9 @@ export function createV8(config){
       // The clearance cylinder encloses every yaw. Keep the body upright so
       // an equip bend cannot lean outside that cylinder into a desk/crate.
       a.wrapper.rotation.x=0;a.wrapper.rotation.z=0;
+      // …그리고 **그 안쪽**(visualRoot)에 전투 자세를 입힌다. 길 계산은 wrapper 만 보므로
+      // 책상에 기대 들어갈 걱정 없이 숙이고 흔드는 모습이 화면에 보인다.
+      if(frame.active){a.visualRoot.rotation.x=a.battleTiltX||0;a.visualRoot.rotation.z=a.battleTiltZ||0;}
       const attacking=['ready','throw','gun','fetch','bazooka','mess'].includes(frame.id);
       // v8g: 평소엔 저마다 자기 책상(a.idleYaw)을 본다 — 예전처럼 전원 0(정면)으로 맞추지 않는다.
       // 걸을 땐 가는 쪽을 보고(미끄러지듯 가지 않게), 수다 중엔 상대를 본다.
@@ -404,7 +425,9 @@ export function createV8(config){
       // 한 번에 무기 하나만: 바주카를 맡은 친구는 바주카를 미는 동안 씨앗총을 감춘다(3바퀴 ⑥).
       // 숨는 동안에도 감춘다 — 상자에 무기만 꽂혀 보이던 것(3바퀴 ⑦).
       const pushingLauncher=operators.includes(a.key) && ['fetch','bazooka','mess'].includes(frame.id);
-      a.equipment.visible=!emotionOverride && !['work','lookup','escape','hide','peek'].includes(frame.id) && !pushingLauncher;
+      // 8바퀴 검토 ⑤ — 'notice' 때는 아직 아무도 집지 않았는데 상자 속 씨앗총이 보여서
+      // 1.35배로 커진 몸(완두콩 얼굴·쌀·땅콩 옆구리)을 가로질렀다. 챙기기(equip)부터 보인다.
+      a.equipment.visible=!emotionOverride && !['work','lookup','notice','escape','hide','peek'].includes(frame.id) && !pushingLauncher;
       if(a.weapon){
         a.weapon.lookAt(new THREE.Vector3(a.homePos.x,2.8,windowZ));
         a.muzzleFlash.visible=frame.id==='gun' && now<a.flashUntil;

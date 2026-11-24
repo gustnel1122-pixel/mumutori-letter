@@ -124,7 +124,8 @@ export function createEmotionRig(actor){
         const r=c.radius*scale;
         const dot=new THREE.Mesh(new THREE.SphereGeometry(r,8,6),dotMaterial);
         // 큰 점은 왼쪽 위, 작은 점은 그보다 더 위·바깥으로 조금.
-        const ox=k==='big'?-0.34:0.16, oy=k==='big'?0.34:0.52;
+        // 8바퀴 검토 ② — 두 점이 겹쳐 한 덩어리로 보였다. 작은 점을 더 위·바깥으로 뗀다.
+        const ox=k==='big'?-0.34:0.40, oy=k==='big'?0.34:0.62;
         dot.position.set(c.center.x+c.radius*ox, c.center.y+c.radius*oy, c.center.z+c.radius*0.95);
         dot.renderOrder=4;dot.visible=false;
         iris.add(dot);dots.push(dot);owned.push(dot.geometry);
