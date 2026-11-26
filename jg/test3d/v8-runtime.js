@@ -52,7 +52,10 @@ export function createV8(config){
   // 으로 옮긴다(예전엔 통나무 정면 1.8 앞 — 카메라가 거의 수평이라 화면에서 통째로 겹쳤다).
   // 왼쪽 통나무는 1.20 까지 밀어도 화면 안(화면좌표 0.95)인데, 오른쪽은 더 앞(z 2.6)에 있어서
   // 1.20 이면 화면 밖(1.055)으로 나간다. 그래서 **통나무마다** 거리를 따로 둔다.
-  const PUSH_GAPS=[1.20,1.20], PUSH_BACK=0.80;
+  // 0206 10바퀴 — 이 거리는 **몸 크기에 따라** 벌어져야 한다. 1.35 배 때 맞춰 둔 1.20 을
+  // 2.0 배에서 그대로 쓰니 미는 친구와 통나무가 화면에서 계속 닿아 보였다(240 중 108회).
+  const PUSH_SIZE=(config.actorScale||1.35)/1.35;
+  const PUSH_GAPS=[1.20*PUSH_SIZE,1.20*PUSH_SIZE], PUSH_BACK=0.80*PUSH_SIZE;
   const pushSide=i=>(parked[i].x<0?-1:1);          // 통나무는 미는 친구의 바깥쪽 옆에 둔다
   const standBy=(spot,i)=>spot.clone().add(new THREE.Vector3(-pushSide(i)*(0.6+PUSH_GAPS[i]), -spot.y, PUSH_BACK));
   // P7 — 일곱이 똑같이 반응하지 않도록 사람마다 늦게 반응하는 시간(초).
@@ -194,6 +197,7 @@ export function createV8(config){
     window.dispatchEvent(new CustomEvent('jg-v8-scene',{detail:event}));
   }
   let waitHeld=0;                                   // 장면이 기다린 실제 시간(초)
+  let giveUpScene=null;                             // 한계 시간이 지나 '기다리기를 포기한' 장면
   function update(dt,t,rawDt,level,now){
     lastTime=now;if(getActors().length && quality.sample(rawDt))applyQuality();
     const loaded=getActors().length>0;
@@ -202,7 +206,9 @@ export function createV8(config){
     const travelling=['escape','recover'].includes(frame.id) && frame.progress>.90;
     const equipWaiting=frame.id==='equip' && frame.progress>.90 && getActors().some(a=>{
       const p=motion.agents.get(a.key)?.position,want=operators.includes(a.key)?a.homePos:battleStation(a);
-      return !a.held || !p || Math.hypot(p.x-want.x,p.z-want.z)>.25;
+      // 0206 10바퀴 — 몸이 커지면 길 찾기가 목표에서 더 멀찍이 멈춘다(2.0 배에서 쌀이 0.40).
+      // 기준도 몸 크기에 맞춰 늘린다. 안 늘리면 전투가 '씨앗 보관함으로'에서 영영 못 넘어간다.
+      return !a.held || !p || Math.hypot(p.x-want.x,p.z-want.z)>.25*(config.actorScale||1.35)/1.35*1.6;
     });
     const fetchWaiting=frame.id==='fetch' && frame.progress>.4 && mounts.some((g,i)=>getActors().some(a=>a.key===operators[i]) && !g.userData.fetched);
     const firingWaiting=frame.id==='fetch' && frame.progress>.9 && operators.some((key,i)=>{const p=motion.agents.get(key)?.position;return p && Math.hypot(p.x-deployed[i].x,p.z-deployed[i].z-1.8)>.15;});
@@ -211,7 +217,11 @@ export function createV8(config){
     // 1241: 예전 한계 시간은 `frame.age` 로 쟀는데, 기다리는 동안은 장면 시계를 멈추니까
     // age 도 같이 멈춰서 **한계 시간이 영원히 오지 않았다**(그래서 도망에서 멈췄다).
     // 기다린 실제 시간을 따로 센다.
-    const stuckLimit=waitHeld>4.5;
+    // 0206 10바퀴 — 예전엔 한계 시간이 지나면 `waitHeld` 가 **곧바로 0 으로 되돌아가서**
+    // 장면이 한 프레임만 나아가고 다시 멈췄다(60초 자유 실행에서 equip 에 3541프레임).
+    // 한 번 포기한 장면은 **그 장면이 끝날 때까지** 다시 기다리지 않는다.
+    if(waitHeld>4.5)giveUpScene=frame.id;
+    const stuckLimit=giveUpScene===frame.id;
     const waiting=!stuckLimit && (equipWaiting || fetchWaiting || firingWaiting || travelling && getActors().some(a=>{
       const p=motion.agents.get(a.key)?.position,target=frame.id==='escape'?a.cover:a.homePos;
       return !p || Math.hypot(p.x-target.x,p.z-target.z)>.40;
@@ -379,7 +389,11 @@ export function createV8(config){
       // 0224 P23·P24 — 도망은 '종종걸음'(보폭 절반)으로, 속도는 친구마다 0.85~1.25배 다르게.
       // 보폭 자체는 이동 담당이 '속도' 하나로만 움직여서 따로 못 준다 → 겁먹은 종종걸음은
       // **빠른 속도 + 1초 7번 통통 + 앞으로 숙이기**로 만든다(P23 의 뜻). 너무 늦추면 도망이 늘어진다.
-      const base=frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.8:3;
+      // 0206 10바퀴 — 2.0 배에서는 방도 넓어져 같은 속도로는 한 판이 1.94배 길어졌고,
+      // 60초 자유 실행에서 전투가 '씨앗 보관함으로'(equip)에서 못 넘어갔다(검토 5/5회).
+      // **걷는 빠르기를 크기에 맞춰** 올린다(1.35배 때와 같은 시간이 걸리도록).
+      const sizeMul=(config.actorScale||1.35)/1.35;
+      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.8:3)*sizeMul;
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
     // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게.
@@ -410,12 +424,15 @@ export function createV8(config){
       const faceCamera=Math.atan2(camera.position.x-state.position.x,camera.position.z-state.position.z);
       const idleFace=frame.id==='notice'?faceCamera
         :(a.poseGoal?.lookYaw!==undefined?a.poseGoal.lookYaw:(a.idleYaw??0));
+      // 0206 10바퀴 — 놀라는 1초 동안은 **걷던 중이라도** 손님 쪽을 본다. 수다·커피로 가던
+      // 친구가 등을 보인 채 놀라서 제일 중요한 '놀란 얼굴'이 안 보였다(땅콩·도토리).
       const yaw=attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)
-        :['work','recover','notice'].includes(frame.id)?(moving?Math.atan2(dx,dz):idleFace)
+        :frame.id==='notice'?faceCamera
+        :['work','recover'].includes(frame.id)?(moving?Math.atan2(dx,dz):idleFace)
         :moving?Math.atan2(dx,dz):a.facing;
       // 걷기 시작할 때는 더 빨리 돌아선다 — 천천히 돌면 몸이 옆으로 미끄러지는 것처럼 보인다
       // (2208 ③ "걷다가 미끄러지듯 미끄럼 X").
-      const turnRate=moving?16:8;
+      const turnRate=frame.id==='notice'?14:moving?16:8;   // 놀랄 땐 1초 안에 다 돌아보게
       a.facing+=Math.atan2(Math.sin(yaw-a.facing),Math.cos(yaw-a.facing))*Math.min(1,dt*turnRate);a.wrapper.rotation.y=a.facing;
       a.lastPhysical={...state.position};a.shadow.position.set(state.position.x,.01,state.position.z);
       const operator=operators.indexOf(a.key);
@@ -468,7 +485,13 @@ export function createV8(config){
     });
     mounts.forEach((g,i)=>{
       const operator=actors.find(a=>a.key===operators[i]);
-      const pushed=!operator?0:frame.id==='fetch'?smooth((frame.progress-.45)/.55):['bazooka','mess','escape','hide','peek','recover'].includes(frame.id)?1:0;
+      // 0206 10바퀴 — 돌아올 때는 통나무도 **제자리로 치운다**. 쏘던 자리에 두고 오면
+      // 주인이 집으로 돌아오는 길과 화면에서 겹쳤다(복귀·빼꼼에서 25회).
+      const pushed=!operator?0
+        :frame.id==='fetch'?smooth((frame.progress-.45)/.55)
+        :frame.id==='hide'?1-smooth(clamp(frame.progress/.35,0,1))   // 다 숨자마자 얼른 제자리로 치운다
+        :['peek','recover'].includes(frame.id)?0
+        :['bazooka','mess','escape'].includes(frame.id)?1:0;
       g.position.copy(parked[i]).lerp(deployed[i],pushed);
       // 5바퀴 불통: 통나무 뒤끝이 미는 친구 몸에 박히고 받침다리가 떴다.
       // 미는 사람 **앞쪽 옆**(몸 반지름 + 0.35)에 두고 바퀴 높이를 바닥에 맞춘다.
@@ -490,7 +513,7 @@ export function createV8(config){
         // 0.6초에 걸쳐 미끄러져 돌아가므로 뚝 끊기지 않고, 주인은 그 사이 멀어지니 몸을 뚫지도 않는다.
         // 되돌아가는 건 **다 숨은 뒤**(hide)에 한다. 도망 중에 되돌리면 통나무가 도망 길을
         // 가로질러 주인과 깊게 겹쳤다(비율 0.74). 숨은 동안엔 다들 책장 뒤(z -5)라 멀다.
-        const back=frame.id==='escape'?0:frame.id==='hide'?clamp(frame.age/.6,0,1):1;
+        const back=frame.id==='escape'?0:1;              // 숨은 뒤부터는 위 `pushed` 가 제자리로 보낸다
         g.position.lerp(g.userData.leftAt,1-back);
       }
       g.position.y=GROUND_Y;

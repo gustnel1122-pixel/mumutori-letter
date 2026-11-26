@@ -59,8 +59,10 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   // Recycling bins, file cabinet, small parcels and a reading lamp.
   for(const side of [-1,1]){
     const bin=new THREE.Mesh(new THREE.CylinderGeometry(.20,.17,.42,12,1,true),mat(side<0?0x8d9c8b:0xbca98b));
-    bin.position.set(side*11.3,.21,.75);furnishings.add(bin);
-    const pages=box(furnishings,.16,.025,.12,side*11.3,.36,.75,paper);pages.rotation.z=.24;
+    // 0206 10바퀴 — 바주카 쏘는 자리(통나무가 서는 칸)가 휴지통을 통째로 가렸다.
+    // 휴지통·종이를 그 칸 **바깥·앞쪽**으로 비킨다.
+    bin.position.set(side*12.5,.21,2.7);furnishings.add(bin);
+    const pages=box(furnishings,.16,.025,.12,side*12.5,.36,2.7,paper);pages.rotation.z=.24;
   }
   const cabinet=new THREE.Group();cabinet.position.set(11.3,0,-.8);furnishings.add(cabinet);
   box(cabinet,1.05,1.15,.65,0,.575,0,mat(0xdbccad));
