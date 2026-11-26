@@ -144,12 +144,15 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     // The shelves serve as real opaque cover during the retreat. They sit
     // beside, rather than across, the seven friends' resting sight lines.
     for(const side of [-1,1]){
-      const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-3.5));if(cover)covers.push(cover);
-      const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-3.5));if(base)covers.push(base);
+      // 13바퀴 — 3.0배에서 완두콩(세계 x 7.1 · 몸 반지름 1.71)이 이 책장 안에 박혀 있었다.
+      // 책장을 뒤로(z -3.5 → **-4.1**) 물려 앉은 친구와 안 겹치게. -4.6 까지 물렸더니 이번엔
+      // **숨는 자리(z -5.0)가 책장 안**이 되어 도토리·밤이 도망을 아예 못 갔다 — 사이로 맞춘다.
+      const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-4.1));if(cover)covers.push(cover);
+      const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-4.1));if(base)covers.push(base);
       place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*11.3,0,-2.5));
       for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-3.4));
     }
-    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-3.5));if(extra)covers.push(extra);
+    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-4.1));if(extra)covers.push(extra);
     cabinet.visible=false;
     place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(11.3,0,-.8));
     place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(11.3,1.15,-.8));

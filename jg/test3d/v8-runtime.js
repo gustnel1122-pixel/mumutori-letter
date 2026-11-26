@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261123-8e';
 import {createEmotionRig,EMOTIONS} from './v8-emotions.js?v=20261123-8e';
 import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261123-8e';
-import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261123-8e';
+import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261126-13';
 import {createRenderPipeline} from './v8-render.js?v=20261123-8e';
 import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 import {MotionWorld} from './v8-motion.js?v=20261123-8e';
@@ -32,11 +32,14 @@ export function createV8(config){
   // 0206 ① — 친구가 커지면 숨는 줄도 넓어져야 한다(2.0 배에서 서로 못 지나가 도망이 멈췄다).
   // 길을 찾는 판 넓이도 같이 넓힌다(기본 ±12.4 로는 넓힌 숨는 자리에 닿지 못한다).
   const spread=config.layoutSpread||1;
-  const WALK_RADIUS=0.62;                 // 길 찾기에 쓰는 '발밑' 반지름(몸 반지름 대비)
-  const motion=new MotionWorld({minX:-12.4*spread,maxX:12.4*spread});let furnitureObstacles=[];
+  const WALK_RADIUS=0.48;   // 13바퀴 — 0.62 에서는 도토리·밤이 도망 때 한 걸음도 못 뗐다(매 걸음이 다른 친구에 막힘)
+  // 13바퀴 — 숨는 자리를 고르게 벌리면서 길 찾는 판도 그 바깥까지 넓힌다(안 그러면 끝자리에 못 닿는다).
+  const motion=new MotionWorld({minX:-20.5,maxX:20.5});let furnitureObstacles=[];
   const actorScale=config.actorScale || 1,propScale=actorScale*.75;
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
   const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
+  // 13바퀴 ④ — 렉 원인 가르기용 스위치(검사 전용 · 기본은 전부 켬).
+  const SEEDS_ON=config.seedsOn!==false, PATH_ON=config.pathOn!==false;
   const mounts=[bazookaGroup,new THREE.Group()];scene.add(mounts[1]);
   // 두 바주카는 각자 주인(병아리·쌀)이 가지러 간다. 세워 두는 곳은 화면에서 친구와
   // 겹쳐 보이지 않는 양쪽 끝 빈자리로 둔다 — v8f 에서는 쌀 바로 뒤에 서 있어서
@@ -133,11 +136,24 @@ export function createV8(config){
     // 오른쪽 집 x: 쌀 0.5 < 완두콩 5.5 < 해바라기씨 6.7 → 오른쪽 칸도 같은 순서로.
     // 0206 ① — 2.0 배에서는 한 줄로 서면 서로 못 지나가 도망이 멈췄다. 자리를 가로로 더 벌리면
     // 화면 밖까지 나가므로 **앞뒤 두 줄로 엇갈려** 세운다(같은 줄 사이가 두 배로 벌어진다).
-    const covers={byeongari:[-11.6,-5.0],ddangkong:[-9.9,-6.8],bam:[-8.2,-5.0],dotori:[-6.6,-6.8],
-                  haebaragi:[11.2,-5.0],wandukong3:[9.1,-6.8],ssal:[6.9,-5.0]};
+    // 13바퀴 — 오른쪽 세 자리만 간격이 좁아(2.15) 3.0배에서 완두콩↔해바라기씨가 도망 때
+    // 23장이나 겹쳤다(왼쪽 네 자리는 앞뒤로 엇갈려 같은 줄끼리 3.4 라 0장). 오른쪽도 3.3 으로.
+    // 13바퀴 — 숨는 자리를 **자기 쪽**으로 준다. 예전엔 도토리(집 x +3.5)가 방을 가로질러
+    // 왼쪽 끝까지 가야 해서, 가는 길에 밤이 비켜 주느라 둘 다 1.6초 동안 한 발도 못 뗐다.
+    // 집 x 순서: 병아리콩 -10.6 · 땅콩 -7.1 · 밤 -3.5 · 쌀 0 · 도토리 3.5 · 완두콩 7.1 · 해바라기씨 10.6
+    // 13바퀴 — 숨는 줄을 **책장 뒤**로 확실히 보낸다. 책장 뒷면이 z -4.53 인데 숨는 줄이 -5.0 이라
+    // 3.0배 몸(걷는 반지름 0.8~1.1)이 책장 안에 걸려 도토리·밤이 길을 못 만들었다(gap -0.36 · -0.59).
+    const covers={byeongari:[-16.5,-6.0],ddangkong:[-13.2,-7.8],bam:[-9.9,-6.0],ssal:[-6.6,-7.8],
+                  haebaragi:[15.0,-6.0],wandukong3:[10.2,-7.8],dotori:[-3.0,-7.8]};
+    // 도토리는 **가운데-왼쪽**으로 보낸다. 오른쪽으로 보내면 거의 뒤로만 가서(가로 5px) 화면에서는
+    // 도망치는 것처럼 안 보였다 — 실제로는 숨는 자리까지 갔는데도 그랬다.
+    // 도토리는 앞줄 가운데라 오른쪽 끝(6.9)으로 가려면 완두콩·해바라기씨 책상 사이 0.1 틈을 지나야 해서
+    // 길이 아예 없었다(1.6초 동안 0px). 가운데 통로로 곧장 갈 수 있는 자리를 준다.
     // 11바퀴 — 숨는 줄까지 자리와 같은 비율로 벌리면 3.0배에서 **화면 밖**으로 나간다
     // (카메라가 가까워졌다). 앞뒤 두 줄로 엇갈려 있으니 가로는 조금만 벌린다.
-    const coverSpread=1+(spread-1)*0.45;
+    // 13바퀴 — 숨는 자리 자체를 3.3 간격으로 고르게 잡았으니 **더 벌리지 않는다**.
+    // 더 벌리면 길 찾는 판 끝(±20.5)에 닿아 **병아리콩이 아예 도망을 못 갔다**(제자리 -11.3 · 걸음 6).
+    const coverSpread=1;
     a.cover=new THREE.Vector3(covers[a.key][0]*coverSpread,0,covers[a.key][1]);
     // 빼꼼은 제자리에서 앞으로만 나온다 — 옆으로 몰리면 서로 가린다.
     a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?1.9:-1.9;a.coverPeek.z+=1.05;
@@ -175,8 +191,12 @@ export function createV8(config){
     // 12바퀴 — 3.0배에서 이 벽이 **친구를 가두고 있었다**. 해바라기씨는 집이 x 10.6 인데 몸 반지름이
     // 1.72 라 11.0 벽 **안쪽에 박힌 채 시작**했고(minGap -0.649), 그래서 도망 길을 아예 못 만들었다
     // (검토 두 곳이 같은 세 명을 짚었다). 벽은 **제일 바깥 친구 몸 끝보다 더 밖**에 세운다.
-    const reach=Math.max(0,...getActors().map(a=>Math.abs(a.homePos.x)+(a.bodyRadius||0)));
-    const idleWall=Math.max(11.0,reach+0.45);
+    // 13바퀴 — 이 벽이 **도망 길을 막고 있었다**. 숨는 자리가 벽 바깥(±16.5)인데 벽이 ±12.7 이라
+    // 병아리콩이 벽을 넘지 못해 제자리(-11.3)에 서 있었다(계획중 true · 걸음 6).
+    // 벽은 **숨는 자리보다 더 밖**에 세운다 — 평소에 멀리 돌아 나가는 것만 막으면 된다.
+    const reach=Math.max(0,...getActors().map(a=>Math.abs(a.homePos.x)+(a.bodyRadius||0)),
+                         ...getActors().map(a=>Math.abs(a.cover?.x||0)));
+    const idleWall=Math.max(11.0,reach+1.2);
     const keepInFrame=[-1,1].map(side=>({key:'frame-'+side,
       minX:side<0?-60:idleWall, maxX:side<0?-idleWall:60, minZ:-3.0, maxZ:9.0}));
     furnitureObstacles=[...office.obstacles,...keepInFrame];motion.clear();motion.setObstacles(furnitureObstacles);
@@ -253,7 +273,7 @@ export function createV8(config){
   }
   // 1241 ⑦ — 숨는 자리를 제 자리 순서대로 바꿨으니 **지나가는 순서도 먼 자리부터** 다시 쓴다.
   // (안 고치면 뒤 사람이 앞 사람 자리를 지나가야 해서 도망이 영영 안 끝난다 — 실제로 그렇게 멈췄다)
-  const traffic=[['byeongari','ddangkong','bam','dotori'],['haebaragi','wandukong3','ssal']];
+  const traffic=[['byeongari','ddangkong','bam','ssal','dotori'],['haebaragi','wandukong3']];   // 13바퀴 — 숨는 자리 순서대로(먼 자리부터)
   function turnToMove(a,returning=false){
     const active=new Set(getActors().map(actor=>actor.key));
     const order=traffic.find(group=>group.includes(a.key)).filter(key=>active.has(key));
@@ -266,7 +286,9 @@ export function createV8(config){
     const p=ahead&&motion.agents.get(ahead.key)?.position;
     const target=ahead?(returning?ahead.homePos:ahead.cover):null;
     if(p&&target&&Math.hypot(p.x-target.x,p.z-target.z)<.35)return true;
-    return frame.age>.55+idx*.30;
+    // 13바퀴 — 0.55+0.30n 이면 네 번째 친구가 1.45초에야 출발한다. 영상 도망 토막이 1.6초라
+    // 뒤 두 명은 '제자리'로 보였다. 숨는 자리를 고르게 벌려 길이 넓어졌으니 시차를 줄인다.
+    return frame.age>.15+idx*.07;   // 13바퀴 — 숨는 자리가 고르게 벌어져 길이 넓으니 더 일찍 출발해도 안 막힌다
   }
   function animateActor(a,dt,t){
     const p=profile[a.key],phase=t*p.pace+a.phase,i=getActors().indexOf(a),id=frame.id;
@@ -351,8 +373,30 @@ export function createV8(config){
       }
     }else if(id==='escape'){
       const go=turnToMove(a);a.motionGoal=go?a.cover:a.escapeFrom;
-      const u=clamp((frame.age-i*.34)/2.65,0,1);
-      walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
+      // 13바퀴 ② — 길 찾기가 첫 걸음을 못 떼면(다른 친구·가구에 막힘) 그 친구는 도망 내내
+      // 제자리에 서 있었다(도토리가 1.6초 동안 0px). **놀라서 도망칠 때는 비집고 나간다** —
+      // 0.5초 넘게 제자리면 길 찾기 대신 걷기(walk)가 몸을 끌고 간다.
+      const here=motion.agents.get(a.key)?.position;
+      if(here){
+        if(!a.fleeMark || frame.age<0.05){a.fleeMark={x:here.x,z:here.z};a.panicWalk=false;}
+        // 한 번 '비집고 가기'로 정해지면 도망이 끝날 때까지 그대로 둔다 — 안 그러면 몸이 움직인 순간
+        // 다시 길 찾기가 끌어당겨 제자리로 돌아오고, 둘이 번갈아 당겨 결국 1px 도 못 간다.
+        if(!a.panicWalk){
+          const moved=Math.hypot(here.x-a.fleeMark.x,here.z-a.fleeMark.z);
+          a.panicWalk = go && frame.age>0.5 && moved<0.6;
+        }
+      }
+      const u=clamp((frame.age-i*.16)/2.1,0,1);   // 13바퀴 — 출발 시차를 줄이고 조금 더 빨리 달린다
+      // 비집고 갈 때는 **뒤로 물러난 뒤 옆으로** 간다(ㄱ자). 곧장 대각선으로 가면 가운데 책상을
+      // 뚫고 지나간다(도토리가 쌀 책상을 -0.41 뚫었다).
+      if(a.panicWalk){
+        const from=a.escapeFrom || a.homePos;
+        // 가운데 통로는 쌀 책상(끝 3.44)과 완두콩 책상(시작 5.42) 사이 **1.98** 뿐인데
+        // 3.0배 도토리 몸은 2.68 이라 **어느 쪽으로 가도 책상을 스친다**(바깥 비켜가기 -0.59 ·
+        // 곧장 물러나기 -0.43). 둘 중 덜 스치는 쪽(곧장 물러나기)으로 둔다 — 사장님 판단 거리.
+        const mid=new THREE.Vector3(from.x,0,a.cover.z);
+        if(u<0.5)walk(a,from,mid,u/0.5,t); else walk(a,mid,a.cover,(u-0.5)/0.5,t);
+      }else walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
       // 0224 P25·P26 — 1초에 6걸음 통통(±0.03) + 앞으로 12° 숙이고 돌 때 안쪽으로 기울기.
       const run=u>0&&u<1?1:0;
       a.wrapper.position.y+=Math.abs(Math.sin(t*Math.PI*7+a.phase))*.03*run;
@@ -417,11 +461,13 @@ export function createV8(config){
       g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
       return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:[operators[i]]};
     }).filter(Boolean);
-    motion.obstacles=[...furnitureObstacles,...launcherBoxes];motion.step(goals,dt);
+    motion.obstacles=[...furnitureObstacles,...launcherBoxes];if(PATH_ON)motion.step(goals,dt);
     for(const a of actors){
       const state=motion.agents.get(a.key),old=a.lastPhysical || state.position;
       const dx=state.position.x-old.x,dz=state.position.z-old.z;
-      a.wrapper.position.x=state.position.x;a.wrapper.position.z=state.position.z;
+      // 도망 때 비집고 나가는 친구는 길 찾기 자리를 덮어쓰지 않는다(위 panicWalk).
+      if(!a.panicWalk){a.wrapper.position.x=state.position.x;a.wrapper.position.z=state.position.z;}
+      else{state.position.x=a.wrapper.position.x;state.position.z=a.wrapper.position.z;}
       // The clearance cylinder encloses every yaw. Keep the body upright so
       // an equip bend cannot lean outside that cylinder into a desk/crate.
       a.wrapper.rotation.x=0;a.wrapper.rotation.z=0;
@@ -480,7 +526,7 @@ export function createV8(config){
       // 미는 둘 말고는 그 동안에도 계속 던지게 한다.
       const stillThrowing=['throw','gun'].includes(frame.id) ||
         (['bazooka','mess'].includes(frame.id) && !operators.includes(a.key));
-      if(!emotionOverride && stillThrowing && a.held && now>=a.nextShot){
+      if(SEEDS_ON && !emotionOverride && stillThrowing && a.held && now>=a.nextShot){
         const kind=frame.id;
         if(kind==='gun' && (!a.def.canThrow || !a.gunActive)){/* 총은 쏠 수 있는 친구만 */}
         else{

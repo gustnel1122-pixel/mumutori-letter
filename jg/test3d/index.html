@@ -554,9 +554,17 @@ const contactContext=contactCanvas.getContext('2d'),contactGradient=contactConte
 contactGradient.addColorStop(0,'rgba(35,23,13,.38)');contactGradient.addColorStop(.5,'rgba(35,23,13,.16)');contactGradient.addColorStop(1,'rgba(35,23,13,0)');
 contactContext.fillStyle=contactGradient;contactContext.fillRect(0,0,128,128);
 // 0224 P34 — 그림자를 못 켜는 대신 발밑 타원 1장만. 카메라가 거의 수평이라 옅으면 안 보인다.
+const QA_FLAGS = new URLSearchParams(location.search);
+// 13바퀴 ④ — 1% 저점이 v8f 보다 낮은 원인을 **하나씩 꺼서** 가른다(검사 전용 · 기본은 전부 켬).
+//   ?outline=0 테두리 · ?shadow=0 발밑 그림자 · ?seeds=0 날아가는 씨앗 · ?path=0 길찾기
+const OUTLINE_ON = QA_FLAGS.get('outline') !== '0';
+const SHADOW_ON  = QA_FLAGS.get('shadow')  !== '0';
+const SEEDS_ON   = QA_FLAGS.get('seeds')   !== '0';
+const PATH_ON    = QA_FLAGS.get('path')    !== '0';
 const shadowMat = new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(contactCanvas),transparent:true,opacity:.82,depthWrite:false });
 function makeShadow(){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1.05*COMPOSITION.actorScale,1.05*COMPOSITION.actorScale), shadowMat);
+  m.visible = SHADOW_ON;
   m.rotation.x = -Math.PI/2;
   m.position.y = 0.01;
   return m;
@@ -711,14 +719,18 @@ const LAYOUT_SLOTS_BY_CAM = {
     { dx: 6.00, dz: 3.10, yaw: 0, row:'front' },
     { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },
   ],
+  // 13바퀴 — 3.0배에서 친구끼리 겹침이 105/240 이었다(완두콩↔해바라기씨 105 · 병아리콩↔땅콩 24).
+  // 원인은 **자리가 고르지 않은 것**이었다: 1.20배 시절 간격이라 앞줄·가운데줄이 세계좌표로
+  // 1.9~2.3 밖에 안 떨어져 있었는데(몸 반지름이 1.7), 벌린 폭은 같아도 **고르게** 놓으면 해결된다.
+  // 왼쪽부터 병아리콩·땅콩·밤·쌀·도토리·완두콩·해바라기씨 순서로 같은 간격(세계좌표 3.5)씩.
   lowered: [
-    { dx: 2.75, dz: 3.10, yaw: 0, row:'front' },   // 11바퀴 3.0배 — 뒷줄 쌀·가운데줄 완두콩 사이 한가운데로
-    { dx:-1.50, dz:-1.70, yaw: 0, row:'middle' },
-    { dx:-4.60, dz:-1.70, yaw: 0, row:'middle' },   // 11바퀴 3.0배 — 밤이 이 책상에 몸이 닿아 더 왼쪽으로
-    { dx:-6.10, dz: 3.10, yaw: 0, row:'front' },
-    { dx: 5.60, dz:-1.70, yaw: 0, row:'middle' },
-    { dx: 6.80, dz: 3.10, yaw: 0, row:'front' },
-    { dx: 0.95, dz:-4.20, yaw: Math.PI, row:'back' },   // 11바퀴 3.0배 — 밤과 화면에서 닿아 조금 더 오른쪽
+    { dx: 2.24, dz: 3.10, yaw: 0, row:'front' },    // 도토리
+    { dx:-2.24, dz:-1.70, yaw: 0, row:'middle' },   // 밤
+    { dx:-4.55, dz:-1.70, yaw: 0, row:'middle' },   // 땅콩
+    { dx:-6.79, dz: 3.10, yaw: 0, row:'front' },    // 병아리콩
+    { dx: 4.55, dz:-1.70, yaw: 0, row:'middle' },   // 완두콩
+    { dx: 6.79, dz: 3.10, yaw: 0, row:'front' },    // 해바라기씨
+    { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },// 쌀
   ],
 };
 // v8g: 일곱이 저마다 자기 책상·화면 쪽으로 몸을 돌려 앉는다(2208 ①-1).
@@ -765,7 +777,10 @@ const LAUNCHER_SPOTS = VARIANT === 'f'
   // 왼쪽은 화이트보드(-11.3, z -1.0), 오른쪽은 스탠드 책상·화분(x 11~12, z ~1)을 피한다.
   // 쏘는 자리를 안쪽으로 당기면 통나무가 친구와 겹친다(실측 13 → 63). 자리는 그대로 두고
   // 대신 **휴지통·종이를 통나무가 서는 칸 밖으로** 비켰다(v8-office.js).
-  : {parked:[[-13.4, 3.6], [13.4, 3.6]], deployed:[[-8.0, -0.8], [8.6, 1.1]]};   // 11바퀴: 바깥(±10.7)으로 옮겨 봤지만 겹침 72→73 으로 그대로였다
+  // 13바퀴 — 쏘는 자리(-8.0 · 8.6)가 가운데줄 친구(세계 ±7.1) 바로 옆이라, 도망 **출발부터**
+  // 미는 친구와 그 이웃이 겹쳤다(왼쪽 23장 · 오른쪽 23장, 좌우가 번갈아 나타났다).
+  // 쏘는 자리를 바깥 끝으로 빼서 출발선을 떼어 놓는다.
+  : {parked:[[-13.4, 3.6], [13.4, 3.6]], deployed:[[-10.0, -0.8], [10.0, 1.1]]};   // 13바퀴 — 숨는 자리를 자기 쪽으로 바꿔 출발 겹침이 없어졌으니 조금 안쪽으로(도망 거리 확보)   // 11바퀴: 바깥(±10.7)으로 옮겨 봤지만 겹침 72→73 으로 그대로였다
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -1031,7 +1046,6 @@ function applyCanonColors(key, model){
 // 조명 계산이 없는 가장 싼 재질 하나를 공유하므로 그리는 횟수만 조금 는다(아래 FPS 실측).
 // 1241 ⑩ — 외곽선 켜고 끄는 한 줄 스위치. **기본값 켬**.
 // 사장님이 진격 방에서 '빼'라고 하시면 이 한 줄만 false 로 바꾸면 된다(`?outline=0` 으로도 꺼짐).
-const OUTLINE_ON = new URLSearchParams(location.search).get('outline') !== '0';
 const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({color:0x4A2C1A, side:THREE.BackSide});
 // 1241 ⑥: 돋보기 렌즈(Lens)·금테(Gold)에 진갈색 테두리가 들어가 '선글라스'로 보였다 → 뺀다.
 const OUTLINE_MESHES = /^(Body|Cap|CapLine|Leaf|Stem|Beak|Petal|Sun|Scarf)$/;   // 0206 ⑦ Belly 제외 — 밑동 테두리가 연베이지를 덮었다
@@ -1630,7 +1644,7 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,layoutSpread:LAYOUT_SPREAD,
+  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,layoutSpread:LAYOUT_SPREAD,seedsOn:SEEDS_ON,pathOn:PATH_ON,
   getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();

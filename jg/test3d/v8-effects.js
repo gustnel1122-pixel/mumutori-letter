@@ -4,7 +4,10 @@ import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 export class WindowMess {
   constructor(scene,{width,height,z,bottom}){
     this.width=width;this.height=height;this.z=z;this.bottom=bottom;this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};
-    const c=document.createElement('canvas');c.width=2048;c.height=Math.round(2048*height/width);this.canvas=c;this.ctx=c.getContext('2d');
+    const c=document.createElement('canvas');c.width=1024;c.height=Math.round(1024*height/width);this.canvas=c;this.ctx=c.getContext('2d');
+    // 13바퀴 ④ — 1% 저점이 v8f 보다 낮은 원인이 **이 그림판을 GPU 로 올리는 것**이었다
+    // (씨앗을 끄면 저점 42 → 81). 2048 은 4MB·1024 는 1MB. 자국은 뭉개진 동그라미라 1024 로도 같아 보인다.
+    this.lastUpload=-1;this.uploadEvery=0.05;   // 1초에 최대 20번만 올린다(눈으로는 구분 안 됨)
     this.texture=new THREE.CanvasTexture(c);this.texture.colorSpace=THREE.SRGBColorSpace;
     this.material=gradeMaterial(new THREE.MeshBasicMaterial({map:this.texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
     this.mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),this.material);
@@ -55,10 +58,15 @@ export class WindowMess {
     ctx.restore();this.dirty=true;
   }
   fade(clean){
-    if(this.dirty){this.texture.needsUpdate=true;this.dirty=false;}   // 프레임마다 한 번만 올린다
+    if(this.dirty){
+      const now=performance.now()/1000;
+      if(this.lastUpload<0 || now-this.lastUpload>=this.uploadEvery){
+        this.texture.needsUpdate=true;this.dirty=false;this.lastUpload=now;
+      }
+    }
     this.material.opacity=1-THREE.MathUtils.clamp(clean,0,1);
   }
-  reset(){this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};this.texture.needsUpdate=true;this.material.opacity=1;}
+  reset(){this.lastUpload=-1;this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};this.texture.needsUpdate=true;this.material.opacity=1;}
 }
 
 export class SeedProjectiles {
