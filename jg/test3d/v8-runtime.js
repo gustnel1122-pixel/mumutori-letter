@@ -149,7 +149,7 @@ export function createV8(config){
   // 자기 기둥 바로 뒤로 두었더니(±12.0/±8.8/±5.6/-2.4) 통로가 좁아 도토리·밤·병아리콩이
   // 0px 로 다시 막혔다. **옆으로 흘러 나가는 자리**로 둔다 — 가로로 움직여야 화면에서 보인다.
   const covers={byeongari:[-16.5,-6.0],ddangkong:[-13.2,-7.8],bam:[-9.9,-6.0],ssal:[-6.6,-7.8],
-                dotori:[-3.0,-7.8],haebaragi:[16.4,-6.0],wandukong3:[12.4,-7.8]};
+                dotori:[8.2,-7.8],haebaragi:[17.8,-6.0],wandukong3:[12.4,-7.8]};
     // 도토리는 **가운데-왼쪽**으로 보낸다. 오른쪽으로 보내면 거의 뒤로만 가서(가로 5px) 화면에서는
     // 도망치는 것처럼 안 보였다 — 실제로는 숨는 자리까지 갔는데도 그랬다.
     // 도토리는 앞줄 가운데라 오른쪽 끝(6.9)으로 가려면 완두콩·해바라기씨 책상 사이 0.1 틈을 지나야 해서
@@ -285,7 +285,7 @@ export function createV8(config){
   }
   // 1241 ⑦ — 숨는 자리를 제 자리 순서대로 바꿨으니 **지나가는 순서도 먼 자리부터** 다시 쓴다.
   // (안 고치면 뒤 사람이 앞 사람 자리를 지나가야 해서 도망이 영영 안 끝난다 — 실제로 그렇게 멈췄다)
-  const traffic=[['byeongari','ddangkong','bam','ssal','dotori'],['haebaragi','wandukong3']];   // 13바퀴 — 숨는 자리 순서대로(먼 자리부터)
+  const traffic=[['byeongari','ddangkong','bam','ssal'],['haebaragi','wandukong3','dotori']];   // 13바퀴 — 숨는 자리 순서대로(먼 자리부터)
   function turnToMove(a,returning=false){
     const active=new Set(getActors().map(actor=>actor.key));
     const order=traffic.find(group=>group.includes(a.key)).filter(key=>active.has(key));
@@ -443,7 +443,7 @@ export function createV8(config){
       // 60초 자유 실행에서 전투가 '씨앗 보관함으로'(equip)에서 못 넘어갔다(검토 5/5회).
       // **걷는 빠르기를 크기에 맞춰** 올린다(1.35배 때와 같은 시간이 걸리도록).
       const sizeMul=(config.actorScale||1.35)/1.35;
-      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.4:3)*sizeMul;   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
+      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?2.6:3)*sizeMul;   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
     // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게.
@@ -547,8 +547,10 @@ export function createV8(config){
       // 7바퀴 영상분석 ① — 바주카·유리창 엉망(7~9초)은 통나무 미는 둘만 움직이고 나머지 다섯은
       // 가만히 서 있어서 **평소보다도 조용했다**(1초 변화량 0.77~0.82 vs 평소 1.4~2.6).
       // 미는 둘 말고는 그 동안에도 계속 던지게 한다.
+      // 13바퀴 재작업(영상검사 ③) — `fetch` 가 빠져 있어서 **통나무 가지러 가는 동안 다섯 명이
+      // 가만히 서 있었다**(토막 변화량 2.95 · 평소 4.23). 미는 둘 말고는 그때도 계속 던진다.
       const stillThrowing=['throw','gun'].includes(frame.id) ||
-        (['bazooka','mess'].includes(frame.id) && !operators.includes(a.key));
+        (['fetch','bazooka','mess'].includes(frame.id) && !operators.includes(a.key));
       if(SEEDS_ON && !emotionOverride && stillThrowing && a.held && now>=a.nextShot){
         const kind=frame.id;
         if(kind==='gun' && (!a.def.canThrow || !a.gunActive)){/* 총은 쏠 수 있는 친구만 */}
