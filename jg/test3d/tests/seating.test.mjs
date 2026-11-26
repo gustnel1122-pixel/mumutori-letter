@@ -29,7 +29,9 @@ test('v8g shrinks the friends and grows the desks, v8f stays as it was', () => {
   const f = shapeOf('f'), g = shapeOf('g');
   assert.equal(f.actorScale, 1.65);            // ?ver=f 는 v8f 그대로 되돌리기
   assert.equal(f.deskScale, 1.20);
-  assert.ok(g.actorScale < f.actorScale, '친구는 지금보다 작아야 한다');
+  // 0206 — 사장님 11/25 02:05 "2배". v8f 때는 '친구를 작게'였지만 이제는 **더 크게**가 지시다.
+  // 대신 책상·의자를 같은 비율로 키워 '앉아서 일하는' 비율을 지킨다(아래 ratio 검사).
+  assert.ok(g.actorScale >= 1.9, '사장님 지시대로 친구는 2.0배 근처여야 한다: ' + g.actorScale);
   assert.ok(g.deskScale > f.deskScale, '책상·의자는 커져야 한다');
   assert.equal(g.seated, true);
   // 책상 상판이 친구 키의 40~60% 여야 '앉아서 일하는' 비율로 읽힌다.

@@ -29,7 +29,10 @@ function handOffset(a){
 export function createV8(config){
   const {scene,renderer,camera,dirLight,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(),pipeline=createRenderPipeline(renderer,scene,camera);
-  const motion=new MotionWorld();let furnitureObstacles=[];
+  // 0206 ① — 친구가 커지면 숨는 줄도 넓어져야 한다(2.0 배에서 서로 못 지나가 도망이 멈췄다).
+  // 길을 찾는 판 넓이도 같이 넓힌다(기본 ±12.4 로는 넓힌 숨는 자리에 닿지 못한다).
+  const spread=config.layoutSpread||1;
+  const motion=new MotionWorld({minX:-12.4*spread,maxX:12.4*spread});let furnitureObstacles=[];
   const actorScale=config.actorScale || 1,propScale=actorScale*.75;
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
   const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
@@ -124,9 +127,11 @@ export function createV8(config){
     // (도토리↔밤·도토리↔병아리콩·밤↔병아리콩·쌀↔해바라기씨) 도망·복귀 때 화면에서 겹쳤다.
     // 왼쪽 집 x: 병아리콩 -6.0 < 땅콩 -5.0 < 밤 -1.3 < 도토리 2.2 → 왼쪽 칸도 같은 순서로.
     // 오른쪽 집 x: 쌀 0.5 < 완두콩 5.5 < 해바라기씨 6.7 → 오른쪽 칸도 같은 순서로.
-    const covers={byeongari:[-11.6,-5.0],ddangkong:[-9.9,-5.0],bam:[-8.2,-5.0],dotori:[-6.6,-5.0],
-                  haebaragi:[11.2,-5.0],wandukong3:[9.1,-5.0],ssal:[6.9,-5.0]};
-    a.cover=new THREE.Vector3(covers[a.key][0],0,covers[a.key][1]);
+    // 0206 ① — 2.0 배에서는 한 줄로 서면 서로 못 지나가 도망이 멈췄다. 자리를 가로로 더 벌리면
+    // 화면 밖까지 나가므로 **앞뒤 두 줄로 엇갈려** 세운다(같은 줄 사이가 두 배로 벌어진다).
+    const covers={byeongari:[-11.6,-5.0],ddangkong:[-9.9,-6.8],bam:[-8.2,-5.0],dotori:[-6.6,-6.8],
+                  haebaragi:[11.2,-5.0],wandukong3:[9.1,-6.8],ssal:[6.9,-5.0]};
+    a.cover=new THREE.Vector3(covers[a.key][0]*spread,0,covers[a.key][1]);
     // 빼꼼은 제자리에서 앞으로만 나온다 — 옆으로 몰리면 서로 가린다.
     a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?1.9:-1.9;a.coverPeek.z+=1.05;
     const crate=office.assets.model('cardboardBoxOpen',[.65,.35,.55]);
@@ -157,7 +162,13 @@ export function createV8(config){
   }
   function rebuildWorld(){
     office.rebuild(scene.children.filter(o=>o.userData.isDesk),getActors().map(a=>a.crate).filter(Boolean));
-    furnitureObstacles=office.obstacles;motion.clear();motion.setObstacles(furnitureObstacles);
+    // 0206 ① — 숨는 줄은 화면 밖까지 넓어야 하지만(친구가 커져 서로 못 지나간다), **평소 구역**은
+    // 화면 안에 머물러야 한다. 2.0 배에서 수다 가던 땅콩이 왼쪽 구석(x -13.1)까지 돌아 나가
+    // 몸이 잘렸다. 책장 앞(z > -3.0)에만 보이지 않는 벽을 세운다 — 도망 길(z < -3.0)은 그대로 연다.
+    const idleWall=11.0;
+    const keepInFrame=[-1,1].map(side=>({key:'frame-'+side,
+      minX:side<0?-60:idleWall, maxX:side<0?-idleWall:60, minZ:-3.0, maxZ:9.0}));
+    furnitureObstacles=[...office.obstacles,...keepInFrame];motion.clear();motion.setObstacles(furnitureObstacles);
     for(const a of getActors())motion.add(a.key,a.homePos,a.bodyRadius);
   }
   function resetEquipment(){

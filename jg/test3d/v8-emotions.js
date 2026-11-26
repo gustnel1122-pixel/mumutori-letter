@@ -139,7 +139,8 @@ export function createEmotionRig(actor){
   sprite.position.set(0,1.05,0);sprite.scale.set(.46,.46,1);sprite.visible=false;visualRoot.add(sprite);
   // P11 — 땀방울은 머리 옆에 따로.
   const sweat=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthWrite:false,map:effectTexture('sweat')}));
-  sweat.position.set(.34,.92,.06);sweat.scale.set(.30,.30,1);sweat.visible=false;visualRoot.add(sweat);
+  // 0206 ⑨ — 땀방울이 눈 바로 밑에 있어 '우는 것'처럼 보였다. 머리 **옆 위**로 옮긴다.
+  sweat.position.set(.56,1.16,.06);sweat.scale.set(.34,.34,1);sweat.visible=false;visualRoot.add(sweat);
   let previous;
   return {
     dispose(){owned.forEach(o=>o.dispose());dots.forEach(d=>d.parent&&d.parent.remove(d));sprite.material.dispose();visualRoot.remove(sprite);
@@ -184,9 +185,9 @@ export function createEmotionRig(actor){
       sweat.visible=panicNow>.05 && active;
       if(sweat.visible){
         const fall=((t*(1/1.2))%1);
-        sweat.position.set(.34,.98-fall*.30,.06);
+        sweat.position.set(.56,1.22-fall*.30,.06);   // 0206 ⑨ 머리 옆에서 흐른다(눈 밑 아님)
         sweat.material.opacity=.85*panicNow*(1-fall*.5);
-        sweat.scale.setScalar(.30*(.7+.3*panicNow));
+        sweat.scale.setScalar(.34*(.7+.3*panicNow));
       }
       actor.emotion=name;
     },

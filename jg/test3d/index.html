@@ -174,14 +174,17 @@ const CAMERA_LEVEL = (() => {
 //      `?ver=f` 면 v8f(66cd66a) 비율·자세 그대로 — 되돌려 보기용.
 const VARIANT = new URLSearchParams(location.search).get('ver') === 'f' ? 'f' : 'g';
 // fitX·fitY = 화면 가로·세로를 얼마나 채울지(1에 가까울수록 더 당겨 본다).
-// 1319 — 사장님 13:18 "캐릭터들이 좀만더 커졌으면 좋겠는데" → 친구 크기 1.20 → **1.35**.
-// `?scale=1.30` 처럼 주면 그 크기로 그린다(총괄이 1.30·1.35·1.40 을 나란히 보여드리기 위한 것).
+// 0206 — 사장님 11/25 02:05 "2배" → 친구 크기 1.35 → **2.0**.
+// `?scale=1.6` 처럼 주면 그 크기로 그린다(1.6 · 2.0 · 2.7 을 나란히 보여드리기 위한 것).
 const SCALE_REQUEST = parseFloat(new URLSearchParams(location.search).get('scale'));
-const ACTOR_SCALE_G = Number.isFinite(SCALE_REQUEST) && SCALE_REQUEST>0.8 && SCALE_REQUEST<2
-  ? SCALE_REQUEST : 1.35;
+const ACTOR_SCALE_G = Number.isFinite(SCALE_REQUEST) && SCALE_REQUEST>0.8 && SCALE_REQUEST<=3
+  ? SCALE_REQUEST : 2.0;
+// 책상·의자도 **같은 비율로** 키운다 — 안 키우면 친구가 책상을 타고 앉은 꼴이 된다.
+// 1.35 배일 때 책상 1.30 이 '앉아서 일하는' 비율(상판/키 0.43)이었으므로 그 비율을 지킨다.
+const DESK_SCALE_G = +(1.30 * ACTOR_SCALE_G / 1.35).toFixed(3);
 const SHAPE = VARIANT === 'f'
   ? {actorScale:1.65, deskScale:1.20, seated:false, fitX:0.90, fitY:0.88}  // v8f 그대로
-  : {actorScale:ACTOR_SCALE_G, deskScale:1.30, seated:true, fitX:0.97, fitY:0.94}; // v8g 자기 의자에 앉음
+  : {actorScale:ACTOR_SCALE_G, deskScale:DESK_SCALE_G, seated:true, fitX:0.92, fitY:0.90}; // v8g 자기 의자에 앉음
 // Display transforms only: the canonical GLBs and their proportions stay intact.
 const COMPOSITION = {...SHAPE, variant:VARIANT, camLevel:CAMERA_LEVEL, ...CAMERA_LEVELS[CAMERA_LEVEL]};
 
@@ -707,13 +710,13 @@ const LAYOUT_SLOTS_BY_CAM = {
     { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },
   ],
   lowered: [
-    { dx: 2.40, dz: 3.10, yaw: 0, row:'front' },
+    { dx: 2.95, dz: 3.10, yaw: 0, row:'front' },   // 0206 ① 뒷줄 쌀과 화면에서 겹쳐 오른쪽으로
     { dx:-1.50, dz:-1.70, yaw: 0, row:'middle' },
     { dx:-5.10, dz:-1.70, yaw: 0, row:'middle' },
     { dx:-6.10, dz: 3.10, yaw: 0, row:'front' },
     { dx: 5.60, dz:-1.70, yaw: 0, row:'middle' },
     { dx: 6.80, dz: 3.10, yaw: 0, row:'front' },
-    { dx: 0.60, dz:-4.20, yaw: Math.PI, row:'back' },
+    { dx: 0.65, dz:-4.20, yaw: Math.PI, row:'back' },   // 0206 ① 앞줄 도토리·가운데줄 밤 사이 한가운데로
   ],
 };
 // v8g: 일곱이 저마다 자기 책상·화면 쪽으로 몸을 돌려 앉는다(2208 ①-1).
@@ -721,9 +724,17 @@ const LAYOUT_SLOTS_BY_CAM = {
 // 순서는 FRIEND_ORDER(도토리·밤·땅콩·병아리·완두콩·해바라기씨·쌀)와 같다.
 // 0010 답 2: 안경은 정본이라 그대로 두고, **머리 밖으로 떨어져 보이지 않는 각도**까지만 돌린다.
 // 병아리콩(둥근 안경)은 많이 돌리면 먼 쪽 알이 머리 테두리 밖으로 나간다 — 실측해서 각도를 낮췄다.
-const SEAT_YAW_DEG = [-34, 41, 26, 28, -29, -46, 33];
+const SEAT_YAW_DEG = [-34, 41, 26, 23, -29, -46, 33];   // 0206 ⑥ 병아리콩만 28→23° — 더 돌리면 먼 쪽 안경알이 머리 테두리 밖으로 나간다(실측)
+// 0206 ① — 친구가 커지면 자리도 벌려야 한다. 안 벌리면 앞줄·뒷줄이 화면에서 겹친다
+// (2.0 배에서 도토리↔쌀이 바로 그랬다). 1.35 배 자리를 기준으로 크기에 맞춰 넓힌다.
+// 전부 같은 비율로 넓히면 양 끝이 화면 밖으로 나가므로 **절반만**(0.55) 따라 넓힌다.
+// 벌리는 양을 크게 잡으면 **카메라가 그만큼 물러나** 친구가 화면에서 도로 작아진다
+// (0.55 로 벌렸더니 2.0 배인데 화면에서는 +9% 뿐이었다). 겹치지 않을 만큼만 조금 벌린다.
+const SPREAD_K = 0.52;      // 책상이 1.48배 커져 사이 통로가 좁아지므로 자리도 그만큼 벌린다
+const LAYOUT_SPREAD = VARIANT === 'f' ? 1 : 1 + (ACTOR_SCALE_G / 1.35 - 1) * SPREAD_K;
 const LAYOUT_SLOTS = (LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered)
-  .map((slot, i) => VARIANT === 'f' ? slot : {...slot, yaw: THREE.MathUtils.degToRad(SEAT_YAW_DEG[i])});
+  .map((slot, i) => VARIANT === 'f' ? slot
+    : {...slot, dx: +(slot.dx * LAYOUT_SPREAD).toFixed(3), yaw: THREE.MathUtils.degToRad(SEAT_YAW_DEG[i])});
 // 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다.
 // v8f 까지는 주인 자리를 따라 옮겼는데, 쌀은 바주카가 바로 뒤에 서서 화면에서 겹쳐 보였다.
 // v8g 는 양쪽 끝 빈자리(친구 화면 칸 밖)에 세워 두고, 가지러 갈 때만 앞으로 끌고 나온다.
@@ -736,7 +747,18 @@ const LAUNCHER_SPOTS = VARIANT === 'f'
   // 쏘는 자리도 화면에서 다른 친구 칸과 겹치지 않는 곳으로 — 8.0,-0.8 은 해바라기씨와 같은 칸이었다.
   // 1241 ① — 오른쪽 쏘는 자리를 안쪽·뒤로 옮긴다(9.5,2.6 은 카메라에 가까워서 통나무를 옆으로
   // 밀면 화면 밖 1.03 으로 나갔다). 해바라기씨 집(x 6.7)과는 아직 1.9 떨어져 칸이 겹치지 않는다.
-  : {parked:[[-10.5, 3.0], [10.5, 3.0]], deployed:[[-8.0, -0.8], [8.6, 1.1]]};
+  // 0206 ① — 친구가 커지고 자리가 벌어지면 통나무도 같이 밀어내야 한다(2.0 배에서 병아리콩이
+  // 왼쪽 통나무와 화면에서 61% 겹쳤다). 자리와 같은 비율로 옮기되 화면 밖으로 나가는지는 잰다.
+  // 통나무는 화면에서 제일 바깥 점이라 여기를 벌리면 카메라가 곧바로 물러난다 →
+  // 가로로는 **그대로 두고**, 친구와 겹치지 않게 **뒤로**(z) 물려 세운다.
+  // 0206 ④ — 세워 두는 자리는 **아무것도 없는 앞쪽 양끝 구석**으로. 뒤(z -6.6)에 두면 화면에서
+  // 화이트보드(-11.3, z -1.0)·스탠드와 같은 칸에 겹쳐 보였고, 예전 자리(±10.5, z 3.0)는
+  // 친구가 커진 뒤로 바깥 친구와 겹쳤다. 휴지통(±11.3, z 0.75)과도 앞뒤로 떨어뜨린다.
+  // (±13.0, 3.6) 은 카메라에 가까워 화면 밖(1.16)으로 나갔다 → 같은 가로 자리라도 **뒤로** 물리면
+  // 멀어져서 화면 안에 들어온다. 화이트보드(-11.3, z -1.0)·휴지통(±11.3, z 0.75)과는 깊이로 떨어진다.
+  // 뒤쪽(z -2.6 · -4.2)에 세우면 바깥 통로가 막혀 도망 길 찾기가 실패한다(도토리가 방을 가로질러
+  // 왼쪽 끝까지 가야 한다). **앞쪽 양끝 구석**(z 3.6)이 통로를 안 막는 유일한 자리다.
+  : {parked:[[-11.2, 3.6], [11.2, 3.6]], deployed:[[-8.0, -0.8], [8.6, 1.1]]};
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -886,12 +908,20 @@ function lerpAngle(a, b, t){
 // 화면에는 대비 1.12·채도 1.10 보정이 걸려 있어서, 재질에 정본 색을 그대로 넣으면
 // 화면에서는 더 붉고 진하게 나온다(실측: #BA511F 넣으면 화면 (210,63,2)).
 // 그래서 **화면 결과가 정본 #BA511F 가 되도록** 보정을 되돌린 값을 넣는다(아래 결과에 실측 기록).
+// 화면 보정(채도 1.10 · 대비 1.12)을 거치므로 **정본 색을 그대로 넣지 않고 미리 눌러서** 넣는다.
 const CANON_MATERIAL_COLOR = {
-  bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다)
+  bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다) → 화면에서 #BA511F
+  // 0206 ⑥ — 색상 정본의 병아리콩 안경테는 **#9B5918**. 보정 뒤 그 색이 되게 눌러서 넣는다.
+  byeongari: { Gold: 0x8E5417 },
 };
 // 0224 P31 — 정본 밤은 아래쪽이 '연베이지 밑동'인데 3D 에서는 거의 안 보였다.
 // GLB 는 그대로 두고, 불러올 때 Belly(밑동) 메시만 몸 높이의 아래 38% 를 덮도록 키운다.
-const CANON_BELLY = { bam: {cover: 0.38, color: 0xE2BC92} };
+// 0206 ⑦ — 밑동(`Belly`)은 높이는 맞는데 **몸(`Body`)보다 가늘어 몸 속에 들어가 있었다**
+// (밤 x 폭 1.94 vs 몸 2.53). 그래서 소포를 치워도 연베이지가 한 장도 안 보였다.
+// 가로·세로(x·z)만 몸보다 조금 크게 불려 **몸 겉으로 나오게** 한다(GLB 는 그대로).
+// 1.38 배로 불렸더니 밑동이 **검은 원반처럼** 튀어나왔다(테두리 껍질까지 같이 커진 탓).
+// 살짝만 내밀고, 밑동은 테두리 대상에서 뺀다.
+const CANON_BELLY = { bam: {cover: 0.38, color: 0xE2BC92, bulge: 1.09} };
 // 5바퀴까지 남은 유일한 정본 불통 — 병아리콩 안경알이 고개를 돌리면 머리 밖 허공에 뜬다.
 // 각도 제한으로는 0 이 안 되므로, 불러올 때 **안경을 머리 중심 쪽으로 줄여 얼굴에 붙인다**
 // (GLB 파일은 그대로. 정면에서 보이는 모양은 거의 그대로고, 돌려도 머리 테두리 안에 남는다).
@@ -907,8 +937,15 @@ const CANON_ACCESSORY = {
   //     옆으로 삐져나온다(화면 기준 최대 42% 밖).
   // 1~7바퀴 여섯 번 다 그랬다. 2D 정본 그림에는 병아리콩에 안경이 없다 → **사장님·총괄 판단 필요**.
   // 그때까지는 '머리 밖 0'(사진 7장 전부)이 되는 값으로 둔다.
-  byeongari: {mesh:'Gold', shrink:0.82, pull:0.36},
+  // 0206 ⑥ — 사장님 지시 "안경은 빼지 않기 · 작게 줄여 얼굴 위에 보이게".
+  // 2.0 배에서 실측: 안경테 `Gold` 는 눈(y 1.44~2.00)보다 **아래**(y 0.86~1.87)에 있고
+  // 머리 상자 안에 통째로 들어가 있어 안 보였다. 눈 너비(1.19)에 맞게 줄이고 눈높이로 올린 뒤
+  // 얼굴 쪽으로 아주 조금만 밀어 **얼굴 표면에 얹는다**.
+  byeongari: {mesh:'Gold', shrink:0.62, up:0.172, front:0.088},
   ddangkong: {mesh:['Gold','Lens','Handle'], shrink:0.80, drop:0.27, out:0.09},
+  // 0206 ⑦ — 밤이 든 소포(`Box`+`Twine`, y 0.98~1.40)가 연베이지 밑동(`Belly`, y 0.59~1.35)을
+  // 거의 다 덮어 정본의 '아래 연베이지 띠'가 한 장도 안 보였다. 줄여서 아래·바깥으로 옮긴다.
+  bam: {mesh:['Box','Twine'], shrink:0.82, drop:0.17, out:0.08},
 };
 function applyCanonAccessory(key, model){
   const want = CANON_ACCESSORY[key];
@@ -965,6 +1002,10 @@ function applyCanonBelly(key, model){
     mesh.position.y = bottom + (mesh.position.y - bottom) * grow;   // 밑면은 그대로 두고 위로만 키움
     mesh.position.x *= grow; mesh.position.z *= grow;
   }
+  if (want.bulge) for (const mesh of belly){
+    mesh.scale.x *= want.bulge; mesh.scale.z *= want.bulge;
+    mesh.position.x *= want.bulge; mesh.position.z *= want.bulge;
+  }
 }
 function applyCanonColors(key, model){
   const table = CANON_MATERIAL_COLOR[key];
@@ -984,7 +1025,7 @@ function applyCanonColors(key, model){
 const OUTLINE_ON = new URLSearchParams(location.search).get('outline') !== '0';
 const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({color:0x4A2C1A, side:THREE.BackSide});
 // 1241 ⑥: 돋보기 렌즈(Lens)·금테(Gold)에 진갈색 테두리가 들어가 '선글라스'로 보였다 → 뺀다.
-const OUTLINE_MESHES = /^(Body|Belly|Cap|CapLine|Leaf|Stem|Beak|Petal|Sun|Scarf)$/;
+const OUTLINE_MESHES = /^(Body|Cap|CapLine|Leaf|Stem|Beak|Petal|Sun|Scarf)$/;   // 0206 ⑦ Belly 제외 — 밑동 테두리가 연베이지를 덮었다
 function addOutline(model){
   const add=[];
   model.traverse(o => { if (o.isMesh && OUTLINE_MESHES.test(o.name)) add.push(o); });
@@ -1102,28 +1143,38 @@ let compositionBounds = new THREE.Box3();
 function updateCameraFraming(n){
   if (!actors.length) return;
   const bounds = new THREE.Box3();
+  // 0206 ① — 친구를 2.0 배로 키우면 책상·통나무가 넓어져 **카메라가 물러나** 친구가 화면에서
+  // 도로 작아진다(2.0 배인데 +9% 뿐이었다). 꼭 다 보여야 하는 것(유리창 · 친구)만 꽉 맞추고,
+  // 가구는 가장자리가 조금 잘려도 된다(사장님 "오피스작게 줄여").
+  const ROOM_FIT = 1.42;                 // 가구에만 주는 여유(1 = 친구·유리창과 같게 꽉)
   const framePoints = [];
-  const includeBox = box => {
+  const includeBox = (box, loose = false) => {
     bounds.union(box);
     for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]){
-      for (const z of [box.min.z, box.max.z]) framePoints.push(new THREE.Vector3(x, y, z));
+      for (const z of [box.min.z, box.max.z]) framePoints.push(Object.assign(new THREE.Vector3(x, y, z), {loose}));
     }
   };
   for (const a of actors.slice(0, n)){
     const transform = new THREE.Matrix4().compose(a.homePos,
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a.deskYaw),
       new THREE.Vector3().setScalar(COMPOSITION.actorScale));
-    includeBox(new THREE.Box3().setFromObject(templates[a.key]).applyMatrix4(transform));
+    // 친구는 제자리에만 있지 않는다 — 커피·수다·서랍으로 옆으로 움직이고, 앞으로 나오면
+    // 화면 아래가 잘린다(2.0 배에서 실제로 발이 잘렸다). 움직이는 만큼 상자를 넓혀 둔다.
+    const roam = 0.86 * COMPOSITION.actorScale;
+    includeBox(new THREE.Box3().setFromObject(templates[a.key]).applyMatrix4(transform)
+      .expandByVector(new THREE.Vector3(roam, 0, roam)));
     const iconTop = a.homePos.clone().add(new THREE.Vector3(0, 1.34*COMPOSITION.actorScale, 0));
     bounds.expandByPoint(iconTop); framePoints.push(iconTop); // 생각 아이콘 여유
   }
   for (const obj of scene.children){
-    if (obj.userData.isDesk || obj.userData.isLauncher) includeBox(new THREE.Box3().setFromObject(obj));
+    // 통나무는 화면 밖으로 나가면 안 된다(일감 조건) → 꽉 맞추는 쪽. 책상만 가장자리가 잘려도 된다.
+    if (obj.userData.isLauncher) includeBox(new THREE.Box3().setFromObject(obj));
+    else if (obj.userData.isDesk) includeBox(new THREE.Box3().setFromObject(obj), true);
   }
   // 적은 인원에서도 커피를 마시러 이동한 친구가 화면 밖으로 사라지지 않게 한다.
   includeBox(new THREE.Box3(
     COFFEE_SPOT.clone().add(new THREE.Vector3(-0.7, 0, 0)),
-    COFFEE_SPOT.clone().add(new THREE.Vector3(0.7, 1.34, 0.9))));
+    COFFEE_SPOT.clone().add(new THREE.Vector3(0.7, 1.34, 0.9))), true);
   // The entire outer window frame participates in the fit, including its top edge.
   includeBox(new THREE.Box3(
     new THREE.Vector3(-WINDOW_WIDTH/2-0.22,WINDOW_BOTTOM-0.08,WINDOW_Z-0.08),
@@ -1144,9 +1195,10 @@ function updateCameraFraming(n){
     const dy = point.y - target.y, dz = point.z - target.z;
     const depthOffset = dy * sin + dz * cos;
     const viewY = dy * cos - dz * sin;
+    const give = point.loose ? ROOM_FIT : 1;
     distance = Math.max(distance,
-      Math.abs(point.x - target.x) / (Math.tan(halfHFOV) * COMPOSITION.fitX) + depthOffset,
-      Math.abs(viewY) / (Math.tan(halfVFOV) * COMPOSITION.fitY) + depthOffset);
+      Math.abs(point.x - target.x) / (Math.tan(halfHFOV) * COMPOSITION.fitX * give) + depthOffset,
+      Math.abs(viewY) / (Math.tan(halfVFOV) * COMPOSITION.fitY * give) + depthOffset);
   }
   camera.position.set(target.x, target.y + distance * sin, target.z + distance * cos);
   camera.lookAt(target);
@@ -1425,6 +1477,10 @@ function beginVisit(a, kind){
     target = COFFEE_SPOT.clone().add(new THREE.Vector3((Math.random()-0.5)*0.3, 0, 1.4));
     a.visitTargetActor = null;
   }
+  // 0206 ① — 수다·커피로 옮겨 간 자리가 자리 바깥이면 2.0 배에서 몸이 화면 밖으로 나간다
+  // (땅콩이 수다 중에 왼쪽으로 1.14 까지 나갔다). 제일 바깥 친구의 자리 안으로 끌어온다.
+  const edge = Math.max(...LAYOUT_SLOTS.map(slot => Math.abs(slot.dx)));
+  target.x = THREE.MathUtils.clamp(target.x, -edge, edge);
   a.moveTo = target;
   a.visitKind = kind;
   a.movePhase = 'going';
@@ -1536,7 +1592,7 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,
+  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,layoutSpread:LAYOUT_SPREAD,
   getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
