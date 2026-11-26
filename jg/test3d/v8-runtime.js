@@ -32,6 +32,7 @@ export function createV8(config){
   // 0206 ① — 친구가 커지면 숨는 줄도 넓어져야 한다(2.0 배에서 서로 못 지나가 도망이 멈췄다).
   // 길을 찾는 판 넓이도 같이 넓힌다(기본 ±12.4 로는 넓힌 숨는 자리에 닿지 못한다).
   const spread=config.layoutSpread||1;
+  const WALK_RADIUS=0.62;                 // 길 찾기에 쓰는 '발밑' 반지름(몸 반지름 대비)
   const motion=new MotionWorld({minX:-12.4*spread,maxX:12.4*spread});let furnitureObstacles=[];
   const actorScale=config.actorScale || 1,propScale=actorScale*.75;
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
@@ -171,11 +172,18 @@ export function createV8(config){
     // 0206 ① — 숨는 줄은 화면 밖까지 넓어야 하지만(친구가 커져 서로 못 지나간다), **평소 구역**은
     // 화면 안에 머물러야 한다. 2.0 배에서 수다 가던 땅콩이 왼쪽 구석(x -13.1)까지 돌아 나가
     // 몸이 잘렸다. 책장 앞(z > -3.0)에만 보이지 않는 벽을 세운다 — 도망 길(z < -3.0)은 그대로 연다.
-    const idleWall=11.0;
+    // 12바퀴 — 3.0배에서 이 벽이 **친구를 가두고 있었다**. 해바라기씨는 집이 x 10.6 인데 몸 반지름이
+    // 1.72 라 11.0 벽 **안쪽에 박힌 채 시작**했고(minGap -0.649), 그래서 도망 길을 아예 못 만들었다
+    // (검토 두 곳이 같은 세 명을 짚었다). 벽은 **제일 바깥 친구 몸 끝보다 더 밖**에 세운다.
+    const reach=Math.max(0,...getActors().map(a=>Math.abs(a.homePos.x)+(a.bodyRadius||0)));
+    const idleWall=Math.max(11.0,reach+0.45);
     const keepInFrame=[-1,1].map(side=>({key:'frame-'+side,
       minX:side<0?-60:idleWall, maxX:side<0?-idleWall:60, minZ:-3.0, maxZ:9.0}));
     furnitureObstacles=[...office.obstacles,...keepInFrame];motion.clear();motion.setObstacles(furnitureObstacles);
-    for(const a of getActors())motion.add(a.key,a.homePos,a.bodyRadius);
+    // 12바퀴 — 길 찾기에 **몸 전체 반지름**(3.0배에서 1.7)을 쓰니 앉은 자리가 책장·창틀 안으로
+    // 들어가 길을 아예 못 만들었다(검토 두 곳이 같은 세 명을 짚음). 친구는 동글동글해서 제일 넓은
+    // 곳은 머리·어깨고, 걸을 때 걸리는 것은 **발밑**이다 → 걷는 반지름은 그 비율로 쓴다.
+    for(const a of getActors())motion.add(a.key,a.homePos,a.bodyRadius*WALK_RADIUS);
   }
   function resetEquipment(){
     getActors().forEach(a=>{a.held=false;a.pickupLogged=false;a.pickupDwell=0;a.pickupBlend=0;a.wrapper.visible=true;if(a.equipment){a.equipment.position.copy(a.weaponRest);a.equipment.visible=true;a.equipment.rotation.set(0,0,0);}if(a.muzzleFlash)a.muzzleFlash.visible=false;});
