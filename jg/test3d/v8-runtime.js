@@ -379,8 +379,18 @@ export function createV8(config){
         // 화면 겹침은 아래 '따라오기'가 통나무를 옆으로 빼서 막는다.
         const firing=deployed[operator].clone().add(new THREE.Vector3(0,-deployed[operator].y,1.8));
         a.motionGoal=id==='fetch' && !mounts[operator].userData.fetched?dock:firing;
-        if(id==='fetch' && frame.progress<.45)walk(a,a.homePos,dock,frame.progress/.45,t);
-        else if(id==='fetch')walk(a,dock,firing,(frame.progress-.45)/.55,t);
+        // 13바퀴 4차(영상검사) — 가져오기 1초 토막이 **통나무가 멈춘 그림**이었다. 영상은 이 토막의
+        // 앞 1초(진행률 0~0.29)만 담는데, 걷기는 0~0.45 · 통나무는 0.45 부터 움직였기 때문이다.
+        // 그 1초 안에 **걷기(0~0.16) → 손 뻗기(0.16~0.22) → 들기(0.22~0.30)** 가 다 들어오게 당긴다.
+        if(id==='fetch' && frame.progress<.16)walk(a,a.homePos,dock,frame.progress/.16,t);
+        else if(id==='fetch' && frame.progress<.30){
+          a.wrapper.position.copy(dock);
+          const u=(frame.progress-.16)/.14;                   // 손 뻗어 통나무를 세우는 동안
+          a.battleTiltX=-.08-Math.sin(Math.PI*u)*.34;         // 숙였다가 일어서며 들어올린다
+          a.wrapper.position.y+=Math.sin(Math.PI*u)*.10;
+          a.movePhase='moving';
+        }
+        else if(id==='fetch')walk(a,dock,firing,(frame.progress-.30)/.70,t);
         else a.wrapper.position.copy(firing);
       }
     }else if(id==='escape'){
@@ -443,7 +453,7 @@ export function createV8(config){
       // 60초 자유 실행에서 전투가 '씨앗 보관함으로'(equip)에서 못 넘어갔다(검토 5/5회).
       // **걷는 빠르기를 크기에 맞춰** 올린다(1.35배 때와 같은 시간이 걸리도록).
       const sizeMul=(config.actorScale||1.35)/1.35;
-      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?2.6:3)*sizeMul;   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
+      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.0:3)*sizeMul;   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
     // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게.
@@ -572,7 +582,8 @@ export function createV8(config){
       // 0206 10바퀴 — 돌아올 때는 통나무도 **제자리로 치운다**. 쏘던 자리에 두고 오면
       // 주인이 집으로 돌아오는 길과 화면에서 겹쳤다(복귀·빼꼼에서 25회).
       const pushed=!operator?0
-        :frame.id==='fetch'?smooth((frame.progress-.45)/.55)
+        // 13바퀴 4차 — 0.45 부터 움직이면 영상 1초 토막(0~0.29) 안에서 통나무가 **한 번도 안 움직인다**.
+        :frame.id==='fetch'?smooth(clamp((frame.progress-.22)/.78,0,1))
         :frame.id==='hide'?1-smooth(clamp(frame.progress/.35,0,1))   // 다 숨자마자 얼른 제자리로 치운다
         :['peek','recover'].includes(frame.id)?0
         :['bazooka','mess','escape'].includes(frame.id)?1:0;
@@ -604,6 +615,13 @@ export function createV8(config){
         g.position.copy(g.userData.leftAt).lerp(parked[i],frame.id==='escape'?u:1);
       }
       g.position.y=GROUND_Y;
+      // 13바퀴 4차(영상검사 ③) — '가지러 가서 **들어올리는**' 것이 보이게. 0.16~0.34 동안
+      // 통나무 앞끝이 들렸다가 자리를 잡는다. 이 토막 1초는 그동안 완전히 정지 그림이었다.
+      if(frame.id==='fetch' && frame.progress>.16 && frame.progress<.34 && operator){
+        const u=clamp((frame.progress-.16)/.18,0,1), lift=Math.sin(Math.PI*u);
+        g.position.y+=lift*0.42;
+        g.rotation.x=g.userData.restRotation.x-lift*0.40;
+      }
       if(frame.id==='bazooka' && operator && !emotionOverride && now>=g.userData.fireAt){
         const aim=target(i,'bazooka');g.lookAt(aim);g.updateMatrixWorld(true);
         if(projectiles.fire(g.localToWorld(new THREE.Vector3(0,0,.57)),aim,'bazooka',now,1)){g.userData.fireAt=now+1.3;g.userData.flashUntil=now+.16;}

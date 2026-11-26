@@ -153,6 +153,9 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
       for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-3.4));
     }
     const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-4.1));if(extra)covers.push(extra);
+    // 13바퀴 4차 — 완두콩이 숨을 가구로 오른쪽에도 책장을 하나 세워 봤으나(x 12.0),
+    // `coverBlocked` 는 그대로(0.042)였고 **도망 길만 막아** 미끄럼이 땅콩 1 → 78 ·
+    // 해바라기씨 13 → 40 으로 늘었다. 되돌린다 — 완두콩 가릴 것 없음은 남은 것으로 적는다.
     cabinet.visible=false;
     place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(11.3,0,-.8));
     place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(11.3,1.15,-.8));
