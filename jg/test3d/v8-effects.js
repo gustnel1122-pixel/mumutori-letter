@@ -4,7 +4,9 @@ import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 export class WindowMess {
   constructor(scene,{width,height,z,bottom}){
     this.width=width;this.height=height;this.z=z;this.bottom=bottom;this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};
-    const c=document.createElement('canvas');c.width=1024;c.height=Math.round(1024*height/width);this.canvas=c;this.ctx=c.getContext('2d');
+    // 13바퀴 재작업 — 영상검사 ③ '자국이 11바퀴보다 18~22% 적다'를 가르기 위해 ?mess= 로 크기를 바꿀 수 있게.
+    const MESS_PX=+((new URLSearchParams(location.search)).get('mess')||1024);
+    const c=document.createElement('canvas');c.width=MESS_PX;c.height=Math.round(MESS_PX*height/width);this.canvas=c;this.ctx=c.getContext('2d');
     // 13바퀴 ④ — 1% 저점이 v8f 보다 낮은 원인이 **이 그림판을 GPU 로 올리는 것**이었다
     // (씨앗을 끄면 저점 42 → 81). 2048 은 4MB·1024 는 1MB. 자국은 뭉개진 동그라미라 1024 로도 같아 보인다.
     this.lastUpload=-1;this.uploadEvery=0.05;   // 1초에 최대 20번만 올린다(눈으로는 구분 안 됨)

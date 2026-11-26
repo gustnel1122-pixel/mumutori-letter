@@ -143,8 +143,13 @@ export function createV8(config){
     // 집 x 순서: 병아리콩 -10.6 · 땅콩 -7.1 · 밤 -3.5 · 쌀 0 · 도토리 3.5 · 완두콩 7.1 · 해바라기씨 10.6
     // 13바퀴 — 숨는 줄을 **책장 뒤**로 확실히 보낸다. 책장 뒷면이 z -4.53 인데 숨는 줄이 -5.0 이라
     // 3.0배 몸(걷는 반지름 0.8~1.1)이 책장 안에 걸려 도토리·밤이 길을 못 만들었다(gap -0.36 · -0.59).
-    const covers={byeongari:[-16.5,-6.0],ddangkong:[-13.2,-7.8],bam:[-9.9,-6.0],ssal:[-6.6,-7.8],
-                  haebaragi:[15.0,-6.0],wandukong3:[10.2,-7.8],dotori:[-3.0,-7.8]};
+    // 13바퀴 재작업 — 숨는 자리를 **자기 자리 바로 뒤 바깥쪽**으로. 1차에서는 모두 왼쪽으로
+  // 몰려가며 남의 책상과 통나무를 가로질렀다(친구↔통나무 12장/240 · 최대 59.2% · 검토 ②).
+  // 자리(세계좌표) ±9.53 / ±6.35 / ±3.18 / 0 → 바깥으로 2.4 물러나 앞뒤 두 줄로 엇갈린다.
+  // 자기 기둥 바로 뒤로 두었더니(±12.0/±8.8/±5.6/-2.4) 통로가 좁아 도토리·밤·병아리콩이
+  // 0px 로 다시 막혔다. **옆으로 흘러 나가는 자리**로 둔다 — 가로로 움직여야 화면에서 보인다.
+  const covers={byeongari:[-16.5,-6.0],ddangkong:[-13.2,-7.8],bam:[-9.9,-6.0],ssal:[-6.6,-7.8],
+                dotori:[-3.0,-7.8],haebaragi:[16.4,-6.0],wandukong3:[12.4,-7.8]};
     // 도토리는 **가운데-왼쪽**으로 보낸다. 오른쪽으로 보내면 거의 뒤로만 가서(가로 5px) 화면에서는
     // 도망치는 것처럼 안 보였다 — 실제로는 숨는 자리까지 갔는데도 그랬다.
     // 도토리는 앞줄 가운데라 오른쪽 끝(6.9)으로 가려면 완두콩·해바라기씨 책상 사이 0.1 틈을 지나야 해서
@@ -266,10 +271,17 @@ export function createV8(config){
   }
   function walk(a,from,to,u,t){
     a.wrapper.position.copy(from).lerp(to,smooth(u));
-    const moving=u>0 && u<1;a.wrapper.position.y+=moving?Math.abs(Math.sin(t*14+a.phase))*.08:0;
-    a.wrapper.rotation.z=moving?Math.sin(t*14+a.phase)*.055:0;
-    a.wrapper.rotation.y=moving?Math.atan2(to.x-from.x,to.z-from.z)*.28:0;
-    a.movePhase=moving?'moving':'idle';
+    // 영상검사 ② — 걸음 장단을 **실제로 움직인 거리**(a.stride)로 낸다. 시간(t*14)으로 내면
+    // 몸은 길 찾기가 끌고 가는데 발은 제 박자로 굴러 미끄러져 보였다.
+    const beat=(a.stride||0)+a.phase;
+    const moving=(a.realMoving!==undefined?a.realMoving:(u>0 && u<1));
+    a.wrapper.position.y+=moving?Math.abs(Math.sin(beat))*.08:0;
+    a.wrapper.rotation.z=moving?Math.sin(beat)*.055:0;
+    // 영상검사 ② — 몸을 길 찾기가 끌고 가는 토막(도망·숨기·복귀)에서는 이 **곧은 선 방향**으로
+    // 기울이면 실제 가는 쪽과 어긋나 미끄러져 보인다. 그 토막에서는 기울이지 않고 아래 yaw 에 맡긴다.
+    const pathDriven=['escape','hide','peek','recover'].includes(frame.id);
+    a.wrapper.rotation.y=(moving && !pathDriven)?Math.atan2(to.x-from.x,to.z-from.z)*.28:0;
+    a.movePhase=(u>0 && u<1)?'moving':'idle';
   }
   // 1241 ⑦ — 숨는 자리를 제 자리 순서대로 바꿨으니 **지나가는 순서도 먼 자리부터** 다시 쓴다.
   // (안 고치면 뒤 사람이 앞 사람 자리를 지나가야 해서 도망이 영영 안 끝난다 — 실제로 그렇게 멈췄다)
@@ -373,30 +385,11 @@ export function createV8(config){
       }
     }else if(id==='escape'){
       const go=turnToMove(a);a.motionGoal=go?a.cover:a.escapeFrom;
-      // 13바퀴 ② — 길 찾기가 첫 걸음을 못 떼면(다른 친구·가구에 막힘) 그 친구는 도망 내내
-      // 제자리에 서 있었다(도토리가 1.6초 동안 0px). **놀라서 도망칠 때는 비집고 나간다** —
-      // 0.5초 넘게 제자리면 길 찾기 대신 걷기(walk)가 몸을 끌고 간다.
-      const here=motion.agents.get(a.key)?.position;
-      if(here){
-        if(!a.fleeMark || frame.age<0.05){a.fleeMark={x:here.x,z:here.z};a.panicWalk=false;}
-        // 한 번 '비집고 가기'로 정해지면 도망이 끝날 때까지 그대로 둔다 — 안 그러면 몸이 움직인 순간
-        // 다시 길 찾기가 끌어당겨 제자리로 돌아오고, 둘이 번갈아 당겨 결국 1px 도 못 간다.
-        if(!a.panicWalk){
-          const moved=Math.hypot(here.x-a.fleeMark.x,here.z-a.fleeMark.z);
-          a.panicWalk = go && frame.age>0.5 && moved<0.6;
-        }
-      }
-      const u=clamp((frame.age-i*.16)/2.1,0,1);   // 13바퀴 — 출발 시차를 줄이고 조금 더 빨리 달린다
-      // 비집고 갈 때는 **뒤로 물러난 뒤 옆으로** 간다(ㄱ자). 곧장 대각선으로 가면 가운데 책상을
-      // 뚫고 지나간다(도토리가 쌀 책상을 -0.41 뚫었다).
-      if(a.panicWalk){
-        const from=a.escapeFrom || a.homePos;
-        // 가운데 통로는 쌀 책상(끝 3.44)과 완두콩 책상(시작 5.42) 사이 **1.98** 뿐인데
-        // 3.0배 도토리 몸은 2.68 이라 **어느 쪽으로 가도 책상을 스친다**(바깥 비켜가기 -0.59 ·
-        // 곧장 물러나기 -0.43). 둘 중 덜 스치는 쪽(곧장 물러나기)으로 둔다 — 사장님 판단 거리.
-        const mid=new THREE.Vector3(from.x,0,a.cover.z);
-        if(u<0.5)walk(a,from,mid,u/0.5,t); else walk(a,mid,a.cover,(u-0.5)/0.5,t);
-      }else walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
+      // 13바퀴 재작업 — 막히면 길 찾기를 끄고 밀고 나가던 `panicWalk` 를 **없앴다**.
+      // 몸이 통나무·남의 책상을 뚫고 지나갔다(친구↔통나무 12장/240 · 최대 59.2% · 검토 ②).
+      // 대신 숨는 자리를 **자기 자리 바로 뒤**로 옮겨 길 자체를 넓혔다(위 covers).
+      const u=clamp((frame.age-i*.16)/2.1,0,1);   // 출발 시차를 줄이고 조금 더 빨리 달린다
+      walk(a,a.escapeFrom || a.homePos,a.cover,u,t);
       // 0224 P25·P26 — 1초에 6걸음 통통(±0.03) + 앞으로 12° 숙이고 돌 때 안쪽으로 기울기.
       const run=u>0&&u<1?1:0;
       a.wrapper.position.y+=Math.abs(Math.sin(t*Math.PI*7+a.phase))*.03*run;
@@ -450,24 +443,52 @@ export function createV8(config){
       // 60초 자유 실행에서 전투가 '씨앗 보관함으로'(equip)에서 못 넘어갔다(검토 5/5회).
       // **걷는 빠르기를 크기에 맞춰** 올린다(1.35배 때와 같은 시간이 걸리도록).
       const sizeMul=(config.actorScale||1.35)/1.35;
-      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.8:3)*sizeMul;
+      const base=(frame.id==='escape'||frame.id==='recover'?4.4:frame.id==='fetch'?4.4:3)*sizeMul;   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
     // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게.
     // 1241: **주인이 끌고 다니는 동안**(fetched)에는 길 계산에서 아예 뺀다. 통나무가 주인을 따라
     // 숨는 길까지 들어가면 뒤에 오는 친구(밤)가 막혀 도망이 멈췄다.
     const launcherBoxes=mounts.map((g,i)=>{
-      if(g.userData.fetched)return null;
+      // 13바퀴 재작업 — `fetched` 는 한 번 켜지면 도망 중에도 켜져 있어서, **놓고 간 통나무가
+      // 길 계산에서 빠진 채** 그 자리에 남았다. 주인이 제 발밑 통나무를 그대로 뚫고 달렸다
+      // (병아리콩 11장 · 최대 60% · 검토 ②). 끌고 다니는 동안에만 뺀다.
+      if(g.userData.fetched && !['escape','hide','peek','recover'].includes(frame.id))return null;
       g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
-      return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:[operators[i]]};
+      // 13바퀴 재작업 — 쏘는 동안에는 주인이 통나무를 지나갈 수 있어야 하지만, **도망칠 때는
+      // 아무도 못 지나간다**. 주인(병아리콩)이 통나무를 뚫고 달려 11장 겹쳤다(최대 60% · 검토 ②).
+      const fleeNow=['escape','hide','peek','recover'].includes(frame.id);
+      return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,
+              ignoreKeys:fleeNow?[]:[operators[i]]};
     }).filter(Boolean);
-    motion.obstacles=[...furnitureObstacles,...launcherBoxes];if(PATH_ON)motion.step(goals,dt);
+    // 13바퀴 재작업 — 도망·숨기·내다보기·돌아오기 동안에는 **책상만** 길 막는 것에서 뺀다.
+    // 가운데 통로가 1.98 인데 3.0배 몸이 2.68 이라 길이 아예 없어 도토리·밤이 제자리였다.
+    // 돌아올 때도 빼야 한다 — 빼지 않으면 도토리가 제 자리로 못 돌아와 쌀과 45장 겹쳤다.
+    // 통나무는 그대로 막아 둔다(뚫고 지나가던 것이 이번 검토의 불통이었다).
+    const fleeing=['escape','hide','peek','recover'].includes(frame.id);
+    const walls=fleeing?furnitureObstacles.filter(o=>!String(o.key||'').startsWith('desk')):furnitureObstacles;
+    motion.obstacles=[...walls,...launcherBoxes];if(PATH_ON)motion.step(goals,dt);
     for(const a of actors){
       const state=motion.agents.get(a.key),old=a.lastPhysical || state.position;
       const dx=state.position.x-old.x,dz=state.position.z-old.z;
-      // 도망 때 비집고 나가는 친구는 길 찾기 자리를 덮어쓰지 않는다(위 panicWalk).
-      if(!a.panicWalk){a.wrapper.position.x=state.position.x;a.wrapper.position.z=state.position.z;}
-      else{state.position.x=a.wrapper.position.x;state.position.z=a.wrapper.position.z;}
+      // 몸 자리는 늘 길 찾기가 정한다(13바퀴 재작업 — panicWalk 삭제).
+      // 영상검사 ① — 한 프레임에 5.845 순간이동한 적이 있다(다른 여섯은 0.16~0.20).
+      // 걸음은 제일 빨라야 4.8/초 = 0.08/프레임이라, 그 3배(0.25)를 넘으면 **끊어서** 따라간다.
+      {
+        const px=a.wrapper.position.x, pz=a.wrapper.position.z;
+        const jx=state.position.x-px, jz=state.position.z-pz, jump=Math.hypot(jx,jz);
+        const CAP=1.20;   // 0.25·0.60 으로 조이니 가져오기 걸음이 끊겼다(2.40·3.08). 보통 한 프레임 0.2 이하라 1.2 면 순간이동(5.845)만 잡힌다.
+        if(jump>CAP && a.settled){
+          a.wrapper.position.x=px+jx/jump*CAP; a.wrapper.position.z=pz+jz/jump*CAP;
+        }else{
+          a.wrapper.position.x=state.position.x; a.wrapper.position.z=state.position.z;
+        }
+        a.settled=true;   // 첫 프레임(자리 잡기)은 그대로 둔다
+      }
+      // 영상검사 ② — 발이 몸을 못 따라가 미끄러져 보였다(도토리 29 · 해바라기씨 20).
+      // 걸음 장단을 **시간**이 아니라 **실제로 움직인 거리**에 맞춘다.
+      a.stride=(a.stride||0)+Math.hypot(dx,dz)*3.6;
+      a.realMoving=Math.hypot(dx,dz)>.004;
       // The clearance cylinder encloses every yaw. Keep the body upright so
       // an equip bend cannot lean outside that cylinder into a desk/crate.
       a.wrapper.rotation.x=0;a.wrapper.rotation.z=0;
@@ -491,7 +512,9 @@ export function createV8(config){
         :moving?Math.atan2(dx,dz):a.facing;
       // 걷기 시작할 때는 더 빨리 돌아선다 — 천천히 돌면 몸이 옆으로 미끄러지는 것처럼 보인다
       // (2208 ③ "걷다가 미끄러지듯 미끄럼 X").
-      const turnRate=frame.id==='notice'?14:moving?16:8;   // 놀랄 땐 1초 안에 다 돌아보게
+      // 영상검사 ② — 길이 꺾이는 도망·복귀에서는 조금 더 빨리 돌아선다(26 은 한 프레임 78도까지
+    // 꺾여 뚝 끊겨 보였다). 느리게 돌면 몸이 가는 쪽을 못 보고 미끄러지는 것처럼 보인다.
+    const turnRate=frame.id==='notice'?14:['escape','hide','peek','recover'].includes(frame.id)?17:moving?16:8;
       a.facing+=Math.atan2(Math.sin(yaw-a.facing),Math.cos(yaw-a.facing))*Math.min(1,dt*turnRate);a.wrapper.rotation.y=a.facing;
       a.lastPhysical={...state.position};a.shadow.position.set(state.position.x,.01,state.position.z);
       const operator=operators.indexOf(a.key);
@@ -572,8 +595,11 @@ export function createV8(config){
         // 0.6초에 걸쳐 미끄러져 돌아가므로 뚝 끊기지 않고, 주인은 그 사이 멀어지니 몸을 뚫지도 않는다.
         // 되돌아가는 건 **다 숨은 뒤**(hide)에 한다. 도망 중에 되돌리면 통나무가 도망 길을
         // 가로질러 주인과 깊게 겹쳤다(비율 0.74). 숨은 동안엔 다들 책장 뒤(z -5)라 멀다.
-        const back=frame.id==='escape'?0:1;              // 숨은 뒤부터는 위 `pushed` 가 제자리로 보낸다
-        g.position.lerp(g.userData.leftAt,1-back);
+        // 13바퀴 재작업 — 도망 내내 통나무를 **주인 발밑에 세워 두니** 주인이 그것을 뚫고
+        // 달렸다(병아리콩 13장 · 최대 85%). 도망하는 1.6초 동안 통나무도 **세워 두는 자리로
+        // 같이 미끄러져** 간다 — 주인은 뒤로, 통나무는 앞 구석으로 멀어진다.
+        const u=clamp(frame.age/0.7,0,1);   // 0.7초 안에 치운다(1.6초로는 첫 0.3초가 주인과 겹쳤다)
+        g.position.copy(g.userData.leftAt).lerp(parked[i],frame.id==='escape'?u:1);
       }
       g.position.y=GROUND_Y;
       if(frame.id==='bazooka' && operator && !emotionOverride && now>=g.userData.fireAt){

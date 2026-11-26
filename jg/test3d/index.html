@@ -162,7 +162,7 @@ const VERSION = '2026-11-23-8g';
 const CAMERA_LEVELS = {
   '0': {pitch:32, targetFraction:.36},
   '1': {pitch:17, targetFraction:.36},
-  '2': {pitch:6,  targetFraction:.52},   // 11바퀴 3.0배 — 카메라가 가까워져 바닥이 넓게 비었다. 구도를 위로(유리창 쪽).
+  '2': {pitch:6,  targetFraction:.495},   // 11바퀴 3.0배 — 카메라가 가까워져 바닥이 넓게 비었다. 구도를 위로(유리창 쪽).
 };
 const CAMERA_LEVEL = (() => {
   const asked = new URLSearchParams(location.search).get('cam');
@@ -723,6 +723,12 @@ const LAYOUT_SLOTS_BY_CAM = {
   // 원인은 **자리가 고르지 않은 것**이었다: 1.20배 시절 간격이라 앞줄·가운데줄이 세계좌표로
   // 1.9~2.3 밖에 안 떨어져 있었는데(몸 반지름이 1.7), 벌린 폭은 같아도 **고르게** 놓으면 해결된다.
   // 왼쪽부터 병아리콩·땅콩·밤·쌀·도토리·완두콩·해바라기씨 순서로 같은 간격(세계좌표 3.5)씩.
+  // 13바퀴 재작업 — 간격은 고르게 두되(겹침 105 → 5 의 원인이 고르지 않은 간격이었다)
+  // **전체 폭은 12바퀴만큼**으로 당긴다. 13바퀴 1차에서 끝자리가 1.08 바깥으로 가며
+  // 카메라가 z 32.66 → 34.68 로 물러나 친구 화면 높이가 일곱 다 -7% 가 됐다(검토 ①).
+  // 폭을 -9.53 까지 당겨도 봤지만 통로가 좁아 도망이 다시 막히고(도토리·밤·병아리콩 0px)
+  // 전투 중 겹침이 5 → 56 장으로 늘었다. **간격 3.5 는 그대로 두고** 카메라 여유(roam)를
+  // 없애 화면 크기를 되찾는다(아래 roam).
   lowered: [
     { dx: 2.24, dz: 3.10, yaw: 0, row:'front' },    // 도토리
     { dx:-2.24, dz:-1.70, yaw: 0, row:'middle' },   // 밤
@@ -1187,7 +1193,10 @@ function updateCameraFraming(n){
     // 11바퀴 — 이 여유가 **카메라를 밀어내는 바로 그 점**이었다(거리를 정한 점이 병아리콩 상자 모서리).
     // 이제는 평소 구역 양옆에 보이지 않는 벽이 있고 수다·커피 자리도 자리 안으로 당겨 두므로
     // 여유를 크게 둘 필요가 없다. 화면 밖 0 은 실측으로 따로 확인한다.
-    const roam = 0.34 * COMPOSITION.actorScale;
+    // 13바퀴 재작업 — 이 여유가 다시 카메라를 밀어내는 점이었다(검토 ①: 끝자리가 1.08 바깥으로
+    // 가며 화면 높이 -7% · 유리창 23.15 → 20.71%). 자리 폭을 줄이면 통로가 막히므로
+    // **여유를 0 으로** 해서 되찾는다. 화면 밖 0 은 실측(checks·shots)으로 확인한다.
+    const roam = 0.06 * COMPOSITION.actorScale;   // 0 으로 두면 수다 가던 밤이 화면 밖으로 0.01~0.31 나간다(checks outside)
     const actorBox=new THREE.Box3().setFromObject(templates[a.key]).applyMatrix4(transform)
       .expandByVector(new THREE.Vector3(roam + 1.05, 0, roam));
     // 앞으로 나오는 두 가지를 다 덮는다: 전투 자리(+1.70) · 서랍 열기 한 발(+1.75).
@@ -1532,7 +1541,9 @@ function beginVisit(a, kind){
   // 11바퀴 — 앞줄 친구 옆으로 수다 가면 **앞줄보다 더 앞**에 서게 되고, 3.0배에서는 그 몸이
   // 화면 아래로 잘렸다(땅콩 -1.05). 앞줄보다 앞으로는 나가지 않게 한다.
   const frontRow = Math.max(...LAYOUT_SLOTS.map(slot => slot.dz));
-  target.z = Math.min(target.z, frontRow);
+  // 13바퀴 재작업 — 앞줄 자리 자체가 화면 아래 끝이라, 앞줄까지 나가면 발이 0.01~0.06 잘린다
+  // (checks outside). 앞줄보다 **0.9 뒤**까지만 나간다.
+  target.z = Math.min(target.z, frontRow - 0.9);
   a.moveTo = target;
   a.visitKind = kind;
   a.movePhase = 'going';
