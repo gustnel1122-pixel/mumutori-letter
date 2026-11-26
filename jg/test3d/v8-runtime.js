@@ -134,7 +134,10 @@ export function createV8(config){
     // 화면 밖까지 나가므로 **앞뒤 두 줄로 엇갈려** 세운다(같은 줄 사이가 두 배로 벌어진다).
     const covers={byeongari:[-11.6,-5.0],ddangkong:[-9.9,-6.8],bam:[-8.2,-5.0],dotori:[-6.6,-6.8],
                   haebaragi:[11.2,-5.0],wandukong3:[9.1,-6.8],ssal:[6.9,-5.0]};
-    a.cover=new THREE.Vector3(covers[a.key][0]*spread,0,covers[a.key][1]);
+    // 11바퀴 — 숨는 줄까지 자리와 같은 비율로 벌리면 3.0배에서 **화면 밖**으로 나간다
+    // (카메라가 가까워졌다). 앞뒤 두 줄로 엇갈려 있으니 가로는 조금만 벌린다.
+    const coverSpread=1+(spread-1)*0.45;
+    a.cover=new THREE.Vector3(covers[a.key][0]*coverSpread,0,covers[a.key][1]);
     // 빼꼼은 제자리에서 앞으로만 나온다 — 옆으로 몰리면 서로 가린다.
     a.coverPeek=a.cover.clone();a.coverPeek.x+=a.cover.x<0?1.9:-1.9;a.coverPeek.z+=1.05;
     const crate=office.assets.model('cardboardBoxOpen',[.65,.35,.55]);
@@ -374,6 +377,8 @@ export function createV8(config){
     if(config.seated===false)return a.homePos;
     let s=stations.get(a.key);
     // 책상은 자리에서 앞으로 1.17, 깊이 0.39 — 그보다 더 손님 쪽으로 나와야 몸이 안 가린다.
+    // 11바퀴 — 옆으로도 벌려 봤지만(x*0.14) 바깥 친구가 통나무 쪽으로 밀려 더 나빠졌다
+    // (겹침 131 → 135, 병아리콩↔통나무 94회). 앞으로만 나온다.
     if(!s){s=a.homePos.clone();s.z+=1.70;stations.set(a.key,s);}
     return s;
   }
