@@ -941,8 +941,10 @@ function lerpAngle(a, b, t){
 // 화면 보정(채도 1.10 · 대비 1.12)을 거치므로 **정본 색을 그대로 넣지 않고 미리 눌러서** 넣는다.
 const CANON_MATERIAL_COLOR = {
   bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다) → 화면에서 #BA511F
-  // 0206 ⑥ — 색상 정본의 병아리콩 안경테는 **#9B5918**. 보정 뒤 그 색이 되게 눌러서 넣는다.
-  byeongari: { Gold: 0x8E5417 },
+  // 14바퀴 — 병아리콩 `Gold` 를 #8E5417(짙은 갈색)로 바꾸던 것을 **뺐다**.
+  // 공식 3D 그림(d3_chickpea_x4.png)의 안경테는 **금색**이고, 정본 GLB 도 금색이다.
+  // 게다가 `Gold` 메시에는 **만년필 금테**도 들어 있어 펜까지 같이 갈색이 됐다.
+  // (색상 정본 2절의 '안경·소품 #9B5918' 은 짙은 포인트색 칸이라 테 색으로 읽은 것이 잘못이었다.)
 };
 // 0224 P31 — 정본 밤은 아래쪽이 '연베이지 밑동'인데 3D 에서는 거의 안 보였다.
 // GLB 는 그대로 두고, 불러올 때 Belly(밑동) 메시만 몸 높이의 아래 38% 를 덮도록 키운다.
@@ -951,7 +953,10 @@ const CANON_MATERIAL_COLOR = {
 // 가로·세로(x·z)만 몸보다 조금 크게 불려 **몸 겉으로 나오게** 한다(GLB 는 그대로).
 // 1.38 배로 불렸더니 밑동이 **검은 원반처럼** 튀어나왔다(테두리 껍질까지 같이 커진 탓).
 // 살짝만 내밀고, 밑동은 테두리 대상에서 뺀다.
-const CANON_BELLY = { bam: {cover: 0.38, color: 0xE2BC92, bulge: 1.09} };
+// 14바퀴 — 밤 밑동을 몸 아래 38% 까지 키우고 1.09배 부풀리던 것을 **뺐다**.
+// 공식 3D 그림의 밤은 **아래 오른쪽에 수수한 베이지 바닥**이고, 소포가 그 위를 많이 가린다.
+// 우리 값은 둥근 '배'처럼 커져서 정본과 달라 보였다. 정본 GLB 가 이미 바닥을 가지고 있다.
+const CANON_BELLY = {};
 // 5바퀴까지 남은 유일한 정본 불통 — 병아리콩 안경알이 고개를 돌리면 머리 밖 허공에 뜬다.
 // 각도 제한으로는 0 이 안 되므로, 불러올 때 **안경을 머리 중심 쪽으로 줄여 얼굴에 붙인다**
 // (GLB 파일은 그대로. 정면에서 보이는 모양은 거의 그대로고, 돌려도 머리 테두리 안에 남는다).
@@ -971,11 +976,12 @@ const CANON_ACCESSORY = {
   // 2.0 배에서 실측: 안경테 `Gold` 는 눈(y 1.44~2.00)보다 **아래**(y 0.86~1.87)에 있고
   // 머리 상자 안에 통째로 들어가 있어 안 보였다. 눈 너비(1.19)에 맞게 줄이고 눈높이로 올린 뒤
   // 얼굴 쪽으로 아주 조금만 밀어 **얼굴 표면에 얹는다**.
-  byeongari: {mesh:'Gold', shrink:0.74, pull:0.20, up:0.150, front:0.088},
-  ddangkong: {mesh:['Gold','Lens','Handle'], shrink:0.80, drop:0.27, out:0.09},
-  // 0206 ⑦ — 밤이 든 소포(`Box`+`Twine`, y 0.98~1.40)가 연베이지 밑동(`Belly`, y 0.59~1.35)을
-  // 거의 다 덮어 정본의 '아래 연베이지 띠'가 한 장도 안 보였다. 줄여서 아래·바깥으로 옮긴다.
-  bam: {mesh:['Box','Twine'], shrink:0.82, drop:0.17, out:0.08},
+  // 14바퀴 — 셋 다 **뺐다**. 공식 3D 그림과 정본 GLB 를 나란히 보니 세 소품 모두 원래 자리가 맞았다.
+  //   · 병아리콩: 큰 금테 안경이 두 눈을 덮는다(우리는 0.74배로 줄이고 위로 올렸다)
+  //   · 땅콩: **돋보기를 오른쪽 눈 위에 들어** 눈이 확대돼 보인다(우리는 가슴 높이로 내렸다)
+  //   · 밤: 소포를 **가슴 앞 가운데**에 두 손으로 든다(우리는 아래·바깥으로 옮겼다)
+  // 게다가 이 옮기기 자체가 **세계 좌표 거리를 로컬 좌표에 더하는 잘못**이라 소품이 몸 밖으로
+  // 3~5배 날아가 있었다(상자 크기 0.95 → 2.10·2.83·2.40). 그것이 "다 이상해졌는데?"의 원인이었다.
 };
 function applyCanonAccessory(key, model){
   const want = CANON_ACCESSORY[key];
@@ -998,17 +1004,27 @@ function applyCanonAccessory(key, model){
     acc.updateMatrixWorld(true);
     const centre = new THREE.Box3().setFromObject(acc).getCenter(new THREE.Vector3());
     acc.scale.multiplyScalar(want.shrink);
+    // 14바퀴 — **여기가 사장님이 "다 이상해졌는데?"라고 하신 자리**였다.
+    // 위에서 잰 `head` · `size` · `bodyBox` 는 전부 **세계 좌표**인데, 아래에서 더하는
+    // `acc.position` 은 **부모 로컬 좌표**다. 모델은 키 0.95 로 줄여져 있어서(normalizeAndLighten)
+    // 로컬 1 = 세계 0.2~0.3 이다. 그래서 세계 거리를 그대로 더하면 소품이 **몸 밖으로 3~5배 날아간다**
+    // (실측: 밤 소포·땅콩 돋보기·병아리콩 안경이 몸에서 완전히 떨어져 공중에 떠 있었다 —
+    //  상자 크기 0.95 → 2.4 · 2.83 · 2.10). 세계 거리를 **부모 배율로 나눠** 로컬 거리로 바꾼다.
+    const pScale = new THREE.Vector3();
+    (acc.parent || acc).updateMatrixWorld(true);
+    (acc.parent || acc).matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), pScale);
+    const k = 1 / (pScale.x || 1);          // 균등 배율
     if (want.pull){
       // 머리 중심 쪽으로 당겨 얼굴에 붙인다(가로로만 — 앞뒤·높이는 그대로).
-      acc.position.x += (head.x - centre.x) * want.pull;
-      acc.position.z += (head.z - centre.z) * want.pull * 0.35;
+      acc.position.x += (head.x - centre.x) * want.pull * k;
+      acc.position.z += (head.z - centre.z) * want.pull * 0.35 * k;
     }
     // 얼굴이 보는 쪽(눈이 있는 쪽)으로 밀어내고 눈높이로 올린다.
-    if (want.front) acc.position.addScaledVector(faceDir, bodyBox.getSize(new THREE.Vector3()).length() * want.front);
-    if (want.up)    acc.position.y += size.y * want.up;
+    if (want.front) acc.position.addScaledVector(faceDir, bodyBox.getSize(new THREE.Vector3()).length() * want.front * k);
+    if (want.up)    acc.position.y += size.y * want.up * k;
     // 눈 아래로 내리고 바깥으로 조금 — 들여다보는 손 위치가 된다.
-    if (want.drop) acc.position.y -= size.y * want.drop;
-    if (want.out)  acc.position.x += Math.sign(centre.x - head.x || 1) * size.x * want.out;
+    if (want.drop) acc.position.y -= size.y * want.drop * k;
+    if (want.out)  acc.position.x += Math.sign(centre.x - head.x || 1) * size.x * want.out * k;
   }
 }
 function applyCanonBelly(key, model){
@@ -1754,6 +1770,24 @@ if(new URLSearchParams(location.search).get('debug')==='1')setPanelOpen(true);
 // 시험 자동화용 훅(Playwright) — 사장님 손가락 대신 스크립트로 친구 수/두뇌 보기를 조작할 때만 씀.
 window.__jgSetFriendCount = setFriendCount;
 window.__jgOpenBrainPanel = () => setPanelOpen(true);
+// 14바퀴 정본 대조용 읽기 전용 고리 — 같은 친구를 ⓑ정본 GLB 그대로 / ⓒ손님 화면(v8f) / ⓓv8g 로
+// 나란히 찍기 위한 것. 화면·행동은 전혀 바꾸지 않는다(QA 스크립트에서만 쓴다).
+window.__jgCanonSheet = {
+  order: FRIEND_ORDER, defs: FRIEND_DEFS, templates,
+  raw: key => templates[key].clone(true),
+  dressed: (key, outline) => {
+    const model = templates[key].clone(true);
+    model.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone(); });
+    applyCanonColors(key, model);
+    applyCanonBelly(key, model);
+    applyCanonAccessory(key, model);
+    if (outline) addOutline(model);
+    return model;
+  },
+  tweaks: { color: CANON_MATERIAL_COLOR, belly: CANON_BELLY, accessory: CANON_ACCESSORY,
+            outlineMeshes: String(OUTLINE_MESHES), outlineColor: OUTLINE_MATERIAL.color.getHexString(),
+            outlineScale: 1.045, actorScale: COMPOSITION.actorScale },
+};
 // 시험 자동화용 읽기 전용 훅 — 각 친구의 지금 행동·이동상태·위치를 로그로 확인할 때만 씀(화면엔 영향 없음).
 window.__jgActors = () => actors.map(a => ({
   key: a.key, action: a.action, movePhase: a.movePhase,
