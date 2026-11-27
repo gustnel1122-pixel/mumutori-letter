@@ -430,8 +430,7 @@ floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
 // ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
-// 16바퀴 — 뒤 벽 색도 **잠금 파일**에서 읽는다(쌀이 벽에 묻히던 것). 바닥·책상은 그대로.
-const wallMat = new THREE.MeshLambertMaterial({ color: parseInt(LOCK.공통.벽?.색 || 'F7F6F3', 16) });
+const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
 const WINDOW_Z = -8.8;
 const WINDOW_WIDTH = 28.8;
 const WINDOW_BOTTOM = 0.08;

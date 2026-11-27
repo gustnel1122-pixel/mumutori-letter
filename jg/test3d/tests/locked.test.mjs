@@ -20,11 +20,10 @@ const lockPath = join(root, 'locked', 'characters.lock.json');
 const lockText = readFileSync(lockPath, 'utf8');
 const lock = JSON.parse(lockText);
 
-// 사장님 승인본(2026-11-27 **16바퀴** — 14:53 "없이 가자" 로 테두리 없이 확정 ·
-// 도토리 모자 자리 올림 · 뒤 벽 조금 어둡게).
+// 사장님 승인본(2026-11-27 **15바퀴** — 11:28 "테두리빼고 만들어봐" 로 외곽선 끔).
 // 잠금 파일을 한 글자라도 고치면 이 값과 달라져 실패한다.
-// 앞 승인본: 14바퀴 `8211a32f4f57a13940dc3d1f45ee9b54` · 15바퀴 `05340281f15e9b2dd5d604773b3899ed`.
-const 승인된_잠금해시 = '0556c9e457e5c0c9ce2ac0d497b1dc49';
+// 14바퀴(외곽선 켬) 승인본은 `8211a32f4f57a13940dc3d1f45ee9b54` 였다.
+const 승인된_잠금해시 = '05340281f15e9b2dd5d604773b3899ed';
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex').toUpperCase();
 const md5 = (text) => createHash('md5').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
