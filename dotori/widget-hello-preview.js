@@ -3,6 +3,58 @@
  */
 (function () {
   'use strict';
+  // Keep the existing widget and its artwork size; only translate its visible bounds.
+  if (!window.DotoriWidgetSafePosition) {
+    window.DotoriWidgetSafePosition = true;
+    var safeSource, safeProbe, safeDX = 0, safeDY = 0, safeAt = -1, safeButtons = [];
+    function safePosition(now) {
+      var node = document.querySelector('.dw');
+      if (node && !node.hidden) {
+        if (node !== safeSource) { safeSource = node; safeDX = safeDY = 0; }
+        if (!safeProbe && document.body) {
+          safeProbe = document.createElement('i');
+          safeProbe.id = 'dotori-safe-inset';
+          safeProbe.style.cssText = 'position:fixed;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
+          safeProbe.setAttribute('aria-hidden', 'true'); document.body.appendChild(safeProbe);
+        }
+        var vv = window.visualViewport, doc = document.documentElement;
+        var left = vv ? vv.offsetLeft : 0, top = vv ? vv.offsetTop : 0;
+        var right = Math.min(doc.clientWidth, left + (vv ? vv.width : innerWidth));
+        var bottom = Math.min(doc.clientHeight, top + (vv ? vv.height : innerHeight));
+        var inset = safeProbe ? safeProbe.getBoundingClientRect().height : 0;
+        var bounds = node.getBoundingClientRect();
+        var minX = bounds.left, minY = bounds.top, maxX = bounds.right, maxY = bounds.bottom;
+        Array.prototype.forEach.call(node.querySelectorAll('.dw-body img'), function (img) {
+          var r = img.getBoundingClientRect();
+          minX = Math.min(minX, r.left); minY = Math.min(minY, r.top);
+          maxX = Math.max(maxX, r.right); maxY = Math.max(maxY, r.bottom);
+        });
+        var width = maxX - minX, height = maxY - minY;
+        var x = Math.max(left + 16, Math.min(minX - safeDX, right - width - (right - left >= 1024 ? 96 : 56)));
+        var y = Math.max(top + 16, Math.min(minY - safeDY, bottom - height - 88 - inset));
+        if (now - safeAt > 500) {
+          safeAt = now; safeButtons = [];
+          Array.prototype.forEach.call(document.querySelectorAll('button,a,[role="button"]'), function (el) {
+            if (el.closest('.dw,.dw-panel,.dw-say,.dw-call')) return;
+            var r = el.getBoundingClientRect(), p = el, fixed = false;
+            if (!r.width || !r.height || r.bottom < bottom - 220 || r.top >= bottom) return;
+            for (var i = 0; p && i < 5; i++, p = p.parentElement) {
+              var position = getComputedStyle(p).position;
+              if (position === 'fixed' || position === 'sticky') { fixed = true; break; }
+            }
+            if (fixed) safeButtons.push(r);
+          });
+        }
+        safeButtons.forEach(function (r) {
+          if (x < r.right + 12 && x + width > r.left - 12 && y < r.bottom + 12 && y + height > r.top - 12) y = Math.max(top + 16, r.top - height - 12);
+        });
+        safeDX += x - minX; safeDY += y - minY;
+        node.style.translate = safeDX.toFixed(2) + 'px ' + safeDY.toFixed(2) + 'px';
+      }
+      requestAnimationFrame(safePosition);
+    }
+    requestAnimationFrame(safePosition);
+  }
   if (location.pathname !== '/' && location.pathname !== '/index.html') return;
   if (window.DotoriHelloPreview) return;
 
@@ -11,7 +63,7 @@
   var variant = window.DotoriHelloPreviewAsset;
   if (['sign', 'original', 'sparkle'].indexOf(variant) < 0) variant = 'sign';
   var HOLD = 2150, RETURN = 600, LIMIT = 2900;
-  var root, character, message, source, observer, frame, deadline, waitTimer;
+  var root, character, message, source, observer, frame, deadline, waitTimer, backdrop;
   var started = 0, finished = false, claimed = false, reduced = false;
   var phase = 'waiting', storage = 'document', big;
   var motion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -73,6 +125,11 @@
       var p = Math.min(1, Math.max(0, (age - HOLD) / RETURN));
       // Gentle acceleration into the existing moving character, no overshoot.
       var e = p * p * (3 - 2 * p);
+      if (backdrop) {
+        var blur = 'blur(' + (6 * (1 - e)).toFixed(2) + 'px)';
+        backdrop.style.backdropFilter = blur; backdrop.style.webkitBackdropFilter = blur;
+        backdrop.style.backgroundColor = 'rgba(74,36,16,' + (0.14 * (1 - e)).toFixed(3) + ')';
+      }
       var target = source.getBoundingClientRect();
       position(big.x + (target.left - big.x) * e, big.y + (target.top - big.y) * e,
         big.width + (target.width - big.width) * e);
@@ -126,6 +183,10 @@
     root.setAttribute('aria-live', 'polite');
     root.setAttribute('aria-atomic', 'true');
     root.setAttribute('role', 'status');
+    if (!reduced) {
+      backdrop = document.createElement('div'); backdrop.className = 'dhello-backdrop';
+      backdrop.setAttribute('aria-hidden', 'true'); root.appendChild(backdrop);
+    }
     message = document.createElement('div');
     message.className = 'dhello-message';
     var messageText = document.createElement('span');
@@ -204,6 +265,7 @@
   }
   var style = document.createElement('style');
   style.textContent = '.dhello{position:fixed;inset:0;z-index:2147483003;pointer-events:none;background:none!important;border:0!important}' +
+    '.dhello-backdrop{position:fixed;inset:0;pointer-events:none;background:rgba(74,36,16,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}' +
     '.dhello-character{position:fixed;left:0;top:0;transform-origin:0 0;pointer-events:none;will-change:transform}' +
     '.dhello-existing-image{display:block;width:100%;height:100%;object-fit:contain}' +
     '.dhello-message{position:fixed;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);padding:0;border:0;background:none;box-shadow:none;color:#4A2410;font:22px/1.5 "Jua","Gowun Dodum",sans-serif;white-space:nowrap;text-shadow:0 1px 2px #FFFDF7,0 -1px 2px #FFFDF7}' +
