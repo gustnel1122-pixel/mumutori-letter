@@ -7,6 +7,7 @@ import {readFile} from 'node:fs/promises';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const office = await readFile(new URL('../v8-office.js', import.meta.url), 'utf8');
 const runtime = await readFile(new URL('../v8-runtime.js', import.meta.url), 'utf8');
+const lock = JSON.parse(await readFile(new URL('../locked/characters.lock.json', import.meta.url), 'utf8'));
 const has = (src, needle, why) => assert.ok(src.includes(needle), why + ' — 못 찾음: ' + needle);
 
 const shapeOf = which => {
@@ -16,6 +17,8 @@ const shapeOf = which => {
   const named = key => {
     const raw = line.split(key + ':')[1].split(/[,}]/)[0].trim();
     if (!Number.isNaN(Number(raw))) return Number(raw);
+    // 14바퀴 — 크기 기본값은 **잠금 파일**에서 온다(사장님 11/27 09:58 '고정시킨 후').
+    if (/LOCK\.공통\.크기배율/.test(html)) return lock.공통.크기배율;
     const m = html.match(/\?\s*SCALE_REQUEST\s*:\s*([0-9.]+)/);
     assert.ok(m, raw + ' 의 기본값을 못 찾음');
     return Number(m[1]);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261123-8e';
-import {createEmotionRig,EMOTIONS} from './v8-emotions.js?v=20261123-8e';
+import {createEmotionRig,EMOTIONS,setEyeTune} from './v8-emotions.js?v=20261127-14';
 import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261123-8e';
 import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261126-13';
 import {createRenderPipeline} from './v8-render.js?v=20261123-8e';
@@ -28,6 +28,8 @@ function handOffset(a){
 }
 export function createV8(config){
   const {scene,renderer,camera,dirLight,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
+  // 14바퀴 — 눈 값은 잠금 파일(locked/characters.lock.json)에서 온 것만 쓴다.
+  setEyeTune(config.eyeTune||{});
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(),pipeline=createRenderPipeline(renderer,scene,camera);
   // 0206 ① — 친구가 커지면 숨는 줄도 넓어져야 한다(2.0 배에서 서로 못 지나가 도망이 멈췄다).
   // 길을 찾는 판 넓이도 같이 넓힌다(기본 ±12.4 로는 넓힌 숨는 자리에 닿지 못한다).

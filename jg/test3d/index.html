@@ -173,12 +173,17 @@ const CAMERA_LEVEL = (() => {
 //      저마다 다른 동작을 한다. 11/22 "애들이 너무크고" 에 맞춰 친구를 줄이고 책상·의자를 키웠다.
 //      `?ver=f` 면 v8f(66cd66a) 비율·자세 그대로 — 되돌려 보기용.
 const VARIANT = new URLSearchParams(location.search).get('ver') === 'f' ? 'f' : 'g';
+// ---- 잠근 캐릭터 값(사장님 11/27 09:58 "캐릭터들을 장면을 만들고 고정시킨 후 그걸로 만들어야지") ----
+// 캐릭터 겉모습(재질색 · 외곽선 · 눈 · 소품 · 크기 비율)은 **이 파일 하나**에서만 읽는다.
+// 바꾸면 `tests/locked.test.mjs` 가 실패한다. 이 코드에는 캐릭터 값을 직접 쓰지 않는다.
+const LOCK = await fetch(new URL('locked/characters.lock.json', import.meta.url))
+  .then(r => { if (!r.ok) throw new Error('잠금 파일을 못 읽음: ' + r.status); return r.json(); });
 // fitX·fitY = 화면 가로·세로를 얼마나 채울지(1에 가까울수록 더 당겨 본다).
 // 0206 — 사장님 11/25 02:05 "2배" → 친구 크기 1.35 → **2.0**.
 // `?scale=1.6` 처럼 주면 그 크기로 그린다(1.6 · 2.0 · 2.7 을 나란히 보여드리기 위한 것).
 const SCALE_REQUEST = parseFloat(new URLSearchParams(location.search).get('scale'));
 const ACTOR_SCALE_G = Number.isFinite(SCALE_REQUEST) && SCALE_REQUEST>0.8 && SCALE_REQUEST<=4
-  ? SCALE_REQUEST : 3.0;     // 11바퀴 — 사장님 11/26 13:59 "3배"
+  ? SCALE_REQUEST : LOCK.공통.크기배율;     // 잠금 파일에서 읽는다(지금 3.0 — 사장님 11/26 13:59 "3배")
 // 책상·의자도 **같은 비율로** 키운다 — 안 키우면 친구가 책상을 타고 앉은 꼴이 된다.
 // 1.35 배일 때 책상 1.30 이 '앉아서 일하는' 비율(상판/키 0.43)이었으므로 그 비율을 지킨다.
 const DESK_SCALE_G = +(1.30 * ACTOR_SCALE_G / 1.35).toFixed(3);
@@ -557,7 +562,7 @@ contactContext.fillStyle=contactGradient;contactContext.fillRect(0,0,128,128);
 const QA_FLAGS = new URLSearchParams(location.search);
 // 13바퀴 ④ — 1% 저점이 v8f 보다 낮은 원인을 **하나씩 꺼서** 가른다(검사 전용 · 기본은 전부 켬).
 //   ?outline=0 테두리 · ?shadow=0 발밑 그림자 · ?seeds=0 날아가는 씨앗 · ?path=0 길찾기
-const OUTLINE_ON = QA_FLAGS.get('outline') !== '0';
+const OUTLINE_ON = LOCK.공통.외곽선.켬 && QA_FLAGS.get('outline') !== '0';
 const SHADOW_ON  = QA_FLAGS.get('shadow')  !== '0';
 const SEEDS_ON   = QA_FLAGS.get('seeds')   !== '0';
 const PATH_ON    = QA_FLAGS.get('path')    !== '0';
@@ -939,13 +944,15 @@ function lerpAngle(a, b, t){
 // 화면에서는 더 붉고 진하게 나온다(실측: #BA511F 넣으면 화면 (210,63,2)).
 // 그래서 **화면 결과가 정본 #BA511F 가 되도록** 보정을 되돌린 값을 넣는다(아래 결과에 실측 기록).
 // 화면 보정(채도 1.10 · 대비 1.12)을 거치므로 **정본 색을 그대로 넣지 않고 미리 눌러서** 넣는다.
-const CANON_MATERIAL_COLOR = {
-  bam: { Body: 0xA9633F },      // 메시 이름 기준(재질 이름은 가벼운 재질로 바꿀 때 사라진다) → 화면에서 #BA511F
-  // 14바퀴 — 병아리콩 `Gold` 를 #8E5417(짙은 갈색)로 바꾸던 것을 **뺐다**.
-  // 공식 3D 그림(d3_chickpea_x4.png)의 안경테는 **금색**이고, 정본 GLB 도 금색이다.
-  // 게다가 `Gold` 메시에는 **만년필 금테**도 들어 있어 펜까지 같이 갈색이 됐다.
-  // (색상 정본 2절의 '안경·소품 #9B5918' 은 짙은 포인트색 칸이라 테 색으로 읽은 것이 잘못이었다.)
-};
+// 14바퀴 — 병아리콩 `Gold` 를 #8E5417(짙은 갈색)로 바꾸던 것은 **뺐다**.
+// 공식 3D 그림(d3_chickpea_x4.png)의 안경테는 **금색**이고, 정본 GLB 도 금색이다.
+// 게다가 `Gold` 메시에는 **만년필 금테**도 들어 있어 펜까지 같이 갈색이 됐다.
+// (색상 정본 2절의 '안경·소품 #9B5918' 은 짙은 포인트색 칸이라 테 색으로 읽은 것이 잘못이었다.)
+// ★ 이 표는 더 이상 여기 적지 않는다 — **잠금 파일(locked/characters.lock.json)** 에서만 읽는다.
+const CANON_MATERIAL_COLOR = Object.fromEntries(Object.entries(LOCK.캐릭터)
+  .map(([key, v]) => [key, Object.fromEntries(Object.entries(v.재질색 || {})
+    .map(([mesh, hex]) => [mesh, parseInt(hex, 16)]))])
+  .filter(([, table]) => Object.keys(table).length));
 // 0224 P31 — 정본 밤은 아래쪽이 '연베이지 밑동'인데 3D 에서는 거의 안 보였다.
 // GLB 는 그대로 두고, 불러올 때 Belly(밑동) 메시만 몸 높이의 아래 38% 를 덮도록 키운다.
 // 0206 ⑦ — 밑동(`Belly`)은 높이는 맞는데 **몸(`Body`)보다 가늘어 몸 속에 들어가 있었다**
@@ -956,7 +963,10 @@ const CANON_MATERIAL_COLOR = {
 // 14바퀴 — 밤 밑동을 몸 아래 38% 까지 키우고 1.09배 부풀리던 것을 **뺐다**.
 // 공식 3D 그림의 밤은 **아래 오른쪽에 수수한 베이지 바닥**이고, 소포가 그 위를 많이 가린다.
 // 우리 값은 둥근 '배'처럼 커져서 정본과 달라 보였다. 정본 GLB 가 이미 바닥을 가지고 있다.
-const CANON_BELLY = {};
+// ★ 밑동·소품 보정도 **잠금 파일에서만** 읽는다. 지금 잠금 값은 일곱 다 비어 있다(= 정본 GLB 그대로).
+const CANON_BELLY = Object.fromEntries(Object.entries(LOCK.캐릭터)
+  .filter(([, v]) => v.밑동보정 && Object.keys(v.밑동보정).length)
+  .map(([key, v]) => [key, v.밑동보정]));
 // 5바퀴까지 남은 유일한 정본 불통 — 병아리콩 안경알이 고개를 돌리면 머리 밖 허공에 뜬다.
 // 각도 제한으로는 0 이 안 되므로, 불러올 때 **안경을 머리 중심 쪽으로 줄여 얼굴에 붙인다**
 // (GLB 파일은 그대로. 정면에서 보이는 모양은 거의 그대로고, 돌려도 머리 테두리 안에 남는다).
@@ -965,7 +975,11 @@ const CANON_BELLY = {};
 // 병아리콩 안경은 얼굴에 붙이고(pull), 땅콩 돋보기는 **눈에서 내려** 가슴 높이로 쥐게 한다.
 // 1241 ⑥ — 돋보기(Gold 금테 + Lens 알 + Handle 손잡이)가 눈(y 1.10~1.38) 위에 그대로 얹혀
 // 선글라스처럼 보였다(7바퀴 04 사진). 외곽선을 뺀 것만으로는 안 없어졌다.
-const CANON_ACCESSORY = {
+// ★ 소품 보정도 **잠금 파일에서만** 읽는다(`소품보정`). 지금 잠금 값은 일곱 다 비어 있다.
+const CANON_ACCESSORY = Object.fromEntries(Object.entries(LOCK.캐릭터)
+  .filter(([, v]) => v.소품보정 && Object.keys(v.소품보정).length)
+  .map(([key, v]) => [key, v.소품보정]));
+const CANON_ACCESSORY_NOTE = {
   // 7바퀴 영상분석 ⑪ — 안경(`Gold` 고리)은 **머리 밖 0 과 얼굴에 보이기를 동시에 만족하지 못한다**.
   //   · 안으로 당기면(당김 0.36) 머리 밖 0 이지만 머리 속에 묻혀 안 보인다.
   //   · 얼굴 쪽으로 밀거나 눈높이로 올리면(앞 0.05·위 0.16) 눈높이에서 머리가 좁아져
@@ -1068,9 +1082,10 @@ function applyCanonColors(key, model){
 // 조명 계산이 없는 가장 싼 재질 하나를 공유하므로 그리는 횟수만 조금 는다(아래 FPS 실측).
 // 1241 ⑩ — 외곽선 켜고 끄는 한 줄 스위치. **기본값 켬**.
 // 사장님이 진격 방에서 '빼'라고 하시면 이 한 줄만 false 로 바꾸면 된다(`?outline=0` 으로도 꺼짐).
-const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({color:0x4A2C1A, side:THREE.BackSide});
+// ★ 외곽선 색·굵기·대상 메시도 **잠금 파일에서만** 읽는다.
+const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({color:parseInt(LOCK.공통.외곽선.색,16), side:THREE.BackSide});
 // 1241 ⑥: 돋보기 렌즈(Lens)·금테(Gold)에 진갈색 테두리가 들어가 '선글라스'로 보였다 → 뺀다.
-const OUTLINE_MESHES = /^(Body|Cap|CapLine|Leaf|Stem|Beak|Petal|Sun|Scarf)$/;   // 0206 ⑦ Belly 제외 — 밑동 테두리가 연베이지를 덮었다
+const OUTLINE_MESHES = new RegExp(LOCK.공통.외곽선.대상메시);   // 0206 ⑦ Belly 제외 — 밑동 테두리가 연베이지를 덮었다
 function addOutline(model){
   const add=[];
   model.traverse(o => { if (o.isMesh && OUTLINE_MESHES.test(o.name)) add.push(o); });
@@ -1078,7 +1093,7 @@ function addOutline(model){
     const line = new THREE.Mesh(mesh.geometry, OUTLINE_MATERIAL);
     line.name = mesh.name + '_Outline';
     line.position.copy(mesh.position); line.quaternion.copy(mesh.quaternion);
-    line.scale.copy(mesh.scale).multiplyScalar(1.045);
+    line.scale.copy(mesh.scale).multiplyScalar(LOCK.공통.외곽선.배율);
     line.renderOrder = -1; line.userData.jgOutline = true;
     mesh.parent.add(line);
   }
@@ -1672,6 +1687,8 @@ function updateMonitorFlicker(t){
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
   bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,layoutSpread:LAYOUT_SPREAD,seedsOn:SEEDS_ON,pathOn:PATH_ON,
+  // 14바퀴 — 눈 값은 잠금 파일에서만.
+  eyeTune:Object.fromEntries(Object.entries(LOCK.캐릭터).map(([k,v])=>[k,{size:v.눈.크기,fix:v.눈.눈꼬리,open:v.눈.세로열기}])),
   getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
 window.__jgV8=v8.api;
 let clock = new THREE.Clock();
