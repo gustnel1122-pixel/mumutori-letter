@@ -18,7 +18,7 @@
   var artwork, liveBody;
   if (variant !== 'original' && !(motion && motion.matches)) {
     artwork = new Image();
-    artwork.src = new URL('hello-preview-assets/t3-' + variant + '.png',
+    artwork.src = new URL('hello-preview-assets/t3-' + variant + (variant === 'sign' ? '-text' : '') + '.png',
       document.currentScript && document.currentScript.src || location.href).href;
   }
 
@@ -151,11 +151,9 @@
         picture.className = 'dhello-existing-image'; picture.alt = '';
         character.appendChild(picture);
         if (variant === 'sign') {
-          character.removeAttribute('aria-hidden');
-          message.classList.add('dhello-sign-label');
-          message.style.left = '8%'; message.style.top = '13%';
-          message.style.fontSize = (baseWidth * 0.072) + 'px';
-          character.appendChild(message);
+          // The approved lettering is baked into the image, independent of device fonts.
+          message.remove();
+          root.setAttribute('aria-label', messageText.textContent);
         }
       }
       root.appendChild(character);
