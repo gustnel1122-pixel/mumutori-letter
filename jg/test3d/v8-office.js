@@ -150,9 +150,12 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
       const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-4.1));if(cover)covers.push(cover);
       const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-4.1));if(base)covers.push(base);
       place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*11.3,0,-2.5));
-      for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-3.4));
+      // 0152 — 책이 책장 **앞 허공**(z −3.4 · 책장 앞면 −3.68)에 떠 있었다 → 칸 안으로 넣는다.
+      for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-4.1));
     }
-    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-4.1));if(extra)covers.push(extra);
+    // 0050 ② — 이 책장이 **왼쪽 도망 통로**를 막고 있었다(땅콩이 x −10.4 에서 끼어 34px).
+    // 카메라 쪽으로 0.6칸 당겨 통로를 넓힌다.
+    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-3.5));if(extra)covers.push(extra);
     // 13바퀴 4차 — 완두콩이 숨을 가구로 오른쪽에도 책장을 하나 세워 봤으나(x 12.0),
     // `coverBlocked` 는 그대로(0.042)였고 **도망 길만 막아** 미끄럼이 땅콩 1 → 78 ·
     // 해바라기씨 13 → 40 으로 늘었다. 되돌린다 — 완두콩 가릴 것 없음은 남은 것으로 적는다.
@@ -173,7 +176,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
       if(b.min.y>1.8 || b.max.y<.12)return;
       // v8g: 자기 책상·자기 상자는 그 친구에게만 막힘이 아니다 — 앉아서 쓰는 물건이다.
       // 남들에게는 그대로 피해 갈 가구다.
-      obstacles.push({key:root.userData.isDesk?'desk-'+root.userData.slotIndex:o.name || 'furniture',
+      obstacles.push({key:root.userData.isDesk?'desk-'+root.userData.slotIndex:(root.userData.ownerKey?'crate-'+root.userData.ownerKey:(o.name || 'furniture')),
         minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,
         ignoreKeys:root.userData.ownerKey?[root.userData.ownerKey]:undefined});
     });
@@ -182,7 +185,16 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     obstacles=[...new Map(obstacles.map(o=>[[o.minX,o.maxX,o.minZ,o.maxZ,(o.ignoreKeys||[]).join('|')].join(','),o])).values()];
     obstacles=obstacles.filter((o,i,list)=>!list.some((b,j)=>i!==j && b.minX<=o.minX && b.maxX>=o.maxX && b.minZ<=o.minZ && b.maxZ>=o.maxZ
       && (b.ignoreKeys||[]).join('|')===(o.ignoreKeys||[]).join('|')));
-    bake.rebuild(roots);
+    // 2350 ⑴ — 책상·의자·모니터는 **굽기에서 뺀다**. 구워 붙이면(merge) 원본을 옮겨도
+    // 화면이 한 픽셀도 안 바뀌어서(2345 실측) 책상을 치우는 모습을 만들 수 없었다.
+    // 다른 가구(책장·화분·창틀·바닥 소품)는 그대로 구워 둔다 — 렉은 전/후로 잰다.
+    // 0152 — 씨앗 상자도 책상 위에 놓인 물건이라 **같이 살아 있어야** 한다.
+    // 구워 두면 책상이 밀려 나간 자리에 상자만 남아 공중에 뜬 것처럼 보였다(사장님 01:51).
+    for(const d of [...desks,...crates]){
+      d.visible=true;d.userData.bakedSource=false;
+      d.traverse(o=>{if(o.isMesh)for(const m of [o.material].flat())if(m)gradeMaterial(m);});
+    }
+    bake.rebuild([...fixed]);
   }
   return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,rebuild,get obstacles(){return obstacles;},bake,
     get info(){return {...assets.info,anisotropy:assets.anisotropy,props:['CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그','직접 만든 종이·장난감']};}};

@@ -149,7 +149,7 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261123-8f';
+import {createV8} from './v8-runtime.js?v=20261128-8h';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
@@ -476,6 +476,35 @@ const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(WINDOW_WIDTH, WINDOW_HE
 bigWindow.position.set(0, WINDOW_BOTTOM + WINDOW_HEIGHT / 2, WINDOW_Z);
 scene.add(bigWindow);
 
+// ---- 유리창 = 실시간 카메라 화면 (사장님 11/16 16:11 "유리창 자체가 카메라 화면이여야해 상시!") ----
+// 사람 감지에 쓰는 **같은 카메라 한 줄기**(camVideo)를 그대로 유리창에 입힌다(카메라를 두 번 열지 않는다).
+// 카메라가 없거나 허용 안 되면 지금까지의 **그린 하늘**을 그대로 쓴다(화면 깨짐 0).
+const camTexture = new THREE.VideoTexture(camVideo);
+camTexture.colorSpace = THREE.SRGBColorSpace;
+camTexture.minFilter = THREE.LinearFilter;
+camTexture.magFilter = THREE.LinearFilter;
+camTexture.generateMipmaps = false;
+// 손님이 자기 모습을 보는 창이라 **거울처럼 좌우를 뒤집는다**.
+camTexture.wrapS = THREE.RepeatWrapping;
+let windowShowsCamera = false;
+function updateWindowSource(){
+  const ready = camVideo.readyState >= 2 && camVideo.videoWidth > 0 && camVideo.videoHeight > 0;
+  if (ready){
+    // 창(가로로 긴)에 꽉 차게 — 세로를 잘라 '큰 얼굴'이 보이게(11/03 '진격의 거인처럼 큰 얼굴').
+    const windowAspect = WINDOW_WIDTH / WINDOW_HEIGHT;
+    const videoAspect = camVideo.videoWidth / camVideo.videoHeight;
+    const coverY = Math.min(1, videoAspect / windowAspect);
+    const coverX = Math.min(1, windowAspect / videoAspect);
+    camTexture.repeat.set(-coverX, coverY);
+    camTexture.offset.set(0.5 + coverX / 2, (1 - coverY) / 2);
+  }
+  const want = ready ? camTexture : skyTexture;
+  if (windowMat.map !== want){
+    windowMat.map = want; windowMat.needsUpdate = true; windowShowsCamera = ready;
+  }
+}
+updateWindowSource();
+
 const windowFrameMat = new THREE.MeshLambertMaterial({ color: 0xCED5DB });
 const windowSillMat = new THREE.MeshLambertMaterial({ color: 0xFAFBFC });
 function addWindowFrame(width, height, depth, x, y, material = windowFrameMat){
@@ -494,6 +523,25 @@ addWindowFrame(WINDOW_WIDTH + 0.2, 0.1, 0.16, 0, WINDOW_BOTTOM + WINDOW_HEIGHT);
 addWindowFrame(WINDOW_WIDTH + 0.3, 0.12, 0.32, 0, WINDOW_BOTTOM - 0.02, windowSillMat);
 
 // ---- 화분(양옆, 전판처럼) — 단순 도형 ----
+// 2315 — 무기 보관함(사장님 11/27 23:14 "무기를 가져와서 쏘게"). 평소엔 바주카가 이 안에 있다.
+function buildWeaponLocker(x, z){
+  const g = new THREE.Group();
+  g.userData.isLocker = true;   // 0152 — 검사에서 '받침'으로 셀 수 있게(그림은 그대로)
+  const woodMat = new THREE.MeshLambertMaterial({ color: 0xD9B98C });
+  const bandMat = new THREE.MeshLambertMaterial({ color: 0xB08A5E });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 1.1), woodMat);
+  body.position.y = 0.5; g.add(body);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.14, 1.18), bandMat);
+  lid.position.y = 1.03; g.add(lid);
+  for (const sx of [-0.52, 0.52]){
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.04, 1.14), bandMat);
+    band.position.set(sx, 0.5, 0); g.add(band);
+  }
+  g.position.set(x, 0, z);
+  g.userData.isWeaponLocker = true;
+  scene.add(g);
+  return g;
+}
 function buildPlant(x, z, scale){
   const g = new THREE.Group();
   const potMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
@@ -643,7 +691,12 @@ function updateThought(a){
   if (show){
     const fade = a.actionT > 1.3 ? Math.max(0, (1.6 - a.actionT) / 0.3) : 1;
     a.thoughtSprite.material.opacity = fade;
-    a.thoughtSprite.position.set(a.wrapper.position.x, a.wrapper.position.y+1.15*COMPOSITION.actorScale, a.wrapper.position.z);
+    // 0152 ③ — 말풍선이 머리보다 한참 위에 떠 있어 '허공에 뜬 점'처럼 보였다.
+  // 놀람 '!' 과 **같은 높이**(머리 꼭대기 바로 위)로 내린다.
+  const headY = a.emotionRig && a.emotionRig.spriteBaseY !== undefined
+    ? (a.visualRoot || a.wrapper).localToWorld(new THREE.Vector3(0, a.emotionRig.spriteBaseY, 0)).y
+    : a.wrapper.position.y + 1.15 * COMPOSITION.actorScale;
+  a.thoughtSprite.position.set(a.wrapper.position.x, headY, a.wrapper.position.z);
   }
 }
 
@@ -739,13 +792,13 @@ const LAYOUT_SLOTS_BY_CAM = {
   // 전투 중 겹침이 5 → 56 장으로 늘었다. **간격 3.5 는 그대로 두고** 카메라 여유(roam)를
   // 없애 화면 크기를 되찾는다(아래 roam).
   lowered: [
-    { dx: 2.24, dz: 3.10, yaw: 0, row:'front' },    // 도토리
-    { dx:-2.24, dz:-1.70, yaw: 0, row:'middle' },   // 밤
-    { dx:-4.55, dz:-1.70, yaw: 0, row:'middle' },   // 땅콩
+    { dx: 2.456, dz: 3.10, yaw: 0, row:'front' },   // 도토리  (17바퀴: 화면 틈 고르게 — 실측값으로 +0.34)
+    { dx:-1.982, dz:-1.70, yaw: 0, row:'middle' },  // 밤      (17바퀴: +0.40)
+    { dx:-5.020, dz:-1.70, yaw: 0, row:'middle' },  // 땅콩    (17바퀴: -0.73)
     { dx:-6.79, dz: 3.10, yaw: 0, row:'front' },    // 병아리콩
-    { dx: 4.55, dz:-1.70, yaw: 0, row:'middle' },   // 완두콩
+    { dx: 5.450, dz:-1.70, yaw: 0, row:'middle' },  // 완두콩  (17바퀴: +1.41)
     { dx: 6.79, dz: 3.10, yaw: 0, row:'front' },    // 해바라기씨
-    { dx: 0.00, dz:-4.20, yaw: Math.PI, row:'back' },// 쌀
+    { dx: 0.620, dz:-4.20, yaw: Math.PI, row:'back' },// 쌀    (2228: 화면에서 밤과 더 떨어지게 +0.67)
   ],
 };
 // v8g: 일곱이 저마다 자기 책상·화면 쪽으로 몸을 돌려 앉는다(2208 ①-1).
@@ -796,6 +849,9 @@ const LAUNCHER_SPOTS = VARIANT === 'f'
   // 미는 친구와 그 이웃이 겹쳤다(왼쪽 23장 · 오른쪽 23장, 좌우가 번갈아 나타났다).
   // 쏘는 자리를 바깥 끝으로 빼서 출발선을 떼어 놓는다.
   : {parked:[[-13.4, 3.6], [13.4, 3.6]], deployed:[[-10.0, -0.8], [10.0, 1.1]]};   // 13바퀴 — 숨는 자리를 자기 쪽으로 바꿔 출발 겹침이 없어졌으니 조금 안쪽으로(도망 거리 확보)   // 11바퀴: 바깥(±10.7)으로 옮겨 봤지만 겹침 72→73 으로 그대로였다
+
+// 2315 — 무기 보관함 둘(바주카가 평소에 들어가 있는 곳) — 자리 값이 정해진 뒤에 세운다.
+for (const [lx, lz] of LAUNCHER_SPOTS.parked) buildWeaponLocker(lx, lz);
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -1332,7 +1388,27 @@ const IDLE_ACTIONS = {
   chatting:  {trip:'chat'},
   carrying:  {trip:'carry'},
   shelf:     {trip:'shelf'},
+  // 17바퀴 — 사장님 11/04 21:14 "돌아다니고 촬영도하고 전화도하고 보고도받고 등등".
+  photographing: {trip:'photo'},   // 사무실 한가운데로 나가 한 장 찍기
+  calling:       {trip:'phone'},   // 구석에서 전화 받기
+  reporting:     {trip:'report'},  // 보고하러 가기 — 늘 대표(도토리)에게
+  inspecting:    {trip:'inspect'}, // 선반·상자 살피기(땅콩 돋보기)
+  greeting:      {trip:'greet'},   // 문 쪽 손님 맞이 자리 오가기(쌀)
 };
+// 17바퀴 3바퀴 — 사장님 11/27 19:59 "각자가 역할에 맞게 일을 해야 더 재밌는것같아".
+// 캐릭터 정본 v1.6 의 직무 그대로. 자리에서 하는 '버릇'(quirk)도 이미 친구별 직무 몸짓이다
+// (도토리 타자 · 병아리콩 편지 들기 · 밤 상자 톡톡 · 땅콩 돋보기 · 완두콩 찰칵 · 해바라기씨 해 보기 · 쌀 차 홀짝).
+// 값은 '그 친구가 그 일을 고를 점수'. 커피·수다는 누구나 가끔(낮은 점수 = 3분의 1 이하).
+const JOB_BY_FRIEND = {
+  dotori:     {quirk:1.5, working:1.3, drawer:0.5, reporting:0,   photographing:0, calling:0,   inspecting:0,   carrying:0,   shelf:0,   greeting:0},
+  byeongari:  {quirk:1.4, working:1.2, drawer:0.8, reporting:0.7, photographing:0, calling:0,   inspecting:0,   carrying:0,   shelf:0,   greeting:0},
+  bam:        {quirk:1.0, working:0.8, drawer:0.3, reporting:0.5, photographing:0, calling:0,   inspecting:0,   carrying:1.3, shelf:1.3, greeting:0},
+  ddangkong:  {quirk:1.1, working:0.8, drawer:0.3, reporting:0.9, photographing:0, calling:0,   inspecting:1.4, carrying:0,   shelf:0.6, greeting:0},
+  wandukong3: {quirk:1.2, working:0.8, drawer:0.3, reporting:0.5, photographing:1.5, calling:0, inspecting:0,   carrying:0,   shelf:0,   greeting:0},
+  haebaragi:  {quirk:1.3, working:0.9, drawer:0.3, reporting:0.6, photographing:0, calling:1.4, inspecting:0,   carrying:0,   shelf:0,   greeting:0},
+  ssal:       {quirk:1.2, working:0.9, drawer:0.3, reporting:0.5, photographing:0, calling:1.0, inspecting:0,   carrying:0,   shelf:0,   greeting:1.3},
+};
+const REST_ACTIONS = ['coffee','chatting','stretch','yawn','lookAside','chairSpin'];   // 누구나 가끔(쉬는 시간)
 const smooth01 = x => { x = Math.min(1, Math.max(0, x)); return x*x*(3-2*x); };
 // 0 → 1 → 0 (들어갔다 나오는 한 박자)
 const arc = (u, rise = 0.25, fall = 0.25) =>
@@ -1459,16 +1535,34 @@ function updateMovement(a, dt, t){
     }
   } else if (a.movePhase === 'busy'){
     a.busyT += dt;
-    const dur = a.visitKind === 'chat' ? 2.2 : a.visitKind === 'drawer' ? 1.5 : 1.1;
+    const DUR = {chat:2.2, drawer:1.5, report:2.4, phone:2.8, photo:2.0, inspect:2.6, greet:2.2};
+    const dur = DUR[a.visitKind] ?? 1.1;
     const hop = Math.abs(Math.sin(t*5 + a.phase)) * 0.03;
     let yawOffset = 0;
-    if (a.visitKind === 'chat' && a.visitTargetActor){
+    if ((a.visitKind === 'chat' || a.visitKind === 'report') && a.visitTargetActor){
       const dir = a.visitTargetActor.wrapper.position.clone().sub(a.wrapper.position);
       if (dir.lengthSq() > 1e-6) a.lookYaw = Math.atan2(dir.x, dir.z);
     }
-    const bend = a.visitKind === 'drawer' ? -0.34 : a.visitKind === 'chat' ? 0.05 : -0.18;
-    a.poseGoal = {lift:hop, tiltX:bend, tiltZ:Math.sin(t*2.4 + a.phase)*0.05,
-      squash:a.visitKind === 'drawer' ? 0.94 : 1, yawOffset, seated:false, walking:false, lookYaw:a.lookYaw};
+    // 17바퀴 — 전화는 유리창 반대(방 안)를 보며, 촬영은 유리창 쪽을 보며 선다.
+    if (a.visitKind === 'photo') a.lookYaw = Math.atan2(-a.wrapper.position.x*0.06, WINDOW_Z - a.wrapper.position.z);
+    if (a.visitKind === 'phone') a.lookYaw = Math.atan2(a.homePos.x < 0 ? -1 : 1, 0.6);
+    // 17바퀴 3바퀴 — 살피기는 돋보기를 들여다보듯 숙이고, 손님 맞이는 허리를 살짝 편다.
+    if (a.visitKind === 'inspect') a.lookYaw = Math.atan2(0, WINDOW_Z - a.wrapper.position.z);
+    if (a.visitKind === 'greet')   a.lookYaw = Math.atan2(camera.position.x - a.wrapper.position.x,
+                                                          camera.position.z - a.wrapper.position.z);
+    const bend = a.visitKind === 'drawer' ? -0.34
+               : (a.visitKind === 'chat' || a.visitKind === 'report') ? 0.05
+               : a.visitKind === 'inspect' ? -0.30
+               : a.visitKind === 'greet' ? 0.10
+               : a.visitKind === 'photo' ? -0.26 : -0.18;
+    // 보고 = 고개 끄덕 · 전화 = 고개를 한쪽으로 기울이고 작게 흔들기 · 촬영 = 찰칵 한 박자
+    const nod   = a.visitKind === 'report' ? Math.sin(t*4.4 + a.phase)*0.16 : 0;
+    const lean  = a.visitKind === 'phone'  ? 0.30 + Math.sin(t*1.8 + a.phase)*0.08 : 0;
+    const click = a.visitKind === 'photo'  ? Math.max(0, Math.sin(a.busyT*Math.PI/dur*2)) : 0;
+    a.poseGoal = {lift:hop + click*0.05, tiltX:bend + nod,
+      tiltZ:Math.sin(t*2.4 + a.phase)*0.05 + lean,
+      squash:a.visitKind === 'drawer' ? 0.94 : 1 - click*0.06,
+      yawOffset, seated:false, walking:false, lookYaw:a.lookYaw};
     if (a.busyT >= dur){
       a.movePhase = 'returning';
       a.moveElapsed = 0;
@@ -1501,10 +1595,14 @@ function applyReturnToNormal(a, dt){
 }
 
 // 사람이 멀어져 레벨이 0으로 돌아온 "그 순간" — 전원 자기 자리로 바로 되돌림(지시사항 그대로)
-function onReturnToIdle(){
+// 17바퀴 — 사장님 11/04 21:14 "사람이오면 **각자 그상황에서** 놀라고".
+// `keepPlace` 면 **있던 자리 그대로** 두고 하던 일만 정리한다(손님을 본 순간엔 순간이동 금지).
+function onReturnToIdle(keepPlace = false){
   for (const a of actors){
-    a.wrapper.position.set(a.homePos.x, (a.seatY || 0), a.homePos.z);
-    a.wrapper.rotation.set(0, a.deskYaw, 0);
+    if (!keepPlace){
+      a.wrapper.position.set(a.homePos.x, (a.seatY || 0), a.homePos.z);
+      a.wrapper.rotation.set(0, a.deskYaw, 0);
+    }
     a.wrapper.scale.set(1,1,1);
     a.hideAmt = 0;
     a.movePhase = 'idle';
@@ -1530,19 +1628,34 @@ function besideFriend(other, dist){
   const ang = side * 0.95;
   return other.homePos.clone().add(new THREE.Vector3(Math.sin(ang)*dist, 0, Math.cos(ang)*dist));
 }
+// 17바퀴 3바퀴 — 찾아가 서는 자리가 **화면에서** 다른 친구와 겹치지 않게 옆으로 조금씩 밀어 본다.
+// (세계 좌표로 떨어져 있어도 앞뒤 줄이면 화면에서는 포개진다 — 13바퀴·17바퀴 실측.)
+function clearSpot(a, target){
+  const screenX = v => { const q = v.clone(); q.y = 0.6; return q.project(camera).x; };
+  const others = actors.filter(o => o !== a).map(o => screenX(o.wrapper.position));
+  if (!others.length) return target;
+  let best = target, bestGap = -1;
+  for (const dx of [0, 1.2, -1.2, 2.4, -2.4, 3.6, -3.6]){
+    const t = target.clone(); t.x += dx;
+    const gap = Math.min(...others.map(o => Math.abs(o - screenX(t))));
+    if (gap > bestGap){ bestGap = gap; best = t; }
+    if (bestGap > 0.16) break;                 // 넉넉히 떨어졌으면 그만 찾는다(2228: 0.12 → 0.16)
+  }
+  return best;
+}
 function beginVisit(a, kind){
   a.moveFrom = new THREE.Vector3(a.homePos.x, 0, a.homePos.z);
   let target = null;
   if (kind === 'carry'){
-    const other = pickOtherActor(a);
-    if (!other){ a.action = 'working'; return false; }
-    target = besideFriend(other, 1.00);
-    a.visitTargetActor = other;
+    // 2228 — 상자는 **선반까지** 나른다(밤 = 물류). 친구 옆에 서면 화면에서 겹쳤다(밤↔쌀 10 · 도토리↔밤 5).
+    const side = a.homePos.x < 0 ? -1 : 1;
+    target = new THREE.Vector3(side*8.3 + (Math.random()-0.5)*0.8, 0, -3.5 + 1.1);
+    a.visitTargetActor = null;
     a.cargoMesh.visible = true;
   } else if (kind === 'chat'){
     const other = actors[a.partnerIndex];
     if (!other || other === a){ a.action = 'working'; return false; }
-    target = besideFriend(other, 1.10);
+    target = besideFriend(other, 2.40);   // 17바퀴 2바퀴 — 수다도 한 걸음 떨어져서
     a.visitTargetActor = other;
   } else if (kind === 'drawer'){
     // 일어나 책상 옆 서랍으로 한 발. 책상 뒤에 선 채로 숙이면 모니터에 얼굴이 가린다.
@@ -1560,6 +1673,32 @@ function beginVisit(a, kind){
     const left = pick(-1), right = pick(1);
     target = (right.gap > left.gap ? right : left).t;
     a.visitTargetActor = null;
+  } else if (kind === 'report'){
+    // 17바퀴 3바퀴 — 보고는 **늘 대표(도토리)에게** 간다(사장님 11/27 19:59 '역할에 맞게').
+    const boss = actors.find(o => o.key === 'dotori' && o !== a) || pickOtherActor(a);
+    if (!boss){ a.action = 'working'; return false; }
+    target = besideFriend(boss, 2.50);   // 17바퀴 2바퀴 — 보고도 한 걸음 떨어져서
+    a.visitTargetActor = boss;
+    a.cargoMesh.visible = true;          // 서류를 들고 간다
+  } else if (kind === 'inspect'){
+    // 땅콩(MD) — 선반 앞에서 돋보기로 상품 살피기. 책장 쪽으로 가되 밤과 겹치지 않게 반대쪽.
+    const side = a.homePos.x < 0 ? -1 : 1;
+    target = new THREE.Vector3(side*7.4 + (Math.random()-0.5)*0.6, 0, -3.5 + 1.9);
+    a.visitTargetActor = null;
+  } else if (kind === 'greet'){
+    // 쌀(매장지기) — 문 쪽(화면 바깥쪽 아래) 손님 맞이 자리로 나갔다 온다.
+    const side = a.homePos.x <= 0 ? -1 : 1;
+    target = new THREE.Vector3(side*3.4, 0, a.homePos.z + 2.6);
+    a.visitTargetActor = null;
+  } else if (kind === 'phone'){
+    // 전화는 자리에서 조금 떨어진 **빈 구석**으로 — 책상 줄 뒤쪽, 자기 자리 바깥쪽.
+    const side = a.homePos.x < 0 ? -1 : 1;
+    target = new THREE.Vector3(a.homePos.x + side*2.2, 0, a.homePos.z + 1.1);
+    a.visitTargetActor = null;
+  } else if (kind === 'photo'){
+    // 촬영 — 사무실 가운데 앞쪽으로 나가 유리창 쪽을 향해 한 장.
+    target = new THREE.Vector3(a.homePos.x*0.45 + (Math.random()-0.5)*0.8, 0, a.homePos.z + 1.3);
+    a.visitTargetActor = null;
   } else if (kind === 'shelf'){
     // 책장에 책 꽂으러 — 가까운 쪽 책장 앞으로(2208 ①-2 '책장 가기').
     const side = a.homePos.x < 0 ? -1 : 1;
@@ -1571,6 +1710,8 @@ function beginVisit(a, kind){
   }
   // 0206 ① — 수다·커피로 옮겨 간 자리가 자리 바깥이면 2.0 배에서 몸이 화면 밖으로 나간다
   // (땅콩이 수다 중에 왼쪽으로 1.14 까지 나갔다). 제일 바깥 친구의 자리 안으로 끌어온다.
+  // 17바퀴 3바퀴 — 서는 자리를 화면에서 비어 있는 쪽으로 민다(자기 책상 옆 서랍 한 발은 그대로).
+  if (kind !== 'drawer') target = clearSpot(a, target);
   const edge = Math.max(...LAYOUT_SLOTS.map(slot => Math.abs(slot.dx)));
   target.x = THREE.MathUtils.clamp(target.x, -edge, edge);
   // 11바퀴 — 앞줄 친구 옆으로 수다 가면 **앞줄보다 더 앞**에 서게 되고, 3.0배에서는 그 몸이
@@ -1634,23 +1775,33 @@ function tickUtilityAI(a, dt, t){
     // "책상·의자가 비어 있다"(2206 총괄 지적 ①)로 보인다. 한 번에 한 명 + 쉬는 시간.
     const canStep   = !someoneAway;                                              // 자기 책상 옆 한 발(서랍)
     const canTravel = canStep && actors.length > 1 && t >= nextTripAllowedAt;    // 멀리 다녀오기
+    // 17바퀴 3바퀴 — 친구마다 **자기 직무 일**을 고른다(사장님 11/27 19:59).
+    const job = JOB_BY_FRIEND[a.key] || {};
+    const w = k => (job[k] ?? 1);                 // 그 친구가 그 일을 고를 점수(0 이면 아예 안 함)
     const candidates = [
-      { k:'working',   v:a.needs.work + Math.random()*0.4 },
-      { k:'lookAside', v:0.9 + Math.random()*0.8 },
-      { k:'stretch',   v:a.needs.rest*0.7 + Math.random()*0.6 },
-      { k:'yawn',      v:a.needs.rest*0.6 + Math.random()*0.5 },
-      { k:'chairSpin', v:0.6 + Math.random()*0.8 },
-      { k:'quirk',     v:0.8 + Math.random()*0.8 },
-    ];
-    if (canStep) candidates.push({ k:'drawer', v:0.7 + Math.random()*0.7 });
+      { k:'working',   v:(Math.min(1.00, a.needs.work) + Math.random()*0.35) * w('working') },
+      { k:'quirk',     v:(0.55 + Math.random()*0.5) * w('quirk') },          // 자리에서 하는 직무 몸짓
+      // 쉬는 것은 누구나 가끔 — 점수를 낮게 둬서 직무 일이 3분의 2 넘게 나오도록.
+      { k:'lookAside', v:(0.30 + Math.random()*0.25) },
+      { k:'stretch',   v:(Math.min(0.45, a.needs.rest*0.10) + Math.random()*0.2) },
+      { k:'yawn',      v:(Math.min(0.40, a.needs.rest*0.08) + Math.random()*0.2) },
+      { k:'chairSpin', v:(0.20 + Math.random()*0.25) },
+    ].filter(c => c.v > 0);
+    // 17바퀴 — 서랍(자기 책상 옆 한 발)이 점수가 제일 높아 멀리 다녀오는 일이 한 번도 안 골렸다
+    //           (60초 실측: 서랍 15 · 커피 1 · 촬영/전화/보고 0). 점수를 낮춰 차례를 넘긴다.
+    if (canStep) candidates.push({ k:'drawer', v:(0.35 + Math.random()*0.35) * w('drawer') });
     if (canTravel){
-      candidates.push({ k:'carrying', v:0.25 + Math.random()*0.45 });
-      candidates.push({ k:'chatting', v:0.30 + Math.random()*0.50 });
-      candidates.push({ k:'coffee',   v:0.30 + Math.random()*0.50 });
-      candidates.push({ k:'shelf',    v:0.25 + Math.random()*0.45 });
+      // 직무 일 — 그 친구 몫인 것만(점수 0 이면 아예 후보에 안 올라간다).
+      for (const k of ['carrying','shelf','photographing','calling','reporting','inspecting','greeting'])
+        if (w(k) > 0) candidates.push({ k, v:(1.25 + Math.random()*0.70) * w(k) });
+      // 커피·수다는 누구나 가끔(쉬는 시간) — 직무 일보다 낮게.
+      candidates.push({ k:'chatting', v:0.26 + Math.random()*0.22 });
+      candidates.push({ k:'coffee',   v:0.26 + Math.random()*0.22 });
     }
     // 바로 전에 한 것·지금 남이 하는 것은 뺀다. 다 빠지면 그냥 일한다.
-    const free = candidates.filter(c => c.k !== a.lastAction && !busyNow.has(c.k));
+    // 자기 일(quirk)·일하기(working)는 친구마다 다른 몸짓이라 겹쳐도 된다 — 빼지 않는다.
+    const free = candidates.filter(c => c.k !== a.lastAction &&
+      (c.k === 'quirk' || c.k === 'working' || !busyNow.has(c.k)));
     const pool = free.length ? free : candidates.filter(c => c.k !== a.lastAction);
     (pool.length ? pool : candidates).sort((x, y) => y.v - x.v);
     const chosen = (pool.length ? pool : candidates)[0].k;
@@ -1668,7 +1819,10 @@ function tickUtilityAI(a, dt, t){
       a.actionDur = 0;
       const ok = beginVisit(a, trip);
       // 멀리 다녀오는 건 가끔만. 서랍은 자기 책상 옆이라 쉬는 시간을 걸지 않는다(한 번에 한 명 규칙만).
-      if (ok && trip !== 'drawer') nextTripAllowedAt = t + 16 + Math.random()*10;
+      // 17바퀴 — 사장님 11/27 17:56 "사람없을떈여기저기돌아다니면서사실적으로".
+      // 16~26초 쉬면 한 바퀴 내내 거의 앉아만 있어 보였다 → 5~10초로 줄인다
+      // (한 번에 한 명 규칙은 그대로라 겹침은 늘지 않는다).
+      if (ok) nextTripAllowedAt = t + (trip === 'drawer' ? 1.5 + Math.random()*1.5 : 2 + Math.random()*2);
       if (!ok) a.nextTickAt = 2 + Math.random()*2;
     } else {
       const [lo, hi] = IDLE_ACTIONS[chosen]?.dur || [3, 6];
@@ -1705,7 +1859,7 @@ document.addEventListener('visibilitychange',()=>{
   clock.getDelta();fpsFrames=0;fpsAccum=0;
 });
 
-const ACTION_LABEL = { working:'일하기', carrying:'서류 나르기', chatting:'수다', dozing:'졸기', coffee:'커피', quirk:'버릇' };
+const ACTION_LABEL = { working:'일하기', carrying:'상자 나르기', chatting:'수다', dozing:'졸기', coffee:'커피', quirk:'자기 일', photographing:'촬영', calling:'전화', reporting:'대표에게 보고', inspecting:'상품 살피기', greeting:'손님 맞이', shelf:'선반 정리', drawer:'서랍' };
 let brainAccum = 0;
 function updateBrainPanel(){
   const rowsEl = document.getElementById('brainRows');
@@ -1748,6 +1902,8 @@ function renderLoop(){
     updateThought(a);v8.updateEmotion(a,t);
   }
   v8.afterActors(t,nowSec,dt);updateDroppedPapers(nowSec);updateMonitorFlicker(t);
+  // 유리창에 카메라가 들어왔는지 가끔만 확인한다(매 프레임 볼 필요 없음).
+  if(fpsFrames%30===0)updateWindowSource();
   v8.render();
   fpsFrames++;fpsAccum+=rawDt;
   if(fpsAccum>=.5){
