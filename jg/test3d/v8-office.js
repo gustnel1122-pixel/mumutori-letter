@@ -59,8 +59,10 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   // Recycling bins, file cabinet, small parcels and a reading lamp.
   for(const side of [-1,1]){
     const bin=new THREE.Mesh(new THREE.CylinderGeometry(.20,.17,.42,12,1,true),mat(side<0?0x8d9c8b:0xbca98b));
-    bin.position.set(side*11.3,.21,.75);furnishings.add(bin);
-    const pages=box(furnishings,.16,.025,.12,side*11.3,.36,.75,paper);pages.rotation.z=.24;
+    // 0206 10바퀴 — 바주카 쏘는 자리(통나무가 서는 칸)가 휴지통을 통째로 가렸다.
+    // 휴지통·종이를 그 칸 **바깥·앞쪽**으로 비킨다.
+    bin.position.set(side*12.5,.21,2.7);furnishings.add(bin);
+    const pages=box(furnishings,.16,.025,.12,side*12.5,.36,2.7,paper);pages.rotation.z=.24;
   }
   const cabinet=new THREE.Group();cabinet.position.set(11.3,0,-.8);furnishings.add(cabinet);
   box(cabinet,1.05,1.15,.65,0,.575,0,mat(0xdbccad));
@@ -82,8 +84,44 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     renderer.setPixelRatio(q.scale);
   }
   function place(parent,name,size,position,yaw=0){const obj=assets.model(name,size);if(!obj)return null;obj.position.copy(position);obj.rotation.y=yaw;parent.add(obj);return obj;}
-  function desk({pos,yaw,bonus,key,deskScale}){
+  // v8g: 친구가 **자기 의자에 앉아** 책상·화면을 보게 한다(2206 ①-1 · 2208 ①-1).
+  // 자리(친구가 앉는 점)를 원점으로 잡고 local 좌표로 만든 뒤 통째로 키우고 돌려 놓는다.
+  // local +z = 친구가 바라보는 쪽(자기 책상). 의자는 원점, 책상은 그 앞.
+  function desk({pos,yaw,bonus,key,deskScale,seated=true}){
     if(!assets.info.models.includes('desk'))return null;
+    if(!seated)return deskV8f({pos,yaw,bonus,key,deskScale});   // ?ver=f 되돌리기 — v8f 배치 그대로
+    const g=new THREE.Group();g.userData.isDesk=true;
+    const inner=new THREE.Group();
+    const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+    place(inner,'desk',[1.16,.42,.60],V(0,0,.90));
+    // 화면은 친구를 마주 본다. 완두콩은 키가 작아 화면을 낮추고 옆으로 더 비켜 둔다
+    // (안 그러면 자기 화면이 자기 눈을 가린다 — 실측 65점 중 21점 가림).
+    const small=key==='wandukong3';
+    place(inner,'computerScreen',[.34,small?.24:.34,.07],V(small?.30:.12,.42,small?.92:.98),Math.PI);
+    place(inner,'computerKeyboard',[.28,.015,.11],V(.02,.425,.76));
+    place(inner,'computerMouse',[.055,.023,.08],V(.23,.425,.77));
+    // 의자는 친구보다 조금 넉넉하게 — 동글동글한 친구 뒤로 완전히 숨으면 '앉아 있다'가 안 읽힌다.
+    const chair=place(inner,'chairDesk',[.62,.74,.60],V(0,0,-.05));
+    if(chair){chair.userData.isOfficeChair=true;g.userData.chair=chair;}
+    place(inner,'books',[.17,.06,.17],V(-.36,.42,.92));
+    if(bonus==='plant')place(inner,'plantSmall1',[.13,.20,.13],V(-.36,.42,1.05));
+    if(bonus==='mug')place(inner,'mug',[.09,.075,.065],V(-.34,.42,.74));
+    inner.scale.setScalar(deskScale);
+    g.add(inner);
+    g.position.set(pos.x,0,pos.z);g.rotation.y=yaw;
+    g.updateMatrixWorld(true);
+    // 앉는 높이는 짐작하지 않고 의자 위로 광선을 쏴서 실제 앉는 면을 잰다.
+    g.userData.seatY=.30*deskScale;
+    if(chair){
+      const ray=new THREE.Raycaster(new THREE.Vector3(pos.x,4,pos.z),new THREE.Vector3(0,-1,0));
+      const hit=ray.intersectObject(chair,true)[0];
+      if(hit)g.userData.seatY=hit.point.y;
+    }
+    g.userData.deskTopY=.42*deskScale;
+    return g;
+  }
+  // v8f(66cd66a) 의 책상 배치 그대로 — `?ver=f` 로 되돌려 볼 때만 쓴다. 고치지 않는다.
+  function deskV8f({pos,yaw,bonus,key,deskScale}){
     const g=new THREE.Group();g.userData.isDesk=true;
     const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)),side=new THREE.Vector3(dir.z,0,-dir.x);
     const center=pos.clone().addScaledVector(dir,.3).addScaledVector(side,1.85);center.y=0;
@@ -96,11 +134,9 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     if(chair)chair.userData.isOfficeChair=true;
     const books=center.clone().addScaledVector(side,-.35);books.y=.42;place(g,'books',[.17,.06,.17],books,yaw);
     if(bonus==='plant'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.15);pp.y=.42;place(g,'plantSmall1',[.13,.20,.13],pp);}
-    if(bonus==='mug'){
-      const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.16);pp.y=.42;
-      place(g,'mug',[.09,.075,.065],pp,yaw);
-    }
+    if(bonus==='mug'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.16);pp.y=.42;place(g,'mug',[.09,.075,.065],pp,yaw);}
     const sx=deskScale*.78,sz=deskScale*.82;g.scale.set(sx,deskScale,sz);g.position.set(pos.x*(1-sx),0,pos.z*(1-sz));
+    g.userData.seatY=0;g.userData.deskTopY=.42*deskScale;
     return g;
   }
   const covers=[];
@@ -108,17 +144,25 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     // The shelves serve as real opaque cover during the retreat. They sit
     // beside, rather than across, the seven friends' resting sight lines.
     for(const side of [-1,1]){
-      const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-3.5));if(cover)covers.push(cover);
-      const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-3.5));if(base)covers.push(base);
+      // 13바퀴 — 3.0배에서 완두콩(세계 x 7.1 · 몸 반지름 1.71)이 이 책장 안에 박혀 있었다.
+      // 책장을 뒤로(z -3.5 → **-4.1**) 물려 앉은 친구와 안 겹치게. -4.6 까지 물렸더니 이번엔
+      // **숨는 자리(z -5.0)가 책장 안**이 되어 도토리·밤이 도망을 아예 못 갔다 — 사이로 맞춘다.
+      const cover=place(furnishings,'bookcaseClosed',[3.4,3.2,.85],new THREE.Vector3(side*8.3,0,-4.1));if(cover)covers.push(cover);
+      const base=place(furnishings,'cardboardBoxClosed',[2.5,.30,.85],new THREE.Vector3(side*8.3,0,-4.1));if(base)covers.push(base);
       place(furnishings,'pottedPlant',[.65,1.25,.65],new THREE.Vector3(side*11.3,0,-2.5));
       for(let i=0;i<3;i++)place(furnishings,'books',[.7,.3,.32],new THREE.Vector3(side*8.3,.3+i*.65,-3.4));
     }
-    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-3.5));if(extra)covers.push(extra);
+    const extra=place(furnishings,'bookcaseClosed',[2.1,3.2,.85],new THREE.Vector3(-10.8,0,-4.1));if(extra)covers.push(extra);
+    // 13바퀴 4차 — 완두콩이 숨을 가구로 오른쪽에도 책장을 하나 세워 봤으나(x 12.0),
+    // `coverBlocked` 는 그대로(0.042)였고 **도망 길만 막아** 미끄럼이 땅콩 1 → 78 ·
+    // 해바라기씨 13 → 40 으로 늘었다. 되돌린다 — 완두콩 가릴 것 없음은 남은 것으로 적는다.
     cabinet.visible=false;
     place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(11.3,0,-.8));
     place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(11.3,1.15,-.8));
   });
-  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.isLight);
+  // 바주카는 움직이는 물건이라 '고정 가구'로 구워 두면 안 된다(길 계산에 두 번 들어가
+  // 주인이 자기 바주카를 못 지나가게 막혔다). 두 대 모두 뺀다 — 실제 사각형은 v8-runtime 이 매 프레임 만든다.
+  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.userData.isLauncher && !o.isLight);
   const bake=createStaticBake(scene,floor);
   let obstacles=[];
   function rebuild(desks,crates){
@@ -127,12 +171,17 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
       if(!o.isMesh || Array.isArray(o.material) || o.material.transparent)return;
       const b=new THREE.Box3().setFromObject(o);
       if(b.min.y>1.8 || b.max.y<.12)return;
-      obstacles.push({key:root.userData.isDesk?'desk-'+root.userData.slotIndex:o.name || 'furniture',minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z});
+      // v8g: 자기 책상·자기 상자는 그 친구에게만 막힘이 아니다 — 앉아서 쓰는 물건이다.
+      // 남들에게는 그대로 피해 갈 가구다.
+      obstacles.push({key:root.userData.isDesk?'desk-'+root.userData.slotIndex:o.name || 'furniture',
+        minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,
+        ignoreKeys:root.userData.ownerKey?[root.userData.ownerKey]:undefined});
     });
     // Keep the same occupied region while dropping duplicate/contained mesh
     // rectangles (chair parts and cupboard panels often repeat a footprint).
-    obstacles=[...new Map(obstacles.map(o=>[[o.minX,o.maxX,o.minZ,o.maxZ].join(','),o])).values()];
-    obstacles=obstacles.filter((o,i,list)=>!list.some((b,j)=>i!==j && b.minX<=o.minX && b.maxX>=o.maxX && b.minZ<=o.minZ && b.maxZ>=o.maxZ));
+    obstacles=[...new Map(obstacles.map(o=>[[o.minX,o.maxX,o.minZ,o.maxZ,(o.ignoreKeys||[]).join('|')].join(','),o])).values()];
+    obstacles=obstacles.filter((o,i,list)=>!list.some((b,j)=>i!==j && b.minX<=o.minX && b.maxX>=o.maxX && b.minZ<=o.minZ && b.maxZ>=o.maxZ
+      && (b.ignoreKeys||[]).join('|')===(o.ignoreKeys||[]).join('|')));
     bake.rebuild(roots);
   }
   return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,rebuild,get obstacles(){return obstacles;},bake,

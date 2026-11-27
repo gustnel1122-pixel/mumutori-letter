@@ -5,15 +5,17 @@ const source=await readFile(new URL('../v8-director.js',import.meta.url),'utf8')
 const {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const advance=(director,seconds,level)=>{for(let t=0;t<seconds;t+=.02)director.update(.02,level);return director.snapshot();};
 
-test('any detected person starts the same determined battle within one frame',()=>{
-  const d=new SceneDirector(),s=d.update(1/60,1);assert.equal(s.id,'notice');assert.equal(s.mode,'battle');assert.equal(s.emotion,'determined');assert.equal(s.encounters,1);
-  assert.equal(advance(d,.5,3).id,'equip');
+// 1241 ② — 손님을 본 순간 감정은 '놀람'(surprised). 예전 'determined'(결심)이 눈을 기울여
+// 노려보는 얼굴로 만들었다(0224 P30 "무서움을 눈 각도로 내지 말라").
+test('any detected person starts the same surprised battle within one frame',()=>{
+  const d=new SceneDirector(),s=d.update(1/60,1);assert.equal(s.id,'notice');assert.equal(s.mode,'battle');assert.equal(s.emotion,'surprised');assert.equal(s.encounters,1);
+  assert.equal(advance(d,1,3).id,'equip');   // 7바퀴 ③ 놀라는 장면이 0.5초 → 1초
 });
 test('battle emotions never include tired or working, and all attack stages run',()=>{
   const d=new SceneDirector();d.begin();const stages=new Set();
-  for(let t=0;t<28;t+=.02){const s=d.update(.02,3);stages.add(s.id);if(s.mode==='battle')assert.ok(!['tired','working'].includes(s.emotion));}
+  for(let t=0;t<33;t+=.02){const s=d.update(.02,3);stages.add(s.id);if(s.mode==='battle')assert.ok(!['tired','working'].includes(s.emotion));}
   for(const id of ['equip','ready','throw','gun','fetch','bazooka','mess','escape'])assert.ok(stages.has(id),id);
-  assert.equal(ATTACK_SECONDS,12.5);
+  assert.equal(ATTACK_SECONDS,17);   // 0224: 공격을 12.5초 → 17초로 늘림
 });
 test('persistent visitor keeps the group hidden; two seconds absent releases them',()=>{
   const d=new SceneDirector();d.begin();assert.equal(advance(d,80,2).id,'hide');assert.equal(d.encounters,1);
@@ -21,11 +23,11 @@ test('persistent visitor keeps the group hidden; two seconds absent releases the
   advance(d,8,0);assert.equal(d.snapshot().id,'work');d.update(.02,1);assert.equal(d.encounters,2);
 });
 test('a returning visitor during peek sends everyone back to cover',()=>{
-  const d=new SceneDirector();d.begin();advance(d,31,0);assert.equal(d.snapshot().id,'peek');
+  const d=new SceneDirector();d.begin();advance(d,35.5,0);assert.equal(d.snapshot().id,'peek');
   assert.equal(d.update(.02,1).id,'escape');assert.equal(d.encounters,1);
 });
 test('camera-free demo follows all stages and completes without a presence feed',()=>{
-  const d=new SceneDirector();d.begin(true);const seen=new Set();for(let t=0;t<40;t+=.02)seen.add(d.update(.02,0).id);
+  const d=new SceneDirector();d.begin(true);const seen=new Set();for(let t=0;t<45;t+=.02)seen.add(d.update(.02,0).id);
   for(const s of SCENES)assert.ok(seen.has(s.id),s.id);assert.equal(d.snapshot().id,'work');
 });
 test('quality preserves native resolution without real-time effects, even when fixed high',()=>{
