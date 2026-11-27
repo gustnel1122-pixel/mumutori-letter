@@ -111,11 +111,13 @@
     var baseWidth = source.offsetWidth, baseHeight = source.offsetHeight;
     if (artwork && !reduced) baseHeight = baseWidth * artwork.naturalHeight / artwork.naturalWidth;
     if (!baseWidth || !baseHeight || !rect.width) { finish('widget-unavailable'); return; }
-    var width = Math.min(view.width * 0.6, 320, view.height * 0.5 * baseWidth / baseHeight);
+    var desktop = view.width >= 1024;
+    var width = desktop ? Math.min(view.width - 48, view.height * 0.55 * baseWidth / baseHeight) :
+      Math.min(view.width * 0.6, 320, view.height * 0.5 * baseWidth / baseHeight);
     var height = width * baseHeight / baseWidth;
     big = { baseWidth: baseWidth, width: width,
       x: view.x + (view.width - width) / 2,
-      y: view.y + Math.max(24, (view.height - height - 52) / 2) };
+      y: view.y + (desktop ? (view.height - height) / 2 : Math.max(24, (view.height - height - 52) / 2)) };
 
     root = document.createElement('div');
     root.className = 'dhello' + (reduced ? ' dhello-reduced' : '');
