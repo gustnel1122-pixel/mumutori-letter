@@ -562,7 +562,11 @@ contactContext.fillStyle=contactGradient;contactContext.fillRect(0,0,128,128);
 const QA_FLAGS = new URLSearchParams(location.search);
 // 13바퀴 ④ — 1% 저점이 v8f 보다 낮은 원인을 **하나씩 꺼서** 가른다(검사 전용 · 기본은 전부 켬).
 //   ?outline=0 테두리 · ?shadow=0 발밑 그림자 · ?seeds=0 날아가는 씨앗 · ?path=0 길찾기
-const OUTLINE_ON = LOCK.공통.외곽선.켬 && QA_FLAGS.get('outline') !== '0';
+// 외곽선은 **잠금 파일**이 정한다. `?outline=0` 은 끄기, `?outline=1` 은 **검사에서 비교판을 찍을 때만**
+// 강제로 켠다(15바퀴에서 '테두리 있음 ↔ 없음'을 나란히 찍으려고 넣음 — 손님 화면 기본값은 잠금 그대로).
+const OUTLINE_ON = QA_FLAGS.get('outline') === '1'
+  ? true
+  : (LOCK.공통.외곽선.켬 && QA_FLAGS.get('outline') !== '0');
 const SHADOW_ON  = QA_FLAGS.get('shadow')  !== '0';
 const SEEDS_ON   = QA_FLAGS.get('seeds')   !== '0';
 const PATH_ON    = QA_FLAGS.get('path')    !== '0';
@@ -1801,9 +1805,11 @@ window.__jgCanonSheet = {
     if (outline) addOutline(model);
     return model;
   },
+  outlineOn: OUTLINE_ON,          // 잠금 파일이 정한 값(15바퀴부터 꺼짐)
   tweaks: { color: CANON_MATERIAL_COLOR, belly: CANON_BELLY, accessory: CANON_ACCESSORY,
-            outlineMeshes: String(OUTLINE_MESHES), outlineColor: OUTLINE_MATERIAL.color.getHexString(),
-            outlineScale: 1.045, actorScale: COMPOSITION.actorScale },
+            outlineOn: OUTLINE_ON, outlineMeshes: String(OUTLINE_MESHES),
+            outlineColor: OUTLINE_MATERIAL.color.getHexString(),
+            outlineScale: LOCK.공통.외곽선.배율, actorScale: COMPOSITION.actorScale },
 };
 // 시험 자동화용 읽기 전용 훅 — 각 친구의 지금 행동·이동상태·위치를 로그로 확인할 때만 씀(화면엔 영향 없음).
 window.__jgActors = () => actors.map(a => ({
