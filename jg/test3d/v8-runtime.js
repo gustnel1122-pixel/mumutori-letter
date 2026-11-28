@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261123-8e';
 import {createEmotionRig,EMOTIONS,setEyeTune} from './v8-emotions.js?v=20261128-8h';
-import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261128-8i';
+import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261128-desk';
 import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261128-8i';
 import {createRenderPipeline} from './v8-render.js?v=20261123-8e';
 import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
-import {MotionWorld} from './v8-motion.js?v=20261123-8e';
+import {MotionWorld,rectangleGap} from './v8-motion.js?v=20261123-8e';
+import {createDeskMoves} from './v8-desks.js?v=20261128-desk';
 
 const smooth=x=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const clamp=THREE.MathUtils.clamp;
@@ -38,19 +39,14 @@ export function createV8(config){
   const spread=config.layoutSpread||1;
   const WALK_RADIUS=0.48;   // 13바퀴 — 0.62 에서는 도토리·밤이 도망 때 한 걸음도 못 뗐다(매 걸음이 다른 친구에 막힘)
   // 13바퀴 — 숨는 자리를 고르게 벌리면서 길 찾는 판도 그 바깥까지 넓힌다(안 그러면 끝자리에 못 닿는다).
-  const motion=new MotionWorld({minX:-20.5,maxX:20.5});let furnitureObstacles=[];
+  const motion=new MotionWorld({minX:-20.5,maxX:20.5});
+  const desks=createDeskMoves(camera);
+  let furnitureObstacles=[], fixedObstacles=[];
   const actorScale=config.actorScale || 1,propScale=actorScale*.75;
   const mess=new WindowMess(scene,{width:windowWidth,height:windowHeight,z:windowZ,bottom:windowBottom});
   const projectiles=new SeedProjectiles(scene,(point,kind)=>mess.impact(point,kind),Math.sqrt(actorScale));
   // 13바퀴 ④ — 렉 원인 가르기용 스위치(검사 전용 · 기본은 전부 켬).
   const SEEDS_ON=config.seedsOn!==false, PATH_ON=config.pathOn!==false;
-  // 2350 — 사장님 "책상을 아에 화면밖까지 밀고가라는거야". 책상을 굽기에서 뺐으니(v8-office ⑴)
-  // 이제 옮기면 화면이 바뀐다. 양옆 **화면 밖**까지 밀어내고 가운데 바닥을 완전히 비운다.
-  const DESK_PUSH_ON=true;
-  const DESK_OUT_X=30.0;                               // 2350 실측 — ±24.8 은 아직 화면 안이었다(깊은 줄은 시야가 넓다)
-  const DESK_OUT_STEP=2.2;                             // 같은 쪽 책상끼리 겹쳐 쌓이지 않게 줄줄이
-  const DESK_OUT_Z=-5.2;                               // 유리창 앞 빈 줄로 빼서 밀고 나간다
-  const DESK_MAX_SPEED=26.0;                           // 한 프레임 최대 이동(칸/초) — 순간이동 0 보장
   const mounts=[bazookaGroup,new THREE.Group()];scene.add(mounts[1]);
   // 두 바주카는 각자 주인(병아리·쌀)이 가지러 간다. 세워 두는 곳은 화면에서 친구와
   // 겹쳐 보이지 않는 양쪽 끝 빈자리로 둔다 — v8f 에서는 쌀 바로 뒤에 서 있어서
@@ -88,6 +84,7 @@ export function createV8(config){
     }
     const flash=new THREE.Mesh(new THREE.OctahedronGeometry(.16),flashMaterial);flash.position.z=.53;flash.visible=false;g.add(flash);
     g.userData.flash=flash;g.userData.fireAt=0;g.userData.flashUntil=0;g.userData.restRotation=g.rotation.clone();
+    g.userData.homeBounds=new THREE.Box3().setFromObject(g);
   });
   let frame=director.snapshot(),lastScene='work',emotionOverride=null,lastTime=0,lastFPS=0,lastCompleted=null,qualityChanges=[],testLevel=null;
   const phaseEvents=[],pickupEvents=[];
@@ -202,7 +199,11 @@ export function createV8(config){
     for(const root of [a.wrapper,a.equipment])root?.traverse(o=>{for(const material of [o.material].flat())if(material)gradeMaterial(material);});
   }
   function rebuildWorld(){
-    office.rebuild(scene.children.filter(o=>o.userData.isDesk),getActors().map(a=>a.crate).filter(Boolean));
+    chestQueue.clear();
+    const roots=scene.children.filter(o=>o.userData.isDesk);
+    desks.rebuild(roots,getActors());
+    office.rebuild(roots,getActors().map(a=>a.crate).filter(Boolean));
+    fixedObstacles=office.obstacles.filter(o=>!/^(desk|crate)-/.test(o.key));
     // 0206 ① — 숨는 줄은 화면 밖까지 넓어야 하지만(친구가 커져 서로 못 지나간다), **평소 구역**은
     // 화면 안에 머물러야 한다. 2.0 배에서 수다 가던 땅콩이 왼쪽 구석(x -13.1)까지 돌아 나가
     // 몸이 잘렸다. 책장 앞(z > -3.0)에만 보이지 않는 벽을 세운다 — 도망 길(z < -3.0)은 그대로 연다.
@@ -227,7 +228,7 @@ export function createV8(config){
     getActors().forEach(a=>{a.held=false;a.pickupLogged=false;a.pickupDwell=0;a.pickupBlend=0;a.wrapper.visible=true;if(a.equipment){a.equipment.position.copy(a.weaponRest);a.equipment.visible=true;a.equipment.rotation.set(0,0,0);}if(a.muzzleFlash)a.muzzleFlash.visible=false;});
     // 4바퀴 ④ — 처음 자리·각도·높이를 그대로 되돌린다(화분에 박히거나 뜨지 않게).
     mounts.forEach((g,i)=>{g.position.copy(parked[i]);g.rotation.copy(g.userData.restRotation);
-      g.userData.flash.visible=false;g.userData.fetched=false;g.userData.leftAt=null;});
+      g.userData.flash.visible=false;g.userData.fetched=false;g.userData.leftAt=null;g.userData.retract=0;});
   }
   // 17바퀴 — 손님을 본 **그 순간** 각자 서 있던 자리(놀라는 동안 여기 그대로 있는다).
   const SIDE_FIRST=new Set(['ddangkong','wandukong3']);   // 0050 — 옆으로 먼저 흩어지는 둘(도토리는 넣어 봤더니 0.655 로 더 겹쳤다)
@@ -262,7 +263,7 @@ export function createV8(config){
     // detour must finish before hiding/resting is announced.
     const travelling=['escape','recover'].includes(frame.id) && frame.progress>.90;
     const equipWaiting=frame.id==='equip' && frame.progress>.90 && getActors().some(a=>{
-      const p=motion.agents.get(a.key)?.position,want=operators.includes(a.key)?a.homePos:battleStation(a);
+      const p=motion.agents.get(a.key)?.position,want=battleStation(a);
       // 0206 10바퀴 — 몸이 커지면 길 찾기가 목표에서 더 멀찍이 멈춘다(2.0 배에서 쌀이 0.40).
       // 기준도 몸 크기에 맞춰 늘린다. 안 늘리면 전투가 '씨앗 보관함으로'에서 영영 못 넘어간다.
       return !a.held || !p || Math.hypot(p.x-want.x,p.z-want.z)>.25*(config.actorScale||1.35)/1.35*1.6;
@@ -277,15 +278,25 @@ export function createV8(config){
     // 0206 10바퀴 — 예전엔 한계 시간이 지나면 `waitHeld` 가 **곧바로 0 으로 되돌아가서**
     // 장면이 한 프레임만 나아가고 다시 멈췄다(60초 자유 실행에서 equip 에 3541프레임).
     // 한 번 포기한 장면은 **그 장면이 끝날 때까지** 다시 기다리지 않는다.
-    if(waitHeld>4.5)giveUpScene=frame.id;
+    const deskScene=frame.id==='equip'||frame.id==='recover';
+    const deskWaiting=deskScene && frame.progress>.90 && desks.stillMoving(frame.id);
+    if(waitHeld>(frame.id==='recover'?24:deskScene?15:4.5))giveUpScene=frame.id;
     const stuckLimit=giveUpScene===frame.id;
-    const waiting=!stuckLimit && (equipWaiting || fetchWaiting || firingWaiting || travelling && getActors().some(a=>{
+    const waiting=!stuckLimit && (deskWaiting || equipWaiting || fetchWaiting || firingWaiting || travelling && getActors().some(a=>{
       const p=motion.agents.get(a.key)?.position,target=frame.id==='escape'?a.cover:a.homePos;
       return !p || Math.hypot(p.x-target.x,p.z-target.z)>.40;
     }));
     waitHeld=waiting?waitHeld+dt:0;
-    frame=director.update(loaded && !waiting?dt:0,loaded?(testLevel??level):0);changeScene(frame.id);mess.fade(frame.id==='recover'?frame.clean:0);
-    const badge=document.getElementById('sceneBadge');if(badge){badge.textContent=frame.label || '';badge.style.display=frame.active?'block':'none';}
+    const before=frame.id;
+    frame=director.update(loaded && !waiting?dt:0,loaded?(testLevel??level):0);
+    if(frame.id!==before){waitHeld=0;giveUpScene=null;}
+    changeScene(frame.id);mess.fade(frame.id==='recover'?frame.clean:0);
+    const badge=document.getElementById('sceneBadge');if(badge){
+      const clearing=frame.id==='equip' && desks.stillMoving('equip');
+      const restoring=frame.id==='recover' && desks.stillMoving('recover');
+      badge.textContent=clearing?'책상을 옮기는 중':restoring?'책상을 제자리로':frame.label || '';
+      badge.style.display=frame.active?'block':'none';
+    }
     const emotionChoice=document.getElementById('emotionPreview');if(emotionChoice){emotionChoice.disabled=frame.active;if(frame.active)emotionChoice.value='';}
     const debug=document.getElementById('dbgQuality');if(debug)debug.textContent=quality.current.id+' · '+renderer.getPixelRatio().toFixed(2)+'× · '+(quality.mode==='auto'?'자동': '고정');
     return frame;
@@ -365,29 +376,10 @@ export function createV8(config){
       a.wrapper.rotation.x=-.16*rise;
       a.panic=Math.max(a.panic||0,clamp(age/.1,0,1));          // 눈 크게(P3)·땀방울(P11) 신호
     }else if(id==='equip'){
-      // All move within 0.24 seconds; every pickup has a visible bend/reach.
-      const age=Math.max(0,frame.age-(i%4)*.1),u=age/4.7;
-      // 장비를 챙기고 나면 바로 책상 앞 전투 자리로 나와 선다 — 'ready' 에서야 움직이면
-      // 공격 시작 사진에서 아직 책상 뒤에 있다(2바퀴 검토 지적).
-      // 2350 ⑵⑶ — 여기서 목적지를 덮어쓰고 있어서(a.pickupPosition = 자기 책상 앞)
-      // 2315·2345 에 넣은 '무기 상자로 가기'가 지워졌다(실측 가로 0칸). 순서를 바로잡는다.
-      //   ① 0~45%  : 자기 책상을 **밀며** 화면 밖으로 걸어 나간다
-      //   ② 45~100%: 빈손으로 돌아와 **무기 상자**까지 걸어가 꺼내 든다
-      const pushing=frame.progress<.20;   // 2350 실측 — 45%·32% 면 상자까지 못 돌아왔다(미는 1초 뒤 책상은 혼자 미끄러져 나간다)
+      const pushing=desks.handling(a);
       const grabAt=chestGoal||a.pickupPosition;
-      const pushSpot=pushing?deskPushSpot(a):null;
-      // 1135 ① — 놀랄 때 **자리에 없던 친구**는 먼저 자기 자리로 빠르게 돌아온 뒤 책상을 민다
-      //          (총괄 결정). 돌아오는 데 주는 시간은 1.5초까지.
-      const here=motion.agents.get(a.key)?.position;
-      const awayFromDesk=!!here && frame.age<1.5 &&
-        Math.hypot(here.x-a.homePos.x,here.z-a.homePos.z)>.8;
-      a.motionGoal=awayFromDesk?a.homePos
-        :(pushSpot||(a.held?(operators.includes(a.key)?a.homePos:battleStation(a)):grabAt));
+      a.motionGoal=a.held?battleStation(a):grabAt;
       a.movePhase='moving';
-      if(pushing){
-        // 미는 모습: 앞으로 기울이고 살짝 낮춘다(두 손으로 밀어내는 느낌).
-        a.battleTiltX=-.30;a.wrapper.scale.y=1-.05;
-      }
       const physical=motion.agents.get(a.key)?.position;
       // 2350 3차 실측 — 2.2칸은 **상자에서 2~3칸 떨어진 채** 무기를 집은 것으로 치고
       // 돌아서게 만들었다(상자까지 최소 3.0~6.4칸). 실제로 닿아야 집는다.
@@ -427,7 +419,7 @@ export function createV8(config){
       // (7바퀴 영상분석 ①: 8~9초가 제일 조용했던 까닭 중 하나).
       if(id==='mess')a.wrapper.position.y=Math.max(a.wrapper.position.y,Math.abs(Math.sin(phase*4))*p.hop*.9);
       const operator=operators.indexOf(a.key);
-      if(operator<0 && ['ready','throw','gun','fetch','bazooka','mess'].includes(id))a.motionGoal=battleStation(a);
+      a.motionGoal=battleStation(a);
       if(operator>=0 && ['fetch','bazooka','mess'].includes(id)){
         const dock=standBy(parked[operator],operator);
         // 쏘는 자리는 예전처럼 통나무 정면(+1.8) — 옆으로 옮기면 책상에 막혀 전투가 멈췄다.
@@ -509,91 +501,18 @@ export function createV8(config){
     const q=chestQueue.get(a.key);if(!q)return null;
     const chest=parked[q.side===0?0:1];
     const inward=q.side===0?1:-1;
+    // Empty outer workstations keep their furniture. Approach the locker
+    // from the open end when the usual queue beside it is still occupied.
+    if(config.seated!==false && !getActors().some(friend=>friend.key===operators[q.side])){
+      return new THREE.Vector3(chest.x,GROUND_Y,chest.z+1.66+q.i*1.92);
+    }
     // 2350 4차 실측 — 줄 간격 1.9칸은 **3배로 커진 몸**(지름 3.4칸)이 들어갈 수 없어
     // 뒤 친구가 서로 막혀 상자 앞까지 못 왔다(도토리는 3칸 앞에서 10프레임 넘게 멈춰 있었다).
     // 몸이 다 들어가게 2.6칸으로 벌린다.
     return new THREE.Vector3(chest.x+inward*(1.7+q.i*2.6),GROUND_Y,chest.z-0.6-q.i*0.5);
   }
-  // 2315 — 놀란 뒤 친구가 **자기 책상을 옆으로 민다**. 단계별로 얼마나 치웠는지(0~1).
-  function deskPushAmount(){
-    const id=frame.id;
-    if(!DESK_PUSH_ON)return 0;
-    if(!frame.active)return 0;
-    if(id==='notice')return 0;
-    // 2350 — 밀기는 '씨앗 보관함으로' 앞쪽 70%(3.5초) 안에 끝난다. 그 뒤 친구는 빈손으로
-    // 상자까지 걸어가 무기를 꺼낸다(책상은 이미 화면 밖).
-    if(id==='equip')return smooth(clamp(frame.progress/.70,0,1));
-    if(['ready','throw','gun','fetch','bazooka','mess','escape','hide','peek'].includes(id))return 1;
-    // 2350 5차 실측 — 정리 때 **숨었던 친구가 유리창 앞 줄을 건너오는 동안** 책상이 같이 들어와
-    // 화면에서 깊게 겹쳤다(해바라기씨 0.95 · 병아리콩 0.91). 친구가 그 줄을 지난 뒤에 밀고 들어온다.
-    if(id==='recover')return 1-smooth(clamp((frame.progress-.42)/.50,0,1));
-    return 0;
-  }
-  // 2350 — 화면에 **실제로 그려지는** 책상을 주인 자리 번호로 찾는다.
-  function liveDesk(a){
-    const i=getActors().indexOf(a);let found=null;
-    scene.children.forEach(o=>{if(o.userData&&o.userData.isDesk&&o.userData.slotIndex===i)found=o;});
-    const g=found||a.deskGroup;if(!g)return null;
-    if(g.userData.baseX===undefined)g.userData.baseX=g.position.x;
-    if(g.userData.baseZ===undefined)g.userData.baseZ=g.position.z;
-    // 0050 — 미는 쪽. 쌀 책상은 거의 한가운데(0.97)라 오른쪽으로 묶이면 도토리와 미는 자리가
-    // 겹친다 → 쌀만 왼쪽으로 민다(왼쪽 4 · 오른쪽 3).
-    if(g.userData.pushOut===undefined)g.userData.pushOut=(g.userData.baseX<0?-1:1);
-    return g;
-  }
-  // 책상이 밀려 가 있어야 하는 자리(0=제자리 · 1=화면 밖).
-  function deskTarget(g,order,amount){
-    const out=g.userData.pushOut??(g.userData.baseX<0?-1:1);
-    const wantX=out*(DESK_OUT_X+order*DESK_OUT_STEP);
-    // 먼저 유리창 앞 빈 줄로 나왔다가(0~0.3) 거기서 옆으로 밀고 나간다(0.25~1).
-    const zPart=clamp(amount/.30,0,1),xPart=clamp((amount-.25)/.75,0,1);
-    return {x:g.userData.baseX+(wantX-g.userData.baseX)*xPart,
-            z:g.userData.baseZ+(DESK_OUT_Z-g.userData.baseZ)*zPart};
-  }
-  // 친구가 책상을 밀 때 서는 자리 — 책상 **안쪽 옆**(화면에서 책상과 안 겹치게 떨어뜨린다).
-  function deskPushSpot(a){
-    const g=liveDesk(a);if(!g)return null;
-    const out=g.userData.pushOut??(g.userData.baseX<0?-1:1);
-    // 2350 2차 실측 — 책상 뒤 0.9칸은 **책장 줄(z -4.1)** 안이라 친구가 거기 끼어
-    // 상자로 돌아오는 길을 못 찾았다(상자까지 3.0~6.4칸 모자람). 책장 줄 안쪽에서 민다.
-    // 0050 ① — 미는 자리는 **자기 쪽**을 넘지 않는다. 가운데 두 친구(밤 −3.1 · 쌀 +1.0)는
-    // 안쪽 3.2칸이 반대편이 되어 둘이 마주쳐 화면에서 겹쳤다(0.095).
-    let sx=g.position.x-out*3.2;
-    sx=out<0?Math.min(sx,-1.6):Math.max(sx,1.6);
-    return new THREE.Vector3(sx,GROUND_Y,g.position.z+2.4);
-  }
-  function moveDesks(dt){
-    const amount=deskPushAmount();
-    const sideCount={'-1':0,'1':0};
-    for(const a of getActors()){
-      const g=liveDesk(a);if(!g)continue;
-      const out=g.userData.pushOut??(g.userData.baseX<0?-1:1);
-      const order=sideCount[out]++;
-      const want=deskTarget(g,order,amount);
-      // 순간이동 0 — 한 프레임에 갈 수 있는 만큼만 따라간다(장면이 갑자기 되돌려도 밀려서 간다).
-      const step=DESK_MAX_SPEED*Math.max(.001,Math.min(dt||.016,.05));
-      for(const [axis,target] of [['x',want.x],['z',want.z]]){
-        const d=target-g.position[axis];
-        g.position[axis]+=Math.abs(d)<=step?d:Math.sign(d)*step;
-      }
-      g.userData.pushAmount=amount;
-      // 0152 ① — 씨앗 상자는 **책상 위**에 놓인 물건이다(높이 0.62). 책상만 밀려 나가면
-      // 상자와 그 위의 씨앗 총이 허공에 남는다 → 책상이 간 만큼 같이 옮긴다.
-      const dx=g.position.x-g.userData.baseX, dz=g.position.z-g.userData.baseZ;
-      if(a.crate){
-        if(a.crate.userData.baseX===undefined){a.crate.userData.baseX=a.crate.position.x;a.crate.userData.baseZ=a.crate.position.z;}
-        a.crate.position.x=a.crate.userData.baseX+dx;a.crate.position.z=a.crate.userData.baseZ+dz;
-      }
-      if(a.weaponRest){
-        if(!a.weaponRestBase)a.weaponRestBase=a.weaponRest.clone();
-        a.weaponRest.x=a.weaponRestBase.x+dx;a.weaponRest.z=a.weaponRestBase.z+dz;
-      }
-    }
-    return amount;
-  }
   function afterActors(t,now,dt){
     const actors=getActors();
-    const deskAmount=moveDesks(dt);
     const overlapFramesBefore=motion.overlapFrames;
     // All poses propose destinations; one controller owns the physical XZ
     // positions in every mode, including utility-AI visits and scene changes.
@@ -613,30 +532,29 @@ export function createV8(config){
       const base=(frame.id==='escape'||frame.id==='recover'?5.4:frame.id==='fetch'?4.0:frame.id==='equip'?4.6:3)*sizeMul;   // 2350 — 책상 밀고 상자까지 다녀오려면 더 빨라야 한다   // 13바퀴 재작업 — 4.8 은 너무 빨라 0.6초 토막에 걷는 모습이 거의 안 남았다(가져오기 2.92)
       goals.set(a.key,{x:goal.x,z:goal.z,speed:base*(a.paceMul||1)});
     }
-    // 바주카는 늘 그 주인 것 — 단계가 바뀌는 그 한 프레임에도 막히지 않게.
-    // 1241: **주인이 끌고 다니는 동안**(fetched)에는 길 계산에서 아예 뺀다. 통나무가 주인을 따라
-    // 숨는 길까지 들어가면 뒤에 오는 친구(밤)가 막혀 도망이 멈췄다.
-    const launcherBoxes=mounts.map((g,i)=>{
-      // 13바퀴 재작업 — `fetched` 는 한 번 켜지면 도망 중에도 켜져 있어서, **놓고 간 통나무가
-      // 길 계산에서 빠진 채** 그 자리에 남았다. 주인이 제 발밑 통나무를 그대로 뚫고 달렸다
-      // (병아리콩 11장 · 최대 60% · 검토 ②). 끌고 다니는 동안에만 뺀다.
-      if(g.userData.fetched && !['escape','hide','peek','recover'].includes(frame.id))return null;
+    const handling=frame.id==='equip'||frame.id==='recover';
+    const launcherActive=['fetch','bazooka','mess'].includes(frame.id);
+    const stowing=['escape','hide','peek','recover'].includes(frame.id);
+    const launcherOut=(g,i)=>actors.some(a=>a.key===operators[i]) &&
+      (launcherActive || stowing && g.userData.leftAt && (g.userData.retract||0)<1);
+    const launcherBoxes=()=>mounts.map((g,i)=>{
+      // A toy stored inside a locker shares the locker's collision box.
+      if(!launcherOut(g,i) || g.userData.fetched && launcherActive)return null;
       g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
-      // 13바퀴 재작업 — 쏘는 동안에는 주인이 통나무를 지나갈 수 있어야 하지만, **도망칠 때는
-      // 아무도 못 지나간다**. 주인(병아리콩)이 통나무를 뚫고 달려 11장 겹쳤다(최대 60% · 검토 ②).
-      const fleeNow=['escape','hide','peek','recover'].includes(frame.id);
       return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,
-              ignoreKeys:fleeNow?[]:[operators[i]]};
+              ignoreKeys:stowing?[]:[operators[i]]};
     }).filter(Boolean);
-    // 13바퀴 재작업 — 도망·숨기·내다보기·돌아오기 동안에는 **책상만** 길 막는 것에서 뺀다.
-    // 가운데 통로가 1.98 인데 3.0배 몸이 2.68 이라 길이 아예 없어 도토리·밤이 제자리였다.
-    // 돌아올 때도 빼야 한다 — 빼지 않으면 도토리가 제 자리로 못 돌아와 쌀과 45장 겹쳤다.
-    // 통나무는 그대로 막아 둔다(뚫고 지나가던 것이 이번 검토의 불통이었다).
-    const fleeing=['escape','hide','peek','recover'].includes(frame.id);
-    // 2315 — 책상을 옆으로 치운 동안에는 **그 자리에 책상이 없으므로** 길 계산에서도 뺀다.
-    const desksMoved=deskAmount>.15;
-    const walls=(fleeing||desksMoved)?furnitureObstacles.filter(o=>!/^(desk|crate)/.test(String(o.key||''))):furnitureObstacles;   // 0152 — 상자도 책상과 같이 옮겨 가므로 제자리 벽을 뺀다
-    motion.obstacles=[...walls,...launcherBoxes];if(PATH_ON)motion.step(goals,dt);
+    const offstage=handling || [...motion.agents.values()].some(a=>a.position.z>6 || Math.abs(a.position.x)>19.5);
+    motion.minX=offstage?-39:-20.5;
+    motion.maxX=offstage?39:20.5;
+    motion.maxZ=offstage?28.5:6.5;
+    const originalDesks=(frame.id==='work'||frame.id==='notice') && desks.allHome();
+    const activeWalls=originalDesks
+      ? (offstage?office.obstacles:furnitureObstacles)
+      : (offstage?fixedObstacles:furnitureObstacles.filter(o=>!/^(desk|crate)-/.test(o.key)));
+    const walls=[...activeWalls,...launcherBoxes()];
+    motion.obstacles=originalDesks?walls:[...walls,...desks.obstacles(motion)];
+    if(PATH_ON){desks.update(frame,motion,goals,walls,dt);motion.step(goals,dt);}
     for(const a of actors){
       const state=motion.agents.get(a.key),old=a.lastPhysical || state.position;
       const dx=state.position.x-old.x,dz=state.position.z-old.z;
@@ -647,7 +565,7 @@ export function createV8(config){
         const px=a.wrapper.position.x, pz=a.wrapper.position.z;
         const jx=state.position.x-px, jz=state.position.z-pz, jump=Math.hypot(jx,jz);
         const CAP=1.20;   // 0.25·0.60 으로 조이니 가져오기 걸음이 끊겼다(2.40·3.08). 보통 한 프레임 0.2 이하라 1.2 면 순간이동(5.845)만 잡힌다.
-        if(jump>CAP && a.settled){
+        if(jump>CAP && a.settled && !handling){
           a.wrapper.position.x=px+jx/jump*CAP; a.wrapper.position.z=pz+jz/jump*CAP;
         }else{
           a.wrapper.position.x=state.position.x; a.wrapper.position.z=state.position.z;
@@ -663,7 +581,16 @@ export function createV8(config){
       a.wrapper.rotation.x=0;a.wrapper.rotation.z=0;
       // …그리고 **그 안쪽**(visualRoot)에 전투 자세를 입힌다. 길 계산은 wrapper 만 보므로
       // 책상에 기대 들어갈 걱정 없이 숙이고 흔드는 모습이 화면에 보인다.
-      if(frame.active){a.visualRoot.rotation.x=a.battleTiltX||0;a.visualRoot.rotation.z=a.battleTiltZ||0;}
+      if(frame.active){
+        a.visualRoot.rotation.x=a.battleTiltX||0;a.visualRoot.rotation.z=a.battleTiltZ||0;
+        if(a.deskHandling?.contact){
+          const stride=Math.abs(Math.sin(a.stride*1.25));
+          a.wrapper.position.y=.02*stride;
+          a.wrapper.scale.y=1-.035*(1-stride);
+          a.visualRoot.rotation.x=a.deskHandling.returning?-.09:.20;
+          a.visualRoot.rotation.z=Math.sin(a.stride*1.25)*.035;
+        }else if(handling && a.realMoving && !a.held)a.wrapper.position.y+=Math.abs(Math.sin(a.stride*1.25))*.065;
+      }
       const attacking=['ready','throw','gun','fetch','bazooka','mess'].includes(frame.id);
       // v8g: 평소엔 저마다 자기 책상(a.idleYaw)을 본다 — 예전처럼 전원 0(정면)으로 맞추지 않는다.
       // 걸을 땐 가는 쪽을 보고(미끄러지듯 가지 않게), 수다 중엔 상대를 본다.
@@ -675,7 +602,8 @@ export function createV8(config){
         :(a.poseGoal?.lookYaw!==undefined?a.poseGoal.lookYaw:(a.idleYaw??0));
       // 0206 10바퀴 — 놀라는 1초 동안은 **걷던 중이라도** 손님 쪽을 본다. 수다·커피로 가던
       // 친구가 등을 보인 채 놀라서 제일 중요한 '놀란 얼굴'이 안 보였다(땅콩·도토리).
-      const yaw=attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)
+      const yaw=a.deskHandling?.contact?a.deskHandling.yaw
+        :attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)
         :frame.id==='notice'?faceCamera
         :['work','recover'].includes(frame.id)?(moving?Math.atan2(dx,dz):idleFace)
         :moving?Math.atan2(dx,dz):a.facing;
@@ -708,14 +636,8 @@ export function createV8(config){
       // 1.35배로 커진 몸(완두콩 얼굴·쌀·땅콩 옆구리)을 가로질렀다. 챙기기(equip)부터 보인다.
       // 2315 — 씨앗 총도 **보관함에 다녀온 뒤**(씨앗 보관함으로 단계 중턱)부터 손에 들린다.
       // 2345 — 상자 **가까이 닿은 뒤**부터 손에 들린다(가서 꺼내 오는 것이 보이게).
-      let gotSeeds=frame.id!=='equip';
-      if(!gotSeeds){
-        const spot=weaponChestSpot(a);
-        gotSeeds=!!spot && Math.hypot(a.wrapper.position.x-spot.x,a.wrapper.position.z-spot.z)<1.3;   // 2350 — 상자에 닿아야 무기가 손에
-        if(gotSeeds)a.gotWeapon=true;
-        gotSeeds=gotSeeds||!!a.gotWeapon;
-      }else a.gotWeapon=false;
-      a.equipment.visible=!emotionOverride && !['work','lookup','notice','escape','hide','peek'].includes(frame.id) && !pushingLauncher && gotSeeds;
+      const gotSeeds=frame.id!=='equip' || a.pickupBlend>0;
+      a.equipment.visible=!emotionOverride && !['work','lookup','notice','escape','hide','peek','recover'].includes(frame.id) && !pushingLauncher && gotSeeds;
       if(a.weapon){
         a.weapon.lookAt(new THREE.Vector3(a.homePos.x,2.8,windowZ));
         a.muzzleFlash.visible=frame.id==='gun' && now<a.flashUntil;
@@ -756,7 +678,8 @@ export function createV8(config){
         :['peek','recover'].includes(frame.id)?0
         :['bazooka','mess','escape'].includes(frame.id)?1:0;
       // 2315 — 평소에는 **보관함 안**(화면에 없음). 가지러 가는 순간부터 보인다.
-      g.visible=['fetch','bazooka','mess','escape','hide','peek'].includes(frame.id);
+      const previous=g.position.clone();
+      g.visible=launcherOut(g,i);
       g.position.copy(parked[i]).lerp(deployed[i],pushed);
       // 5바퀴 불통: 통나무 뒤끝이 미는 친구 몸에 박히고 받침다리가 떴다.
       // 미는 사람 **앞쪽 옆**(몸 반지름 + 0.35)에 두고 바퀴 높이를 바닥에 맞춘다.
@@ -772,17 +695,17 @@ export function createV8(config){
         g.position.x=operator.wrapper.position.x+out*gap;
         g.position.z=operator.wrapper.position.z-PUSH_BACK;
         g.userData.leftAt=g.position.clone();
-      }else if(g.userData.leftAt && ['escape','hide','peek','recover'].includes(frame.id)){
-        // 1241 ①⑦ — 놀라서 **통나무는 놓고 도망간다**. 끌고 숨으면 통나무가 숨는 줄을
-        // 막아 뒤 친구들과 화면에서 깊게 겹쳤다(비율 0.43~0.82). 끌던 자리에서 쏘던 자리로
-        // 0.6초에 걸쳐 미끄러져 돌아가므로 뚝 끊기지 않고, 주인은 그 사이 멀어지니 몸을 뚫지도 않는다.
-        // 되돌아가는 건 **다 숨은 뒤**(hide)에 한다. 도망 중에 되돌리면 통나무가 도망 길을
-        // 가로질러 주인과 깊게 겹쳤다(비율 0.74). 숨은 동안엔 다들 책장 뒤(z -5)라 멀다.
-        // 13바퀴 재작업 — 도망 내내 통나무를 **주인 발밑에 세워 두니** 주인이 그것을 뚫고
-        // 달렸다(병아리콩 13장 · 최대 85%). 도망하는 1.6초 동안 통나무도 **세워 두는 자리로
-        // 같이 미끄러져** 간다 — 주인은 뒤로, 통나무는 앞 구석으로 멀어진다.
-        const u=clamp(frame.age/0.7,0,1);   // 0.7초 안에 치운다(1.6초로는 첫 0.3초가 주인과 겹쳤다)
-        g.position.copy(g.userData.leftAt).lerp(parked[i],frame.id==='escape'?u:1);
+      }else if(stowing && g.visible){
+        const u=Math.min(1,(g.userData.retract||0)+dt/.85);
+        g.position.copy(g.userData.leftAt).lerp(parked[i],smooth(u));
+        const box=new THREE.Box3().setFromObject(g);
+        const x=previous.x-g.position.x,z=previous.z-g.position.z;
+        const swept={minX:box.min.x+Math.min(0,x),maxX:box.max.x+Math.max(0,x),
+          minZ:box.min.z+Math.min(0,z),maxZ:box.max.z+Math.max(0,z)};
+        // Leave the same walking clearance on both sides of the handoff.
+        const blocked=[...motion.agents.values()].some(a=>rectangleGap(a.position,swept)<a.radius+.055);
+        if(blocked)g.position.copy(previous);
+        else{g.userData.retract=u;g.visible=u<1;}
       }
       g.position.y=GROUND_Y;
       // 13바퀴 4차(영상검사 ③) — '가지러 가서 **들어올리는**' 것이 보이게. 0.16~0.34 동안
@@ -800,11 +723,7 @@ export function createV8(config){
     });
     // Attached pushers and carts advance together. Check their current poses
     // after both moved, rather than comparing a new actor to yesterday's cart.
-    motion.obstacles=[...furnitureObstacles,...mounts.map((g,i)=>{
-      if(g.userData.fetched)return null;              // 끌고 다니는 동안은 길 계산에서 뺀다(위와 같은 이유)
-      g.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(g);
-      return {key:'launcher-'+i,minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,ignoreKeys:[operators[i]]};
-    }).filter(Boolean)];
+    motion.obstacles=[...activeWalls,...(originalDesks?[]:desks.obstacles(motion)),...launcherBoxes()];
     if(motion.overlaps().length && motion.overlapFrames===overlapFramesBefore)motion.overlapFrames++;
     projectiles.update(now);
   }
@@ -821,7 +740,7 @@ export function createV8(config){
     inspect(){return {scene:{...frame},emotionOverride,attackSeconds:ATTACK_SECONDS,encounterSeconds:ENCOUNTER_SECONDS,hits:mess.hits,impactKinds:{...mess.byKind},shots:{...projectiles.shots},projectilePeak:projectiles.peak,lastCompleted,
       quality:quality.current,qualityMode:quality.mode,qualityChanges:[...qualityChanges],render:pipeline.inspect(),bake:office.bake.inspect(),motion:motion.inspect(),fps:lastFPS,environment:office.info.hdr,assets:office.info,
       models:getActors().map(a=>({key:a.key,mode:frame.mode,emotion:a.emotion,eyeSurfaces:a.emotionRig?.eyes,canThrow:a.def.canThrow,hasWeapon:!!a.weapon,held:a.held,pickupBlend:a.pickupBlend || 0,position:a.wrapper.position.toArray(),facing:a.facing,windowFacing:Math.cos(a.facing)<-.95,equipment:a.equipment?.position.toArray(),crate:a.cratePosition.toArray()})),
-      pickups:[...pickupEvents],events:[...phaseEvents],stages:SCENES.map(s=>({...s})),testLevel,cameraStored:false};},
+      pickups:[...pickupEvents],events:[...phaseEvents],stages:SCENES.map(s=>({...s})),deskMove:desks.inspect(),testLevel,cameraStored:false};},
   };
   function disposeActor(a){
     motion.remove(a.key);

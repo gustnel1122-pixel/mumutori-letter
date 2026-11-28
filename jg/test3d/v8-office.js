@@ -107,7 +107,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     if(bonus==='plant')place(inner,'plantSmall1',[.13,.20,.13],V(-.36,.42,1.05));
     if(bonus==='mug')place(inner,'mug',[.09,.075,.065],V(-.34,.42,.74));
     inner.scale.setScalar(deskScale);
-    g.add(inner);
+    g.add(inner);g.userData.deskContents=inner;
     g.position.set(pos.x,0,pos.z);g.rotation.y=yaw;
     g.updateMatrixWorld(true);
     // 앉는 높이는 짐작하지 않고 의자 위로 광선을 쏴서 실제 앉는 면을 잰다.
@@ -131,7 +131,7 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     const keyboard=center.clone().addScaledVector(dir,-.13);keyboard.y=.425;place(g,'computerKeyboard',[.28,.015,.11],keyboard,yaw);
     const mouse=keyboard.clone().addScaledVector(side,.21);place(g,'computerMouse',[.055,.023,.08],mouse,yaw);
     const chair=place(g,'chairDesk',[.46,.60,.48],pos.clone().addScaledVector(dir,.65).addScaledVector(side,1.85),yaw+Math.PI);
-    if(chair)chair.userData.isOfficeChair=true;
+    if(chair){chair.userData.isOfficeChair=true;g.userData.chair=chair;}
     const books=center.clone().addScaledVector(side,-.35);books.y=.42;place(g,'books',[.17,.06,.17],books,yaw);
     if(bonus==='plant'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.15);pp.y=.42;place(g,'plantSmall1',[.13,.20,.13],pp);}
     if(bonus==='mug'){const pp=center.clone().addScaledVector(side,-.35).addScaledVector(dir,.16);pp.y=.42;place(g,'mug',[.09,.075,.065],pp,yaw);}

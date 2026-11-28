@@ -149,7 +149,7 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261128-8i';
+import {createV8} from './v8-runtime.js?v=20261128-desk';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
@@ -1051,6 +1051,7 @@ function buildDeskForSlot(pos, yaw, bonus, characterKey){
     chair.add(spoke, wheel);
   }
   g.add(chair);
+  g.userData.chair=chair;
 
   g.userData.monScreenMat = monScreenMat;
   // Scale the desk about its own character's home, preserving world aisle spacing.
@@ -1376,7 +1377,7 @@ function updateCameraFraming(n){
     // 11바퀴 — 통나무는 앞쪽(z 3.6)이라 카메라에서 제일 가깝고, 꽉 맞추면 **얘가 카메라를 밀어낸다**
     // (실측: 거리를 정한 점이 통나무 모서리 x -12.78, z 7.56 이었다). 책상과 같이 '조금 잘려도 되는 것'
     // 으로 두고, 정말 화면 안에 있는지는 `smooth` 의 `launcherFrame` 으로 따로 잰다.
-    if (obj.userData.isLauncher || obj.userData.isDesk) includeBox(new THREE.Box3().setFromObject(obj), true);
+    if (obj.userData.isLauncher || obj.userData.isDesk) includeBox(obj.userData.homeBounds || new THREE.Box3().setFromObject(obj), true);
   }
   // 적은 인원에서도 커피를 마시러 이동한 친구가 화면 밖으로 사라지지 않게 한다.
   includeBox(new THREE.Box3(
@@ -2176,7 +2177,7 @@ window.__jgComposition = () => ({
   camera: camera.position.toArray(), frameDriver,
   bounds: {min: compositionBounds.min.toArray(), max: compositionBounds.max.toArray()},
   desks: scene.children.filter(o => o.userData.isDesk).map(o => {
-    const screen = o.children[0].getWorldPosition(new THREE.Vector3()).project(camera);
+    const screen = (o.userData.movingDesk || o.children[0]).getWorldPosition(new THREE.Vector3()).project(camera);
     return {slot: o.userData.slotIndex, row: o.userData.row,
       position: [LAYOUT_SLOTS[o.userData.slotIndex].dx, LAYOUT_SLOTS[o.userData.slotIndex].dz],
       screen: screen.toArray()};
