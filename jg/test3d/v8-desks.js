@@ -5,6 +5,7 @@ const PAD = .06;
 const MAX_DESK_SPEED = 6.2;
 const ACCELERATION = 11;
 const ARRIVAL = .045;
+const GRIP_TOLERANCE = .11;
 const ENTRY_LENGTH = 2.4;
 const TURN_RADIUS = 3;
 const TURN_LENGTH = Math.PI * TURN_RADIUS / 2;
@@ -163,9 +164,13 @@ export function createDeskMoves(camera){
     }
     // In portrait the camera is much farther back. The foreground never
     // reaches the bottom of the image, so use staggered side aisles instead.
+    // Empty workstations still occupy the outer aisles. Keep their turn slots
+    // so inner pushers cross in front of the remaining furniture.
+    const lane = d=>d.laneX ?? d.home.x;
     for(const side of [-1,1]){
-      const group=sorted.filter(d=>(d.laneX<0?-1:1)===side).sort((a,b)=>Math.abs(b.laneX)-Math.abs(a.laneX));
+      const group=desks.filter(d=>(lane(d)<0?-1:1)===side).sort((a,b)=>Math.abs(lane(b))-Math.abs(lane(a)));
       group.forEach((d,i)=>{
+        if(!d.actor || d.skipped)return;
         d.turn={side,start:9.3+i*5.45-TURN_RADIUS-d.home.z};
         let travel=d.turn.start+TURN_LENGTH;
         let p=trackPoint(d,travel);
@@ -185,7 +190,10 @@ export function createDeskMoves(camera){
 
   function reserveReturnPath(d,state){
     const sections=[];
-    const body={x:state.radius+PAD,z:state.radius+PAD};
+    // The pusher can reach the handle from either side of its nominal point.
+    // Reserve that tolerance too so another table cannot trap the pusher.
+    const reach=state.radius+PAD+GRIP_TOLERANCE;
+    const body={x:reach,z:reach};
     let from=trackPoint(d,0);
     for(let start=0;start<d.end;start+=.42){
       const to=trackPoint(d,Math.min(d.end,start+.42));
@@ -220,8 +228,14 @@ export function createDeskMoves(camera){
     const grip=gripPoint(d,from,state);
     const gripGap=distance(state.position,grip);
     const yaw=Math.atan2(from.x-state.position.x,from.z-state.position.z);
-    if(gripGap>.11){
+    if(gripGap>GRIP_TOLERANCE){
       d.gripped=false;d.approachReady=0;d.speed=0;d.blocked='grip';
+      // A moving friend can make the route end short of the handle. Once
+      // that handle is free again, replace the completed detour's goal.
+      if(state.arrived && !state.search && state.resolvedGoal &&
+        distance(state.resolvedGoal,grip)>GRIP_TOLERANCE && motion.free(grip,state.radius,state.key,true)){
+        state.goal=null;
+      }
       goals.set(state.key,{...grip,speed:returning?7.0:5.8});
       d.actor.deskHandling={yaw,contact:false};
       return false;

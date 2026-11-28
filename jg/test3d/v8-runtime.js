@@ -6,7 +6,7 @@ import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261128-8i';
 import {createRenderPipeline} from './v8-render.js?v=20261123-8e';
 import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 import {MotionWorld,rectangleGap} from './v8-motion.js?v=20261123-8e';
-import {createDeskMoves} from './v8-desks.js?v=20261128-desk';
+import {createDeskMoves} from './v8-desks.js?v=20261128-desk-return';
 
 const smooth=x=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const clamp=THREE.MathUtils.clamp;
