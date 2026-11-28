@@ -149,7 +149,7 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261128-8h';
+import {createV8} from './v8-runtime.js?v=20261128-8i';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
@@ -173,6 +173,11 @@ const CAMERA_LEVEL = (() => {
 //      저마다 다른 동작을 한다. 11/22 "애들이 너무크고" 에 맞춰 친구를 줄이고 책상·의자를 키웠다.
 //      `?ver=f` 면 v8f(66cd66a) 비율·자세 그대로 — 되돌려 보기용.
 const VARIANT = new URLSearchParams(location.search).get('ver') === 'f' ? 'f' : 'g';
+// ---- 1022: 사장님 11/28 10:21 "유리창을 사이즈를 확키워".
+//      유리창은 '카메라 화면'이라 화면 모양을 따라간다 — 가로 화면이면 넓게, 세로(폰)면 좁고 높게.
+//      둘 다 **통째로 다 보이게**(아래 맞춤에서 유리창 전체를 꼭 보여야 하는 것으로 둔다) 하면서
+//      차지하는 넓이를 2배 넘게 키운 값이다(실측: PC 28.81 → 58.42% · 폰 14.17 → 34.60%).
+const GLASS_LANDSCAPE = (window.innerWidth / Math.max(1, window.innerHeight)) >= 1.2;
 // ---- 잠근 캐릭터 값(사장님 11/27 09:58 "캐릭터들을 장면을 만들고 고정시킨 후 그걸로 만들어야지") ----
 // 캐릭터 겉모습(재질색 · 외곽선 · 눈 · 소품 · 크기 비율)은 **이 파일 하나**에서만 읽는다.
 // 바꾸면 `tests/locked.test.mjs` 가 실패한다. 이 코드에는 캐릭터 값을 직접 쓰지 않는다.
@@ -431,12 +436,16 @@ scene.add(floor);
 
 // ---- 전판처럼 큰 통창: 넓은 중앙 유리 + 얇은 테두리 + 낮은 창턱 ----
 const wallMat = new THREE.MeshLambertMaterial({ color: 0xF7F6F3 });
-const WINDOW_Z = -8.8;
-const WINDOW_WIDTH = 28.8;
+const WINDOW_Z = -8.8;      // 1022 — -7.0 으로 당겨 봤더니 전투 때 친구끼리 겹침이 3 → 216 으로 늘어 되돌림
+// 1135 — 유리창은 카메라를 맞춘 **뒤에** 화면을 채우도록 다시 잰다(아래 fitWindowToView).
+//        처음 값은 지금 손님 판과 같게 두고, 카메라·친구 크기는 건드리지 않는다.
+let WINDOW_WIDTH = 28.8;
 const WINDOW_BOTTOM = 0.08;
 // 0010 답 4: "유리창이 훨씬더 커야해" + "무조건 다나오게" → 위로 키워 빈 회색을 채운다.
 // v8f 8.4 → 12.6. 맞춤(fit)이 창 전체를 화면에 담으므로 잘리지 않는다.
-const WINDOW_HEIGHT = COMPOSITION.variant === 'f' ? 8.4 : 12.6;
+let WINDOW_HEIGHT = COMPOSITION.variant === 'f' ? 8.4 : 12.6;
+// 카메라 거리를 정할 때 쓰는 **고정 값**(지금 손님 판 그대로) — 유리창을 키워도 카메라가 물러나지 않게 한다.
+const FRAME_WIN_W = 28.8, FRAME_WIN_H = COMPOSITION.variant === 'f' ? 8.4 : 12.6;
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), wallMat);
 backWall.position.set(0, 12, WINDOW_Z - 0.1);
 scene.add(backWall);
@@ -472,7 +481,8 @@ skyContext.fillRect(0, 0, 256, 256);
 const skyTexture = new THREE.CanvasTexture(skyCanvas);
 skyTexture.colorSpace = THREE.SRGBColorSpace;
 const windowMat = new THREE.MeshBasicMaterial({ map: skyTexture });
-const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(WINDOW_WIDTH, WINDOW_HEIGHT), windowMat);
+const bigWindow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), windowMat);   // 1135 — 크기는 scale 로
+bigWindow.scale.set(WINDOW_WIDTH, WINDOW_HEIGHT, 1);
 bigWindow.position.set(0, WINDOW_BOTTOM + WINDOW_HEIGHT / 2, WINDOW_Z);
 scene.add(bigWindow);
 
@@ -507,20 +517,85 @@ updateWindowSource();
 
 const windowFrameMat = new THREE.MeshLambertMaterial({ color: 0xCED5DB });
 const windowSillMat = new THREE.MeshLambertMaterial({ color: 0xFAFBFC });
-function addWindowFrame(width, height, depth, x, y, material = windowFrameMat){
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-  frame.position.set(x, y, WINDOW_Z + depth / 2);
-  scene.add(frame);
+// 1135 — 창틀은 단위 상자로 만들어 두고, 크기·자리는 layoutWindow() 가 정한다(유리창이 커지면 같이 커진다).
+const windowFrames = {};
+function addWindowFrame(key, material = windowFrameMat){
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+  frame.userData.isWindowFrame = true;      // 1135 — 굽기에서 빼서 크기를 바꿀 수 있게
+  scene.add(frame); windowFrames[key] = frame; return frame;
 }
-for (const x of [-WINDOW_WIDTH / 2, WINDOW_WIDTH / 2]){
-  addWindowFrame(0.11, WINDOW_HEIGHT + 0.16, 0.16, x, WINDOW_BOTTOM + WINDOW_HEIGHT / 2);
+for (const key of ['left', 'right', 'mullionL', 'mullionR', 'top']) addWindowFrame(key);
+addWindowFrame('sill', windowSillMat);
+
+// 유리 너머 하늘·건물을 **늘이지 않고 다시 깐다**(창이 넓어지면 그림판도 그 비율로 다시 그린다).
+function drawSky(aspect){
+  const W = 256, H = Math.max(64, Math.round(W / Math.max(0.2, aspect)));
+  skyCanvas.width = W; skyCanvas.height = H;
+  const g = skyContext.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#CFE2FA'); g.addColorStop(0.55, '#E8F1FD'); g.addColorStop(1, '#FBF7EE');
+  skyContext.fillStyle = g; skyContext.fillRect(0, 0, W, H);
+  skyContext.fillStyle = 'rgba(255,255,255,.55)';
+  for (const [cx, cy, r] of [[.19, .21, .078], [.26, .20, .102], [.34, .22, .070],
+                             [.67, .34, .063], [.74, .32, .082], [.81, .34, .055]]){
+    skyContext.beginPath(); skyContext.arc(cx * W, cy * H, r * W, 0, 7); skyContext.fill();
+  }
+  skyContext.fillStyle = 'rgba(150,170,195,.22)';
+  let x = -10;
+  while (x < W + 10){
+    const w = 16 + ((x * 37) % 23), h = (26 + ((x * 53) % 46)) * (H / 256) * 1.6;
+    skyContext.fillRect(x, H - h, w, h);
+    x += w + 4 + ((x * 17) % 9);
+  }
+  skyContext.fillStyle = 'rgba(120,145,175,.16)';
+  skyContext.fillRect(0, H - H * .094, W, H * .094);          // 먼 지평선
+  skyTexture.needsUpdate = true;
 }
-// 중앙 유리 한 장의 폭을 넓게 남겨 창살처럼 잘게 나뉘어 보이지 않게 한다.
-for (const x of [-4.35, 4.35]){
-  addWindowFrame(0.045, WINDOW_HEIGHT, 0.08, x, WINDOW_BOTTOM + WINDOW_HEIGHT / 2);
+
+// 유리창 크기를 바꾸고(판 · 창틀 · 하늘 · 씨앗 맞는 범위) 한 번에 다시 놓는다.
+function layoutWindow(width, height){
+  WINDOW_WIDTH = width; WINDOW_HEIGHT = height;
+  const midY = WINDOW_BOTTOM + height / 2;
+  bigWindow.scale.set(width, height, 1);
+  bigWindow.position.set(0, midY, WINDOW_Z);
+  const put = (key, w, h, d, x, y) => {
+    const f = windowFrames[key];
+    f.scale.set(w, h, d); f.position.set(x, y, WINDOW_Z + d / 2);
+  };
+  put('left',  0.11, height + 0.16, 0.16, -width / 2, midY);
+  put('right', 0.11, height + 0.16, 0.16,  width / 2, midY);
+  // 가운데 유리 한 장을 넓게 남긴다(창살처럼 잘게 나뉘어 보이지 않게) — 옛 비율(4.35/28.8) 그대로.
+  put('mullionL', 0.045, height, 0.08, -width * 0.151, midY);
+  put('mullionR', 0.045, height, 0.08,  width * 0.151, midY);
+  put('top',  width + 0.2,  0.1,  0.16, 0, WINDOW_BOTTOM + height);
+  put('sill', width + 0.3,  0.12, 0.32, 0, WINDOW_BOTTOM - 0.02);
+  drawSky(width / height);
+  updateWindowSource();
+  v8?.api?.setWindowSize?.(width, height);
 }
-addWindowFrame(WINDOW_WIDTH + 0.2, 0.1, 0.16, 0, WINDOW_BOTTOM + WINDOW_HEIGHT);
-addWindowFrame(WINDOW_WIDTH + 0.3, 0.12, 0.32, 0, WINDOW_BOTTOM - 0.02, windowSillMat);
+
+// 지금 카메라 화면에서 **뒷벽(유리창 자리)이 보이는 범위**를 재서 그만큼 채운다.
+// 사장님 11/28 10:21 "유리창을 사이즈를 확키워" + 11/22 22:25 "무조건 다나오게해"(= 잘리지 않게).
+function fitWindowToView(){
+  if (!camera) return;
+  const cornerAt = (nx, ny) => {
+    const point = new THREE.Vector3(nx, ny, 0.5).unproject(camera);
+    const dir = point.sub(camera.position).normalize();
+    if (Math.abs(dir.z) < 1e-6) return null;
+    const dist = (WINDOW_Z - camera.position.z) / dir.z;
+    if (!(dist > 0)) return null;
+    return camera.position.clone().addScaledVector(dir, dist);
+  };
+  const corners = [cornerAt(-1, -1), cornerAt(1, -1), cornerAt(-1, 1), cornerAt(1, 1)];
+  if (corners.some(c => !c)) return;
+  const EDGE = 0.965;                    // 테두리가 화면 안에 보이도록 조금 남긴다(잘림 0)
+  const halfW = Math.min(...corners.map(c => Math.abs(c.x))) * EDGE;
+  const topY  = Math.min(corners[2].y, corners[3].y) * EDGE;
+  const width  = Math.max(FRAME_WIN_W, 2 * halfW);
+  const height = Math.max(FRAME_WIN_H, topY - WINDOW_BOTTOM);
+  if (Math.abs(width - WINDOW_WIDTH) < 0.02 && Math.abs(height - WINDOW_HEIGHT) < 0.02) return;
+  layoutWindow(width, height);
+}
+layoutWindow(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 // ---- 화분(양옆, 전판처럼) — 단순 도형 ----
 // 2315 — 무기 보관함(사장님 11/27 23:14 "무기를 가져와서 쏘게"). 평소엔 바주카가 이 안에 있다.
@@ -1314,13 +1389,15 @@ function updateCameraFraming(n){
   // 유리창은 가로 28.8 로 방에서 제일 넓다 — 통째로 꽉 맞추면 친구를 아무리 키워도
   // 카메라가 그만큼 물러난다. **씨앗이 날아가 맞는 가운데 아래쪽**만 꽉 맞추고
   // 나머지(위쪽·양 끝)는 잘려도 되는 것으로 둔다.
+  // 1135 — 여기서는 **옛 유리창 크기(FRAME_WIN_*)** 만 본다. 실제 유리창은 카메라를 맞춘 뒤
+  //        화면을 채우도록 다시 잰다(fitWindowToView) — 그래야 카메라·친구 크기가 지금 손님 판 그대로다.
   const WINDOW_KEEP = 0.45, WINDOW_KEEP_X = 9.5;
   includeBox(new THREE.Box3(
     new THREE.Vector3(-WINDOW_KEEP_X,WINDOW_BOTTOM-0.08,WINDOW_Z-0.08),
-    new THREE.Vector3( WINDOW_KEEP_X,WINDOW_BOTTOM+WINDOW_HEIGHT*WINDOW_KEEP,WINDOW_Z+0.35)));
+    new THREE.Vector3( WINDOW_KEEP_X,WINDOW_BOTTOM+FRAME_WIN_H*WINDOW_KEEP,WINDOW_Z+0.35)));
   includeBox(new THREE.Box3(
-    new THREE.Vector3(-WINDOW_WIDTH/2-0.22,WINDOW_BOTTOM-0.08,WINDOW_Z-0.08),
-    new THREE.Vector3( WINDOW_WIDTH/2+0.22,WINDOW_BOTTOM+WINDOW_HEIGHT+0.18,WINDOW_Z+0.35)), true);
+    new THREE.Vector3(-FRAME_WIN_W/2-0.22,WINDOW_BOTTOM-0.08,WINDOW_Z-0.08),
+    new THREE.Vector3( FRAME_WIN_W/2+0.22,WINDOW_BOTTOM+FRAME_WIN_H+0.18,WINDOW_Z+0.35)), true);
   compositionBounds.copy(bounds);
 
   camera.fov = 36;
@@ -1345,6 +1422,11 @@ function updateCameraFraming(n){
     if (needY > distance && needY > needX) frameDriver = {axis:'y', loose:!!point.loose, p:point.toArray().map(v=>+v.toFixed(2)), need:+needY.toFixed(2)};
     distance = Math.max(distance, needX, needY);
   }
+  // 1246 — **세로(폰) 화면에서 장면이 통째로 사라지던 까닭**: 카메라 far 가 100 으로 고정이라
+  //        세로에서 카메라가 z 105 까지 물러나면 친구 · 유리창이 전부 far 밖으로 잘려 나갔다
+  //        (바닥 앞부분만 남고 나머지는 배경색). 지금 라이브 판에도 있는 문제라 여기서 같이 고친다.
+  //        거리만큼 넉넉히 늘린다(가까운 쪽 near 는 그대로라 깊이 정밀도에 문제 없음).
+  camera.far = Math.max(60, distance + 45);
   camera.position.set(target.x, target.y + distance * sin, target.z + distance * cos);
   camera.lookAt(target);
   camera.updateProjectionMatrix();
@@ -1357,6 +1439,7 @@ function onResize(){
   camera.aspect = width / height;
   renderer.setSize(width, height, false);
   updateCameraFraming(friendCount);
+  fitWindowToView();                 // 1135 — 카메라를 맞춘 뒤 유리창이 화면을 채우게
   v8?.resize();
 }
 window.addEventListener('resize', onResize);
@@ -1376,14 +1459,14 @@ function damp(current, goal, rate, dt){ return current + (goal - current) * (1 -
 // 평소 동작표 — 저마다 다르게, 같은 걸 동시에 하지 않게(2208 ①-2).
 // trip 이 있는 것만 자리를 비운다(한 번에 한 명).
 const IDLE_ACTIONS = {
-  working:   {dur:[2.6, 4.2]},   // 1241 ⑧ 한 자세를 오래 끌면 0.5초 변화량이 안 올라간다
+  working:   {dur:[1.0, 1.6]},   // 1022 — 앉아 있는 시간을 줄인다(옛 2.6~4.2)
   lookAside: {dur:[2.2, 3.6]},
   lookFront: {dur:[2.6, 3.2]},   // 장난 끝나고 손님 돌아보기(전투 후). 스스로 고르지는 않는다.
   stretch:   {dur:[2.4, 3.4]},
   yawn:      {dur:[2.6, 3.6]},
   chairSpin: {dur:[3.2, 4.6]},
   drawer:    {trip:'drawer'},
-  quirk:     {dur:[3.5, 5.5]},
+  quirk:     {dur:[1.2, 2.0]},   // 1022 — 자리 직무 몸짓도 짧게(옛 3.5~5.5)
   coffee:    {trip:'coffee'},
   chatting:  {trip:'chat'},
   carrying:  {trip:'carry'},
@@ -1394,19 +1477,27 @@ const IDLE_ACTIONS = {
   reporting:     {trip:'report'},  // 보고하러 가기 — 늘 대표(도토리)에게
   inspecting:    {trip:'inspect'}, // 선반·상자 살피기(땅콩 돋보기)
   greeting:      {trip:'greet'},   // 문 쪽 손님 맞이 자리 오가기(쌀)
+  // 1022 — 사장님 11/28 10:21 "진짜각자역할에 맞게 회사생활하는것처럼".
+  rounds:        {trip:'rounds'},  // 도토리(대표) 자리 돌며 둘러보기
+  meeting:       {trip:'meeting'}, // 화이트보드 앞에 모여 회의(둘 이상 — 함께하는 장면)
+  mailbox:       {trip:'mailbox'}, // 병아리콩(편지 작가) 편지 들고 우편함 · 프린터
+  board:         {trip:'board'},   // 해바라기씨(마케팅) 게시판에 붙이기
 };
 // 17바퀴 3바퀴 — 사장님 11/27 19:59 "각자가 역할에 맞게 일을 해야 더 재밌는것같아".
 // 캐릭터 정본 v1.6 의 직무 그대로. 자리에서 하는 '버릇'(quirk)도 이미 친구별 직무 몸짓이다
 // (도토리 타자 · 병아리콩 편지 들기 · 밤 상자 톡톡 · 땅콩 돋보기 · 완두콩 찰칵 · 해바라기씨 해 보기 · 쌀 차 홀짝).
 // 값은 '그 친구가 그 일을 고를 점수'. 커피·수다는 누구나 가끔(낮은 점수 = 3분의 1 이하).
+// 1022 — 사장님 10:21 "지금애들이 너무 앉아만 있어". 자리에서 하는 것(quirk . working)은 점수를 낮추고,
+// **일어나서 움직이며 하는 직무 일**을 친구마다 2가지 이상 준다(아래 0 이 아닌 '돌아다니는 일').
 const JOB_BY_FRIEND = {
-  dotori:     {quirk:1.5, working:1.3, drawer:0.5, reporting:0,   photographing:0, calling:0,   inspecting:0,   carrying:0,   shelf:0,   greeting:0},
-  byeongari:  {quirk:1.4, working:1.2, drawer:0.8, reporting:0.7, photographing:0, calling:0,   inspecting:0,   carrying:0,   shelf:0,   greeting:0},
-  bam:        {quirk:1.0, working:0.8, drawer:0.3, reporting:0.5, photographing:0, calling:0,   inspecting:0,   carrying:1.3, shelf:1.3, greeting:0},
-  ddangkong:  {quirk:1.1, working:0.8, drawer:0.3, reporting:0.9, photographing:0, calling:0,   inspecting:1.4, carrying:0,   shelf:0.6, greeting:0},
-  wandukong3: {quirk:1.2, working:0.8, drawer:0.3, reporting:0.5, photographing:1.5, calling:0, inspecting:0,   carrying:0,   shelf:0,   greeting:0},
-  haebaragi:  {quirk:1.3, working:0.9, drawer:0.3, reporting:0.6, photographing:0, calling:1.4, inspecting:0,   carrying:0,   shelf:0,   greeting:0},
-  ssal:       {quirk:1.2, working:0.9, drawer:0.3, reporting:0.5, photographing:0, calling:1.0, inspecting:0,   carrying:0,   shelf:0,   greeting:1.3},
+  //            자리에서                           | 돌아다니며 하는 직무 일(친구마다 2가지 이상)
+  dotori:     {quirk:0.45, working:0.40, drawer:0.2, rounds:1.75, meeting:1.55, reporting:0,    photographing:0,    calling:0,    inspecting:0,    carrying:0,    shelf:0,    greeting:0,    mailbox:0,    board:0},
+  byeongari:  {quirk:0.45, working:0.40, drawer:0.2, rounds:0,    meeting:0.80, reporting:1.25, photographing:0,    calling:0,    inspecting:0,    carrying:0,    shelf:0,    greeting:0,    mailbox:1.70, board:0},
+  bam:        {quirk:0.40, working:0.35, drawer:0.2, rounds:0,    meeting:0.70, reporting:0.55, photographing:0,    calling:0,    inspecting:0,    carrying:1.75, shelf:1.40, greeting:0,    mailbox:0,    board:0},
+  ddangkong:  {quirk:0.40, working:0.35, drawer:0.2, rounds:0,    meeting:0.90, reporting:1.30, photographing:0,    calling:0,    inspecting:2.00, carrying:0,    shelf:1.20, greeting:0,    mailbox:0,    board:0},
+  wandukong3: {quirk:0.45, working:0.40, drawer:0.2, rounds:0,    meeting:0.75, reporting:0.90, photographing:1.80, calling:0,    inspecting:0,    carrying:0,    shelf:0,    greeting:0,    mailbox:0,    board:0.90},
+  haebaragi:  {quirk:0.45, working:0.40, drawer:0.2, rounds:0,    meeting:0.75, reporting:0.55, photographing:0,    calling:1.70, inspecting:0,    carrying:0,    shelf:0,    greeting:0,    mailbox:0,    board:1.45},
+  ssal:       {quirk:0.45, working:0.40, drawer:0.2, rounds:0,    meeting:0.75, reporting:0.55, photographing:0,    calling:1.25, inspecting:0,    carrying:0,    shelf:0,    greeting:1.90, mailbox:0,    board:0},
 };
 const REST_ACTIONS = ['coffee','chatting','stretch','yawn','lookAside','chairSpin'];   // 누구나 가끔(쉬는 시간)
 const smooth01 = x => { x = Math.min(1, Math.max(0, x)); return x*x*(3-2*x); };
@@ -1535,11 +1626,19 @@ function updateMovement(a, dt, t){
     }
   } else if (a.movePhase === 'busy'){
     a.busyT += dt;
-    const DUR = {chat:2.2, drawer:1.5, report:2.4, phone:2.8, photo:2.0, inspect:2.6, greet:2.2};
+    // 1022 — 머무는 시간을 늘려 '서서 일하는' 시간이 실제로 보이게 한다(가자마자 돌아오면 또 앉아 있다).
+    const DUR = {chat:2.4, drawer:1.5, report:4.6, phone:6.0, photo:5.0, inspect:5.8, greet:5.2,
+                 carry:5.0, shelf:5.2, coffee:2.6,
+                 rounds:4.4, meeting:6.5, mailbox:4.6, board:5.0};
     const dur = DUR[a.visitKind] ?? 1.1;
-    const hop = Math.abs(Math.sin(t*5 + a.phase)) * 0.03;
+    let hop = Math.abs(Math.sin(t*5 + a.phase)) * 0.03;
+    if (a.visitKind === 'board') hop += Math.abs(Math.sin(t*1.9 + a.phase)) * 0.10;   // 1022 붙이려고 발돋움
     let yawOffset = 0;
-    if ((a.visitKind === 'chat' || a.visitKind === 'report') && a.visitTargetActor){
+    if (a.visitKind === 'meeting' || a.visitKind === 'board'){
+      // 화이트보드(-11.3, z -1.0) 쪽을 본다.
+      a.lookYaw = Math.atan2(-11.3 - a.wrapper.position.x, -1.0 - a.wrapper.position.z);
+    }
+    if ((a.visitKind === 'chat' || a.visitKind === 'report' || a.visitKind === 'rounds') && a.visitTargetActor){
       const dir = a.visitTargetActor.wrapper.position.clone().sub(a.wrapper.position);
       if (dir.lengthSq() > 1e-6) a.lookYaw = Math.atan2(dir.x, dir.z);
     }
@@ -1551,12 +1650,17 @@ function updateMovement(a, dt, t){
     if (a.visitKind === 'greet')   a.lookYaw = Math.atan2(camera.position.x - a.wrapper.position.x,
                                                           camera.position.z - a.wrapper.position.z);
     const bend = a.visitKind === 'drawer' ? -0.34
-               : (a.visitKind === 'chat' || a.visitKind === 'report') ? 0.05
+               : (a.visitKind === 'chat' || a.visitKind === 'report' || a.visitKind === 'rounds') ? 0.05
                : a.visitKind === 'inspect' ? -0.30
                : a.visitKind === 'greet' ? 0.10
+               : a.visitKind === 'mailbox' ? -0.24        // 1022 편지 넣기
+               : a.visitKind === 'board' ? -0.26          // 1022 게시판에 붙이기(팔 들기)
+               : a.visitKind === 'meeting' ? 0.04         // 1022 회의 — 바로 서서 듣기
                : a.visitKind === 'photo' ? -0.26 : -0.18;
     // 보고 = 고개 끄덕 · 전화 = 고개를 한쪽으로 기울이고 작게 흔들기 · 촬영 = 찰칵 한 박자
-    const nod   = a.visitKind === 'report' ? Math.sin(t*4.4 + a.phase)*0.16 : 0;
+    // 1022 — 보고 . 둘러보기 . 회의는 고개를 끄덕이고, 게시판은 팔을 올렸다 내리는 느낌으로 들썩인다.
+    const nod   = (a.visitKind === 'report' || a.visitKind === 'rounds') ? Math.sin(t*4.4 + a.phase)*0.16
+                : a.visitKind === 'meeting' ? Math.sin(t*2.6 + a.phase)*0.10 : 0;
     const lean  = a.visitKind === 'phone'  ? 0.30 + Math.sin(t*1.8 + a.phase)*0.08 : 0;
     const click = a.visitKind === 'photo'  ? Math.max(0, Math.sin(a.busyT*Math.PI/dur*2)) : 0;
     a.poseGoal = {lift:hop + click*0.05, tiltX:bend + nod,
@@ -1643,6 +1747,52 @@ function clearSpot(a, target){
   }
   return best;
 }
+// 1022 — 회의를 시작한 친구가 자리에 있는 친구 둘을 부른다(사장님이 보실 '함께하는 장면').
+function inviteToMeeting(host){
+  const free = actors.filter(o => o !== host && o.movePhase === 'idle'
+                                 && (JOB_BY_FRIEND[o.key]?.meeting ?? 0) > 0);
+  for (let i = free.length - 1; i > 0; i--){                 // 섞어서 늘 같은 둘만 부르지 않게
+    const j = Math.floor(Math.random()*(i+1)); [free[i], free[j]] = [free[j], free[i]];
+  }
+  let called = 0;
+  for (const o of free){
+    if (called >= 2) break;
+    o.lastAction = o.action = 'meeting';
+    o.actionT = 0; o.actionDur = 0;
+    if (beginVisit(o, 'meeting')) called++; else o.action = 'working';
+  }
+  return called;
+}
+
+// 1022 — 책상·상자 자리(길 찾기가 쓰는 네모)를 받아 두고, 서는 자리가 그 안이면 밖으로 민다.
+//        평소 돌아다니기는 길 찾기를 쓰지 않아서(그냥 걸어간다) 이걸 안 하면 책상 안에 선다.
+let furnitureRects = null;
+function deskRects(){
+  if (furnitureRects) return furnitureRects;
+  try {
+    furnitureRects = (v8.api.navigation().obstacles || [])
+      .filter(o => /^(desk|crate)/.test(String(o.key || '')));
+  } catch (e) { furnitureRects = []; }
+  return furnitureRects;
+}
+function avoidFurniture(p){
+  const margin = 1.15;                       // 몸 반지름 + 조금
+  for (let pass = 0; pass < 2; pass++){      // 두 번까지만(책상 사이에 끼는 것 방지)
+    let moved = false;
+    for (const o of deskRects()){
+      if (p.x > o.minX - margin && p.x < o.maxX + margin &&
+          p.z > o.minZ - margin && p.z < o.maxZ + margin){
+        const outs = [[o.minX - margin - p.x, 0], [o.maxX + margin - p.x, 0],
+                      [0, o.minZ - margin - p.z], [0, o.maxZ + margin - p.z]];
+        outs.sort((x, y) => Math.hypot(x[0], x[1]) - Math.hypot(y[0], y[1]));
+        p.x += outs[0][0]; p.z += outs[0][1]; moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return p;
+}
+
 function beginVisit(a, kind){
   a.moveFrom = new THREE.Vector3(a.homePos.x, 0, a.homePos.z);
   let target = null;
@@ -1690,6 +1840,32 @@ function beginVisit(a, kind){
     const side = a.homePos.x <= 0 ? -1 : 1;
     target = new THREE.Vector3(side*3.4, 0, a.homePos.z + 2.6);
     a.visitTargetActor = null;
+  } else if (kind === 'rounds'){
+    // 1022 도토리(대표) — 자리를 돌며 둘러본다. 보고와 반대로 **대표가 찾아간다**.
+    const others = actors.filter(o => o !== a);
+    if (!others.length){ a.action = 'working'; return false; }
+    const mate = others[Math.floor(Math.random()*others.length)];
+    target = besideFriend(mate, 2.50);
+    a.visitTargetActor = mate;
+  } else if (kind === 'meeting'){
+    // 1022 — 화이트보드(-11.3, z -1.0) 앞에 모여 선다. 서는 칸을 미리 나눠 둬서 겹치지 않는다.
+    const taken = actors.filter(o => o !== a && o.visitKind === 'meeting' && o.movePhase !== 'idle')
+                        .map(o => o.meetingSlot);
+    const slot = [0, 1, 2].find(i => !taken.includes(i));
+    if (slot === undefined){ a.action = 'working'; return false; }
+    a.meetingSlot = slot;
+    target = new THREE.Vector3(-6.4 + slot*2.45, 0, -0.5 + (slot % 2)*0.95);
+    a.visitTargetActor = null;
+  } else if (kind === 'mailbox'){
+    // 1022 병아리콩(편지 작가) — 쓴 편지를 들고 우편함 . 프린터 쪽으로.
+    target = new THREE.Vector3(a.homePos.x < 0 ? -6.2 : 6.2, 0, -2.3 + (Math.random()-0.5)*0.5);
+    a.visitTargetActor = null;
+    a.cargoMesh.visible = true;          // 편지를 들고 간다
+  } else if (kind === 'board'){
+    // 1022 해바라기씨(마케팅) — 게시판에 붙이러. 벽 쪽에 서서 팔을 든다.
+    const side = a.homePos.x < 0 ? -1 : 1;
+    target = new THREE.Vector3(side*6.5, 0, -1.4 + (Math.random()-0.5)*0.6);
+    a.visitTargetActor = null;
   } else if (kind === 'phone'){
     // 전화는 자리에서 조금 떨어진 **빈 구석**으로 — 책상 줄 뒤쪽, 자기 자리 바깥쪽.
     const side = a.homePos.x < 0 ? -1 : 1;
@@ -1711,7 +1887,7 @@ function beginVisit(a, kind){
   // 0206 ① — 수다·커피로 옮겨 간 자리가 자리 바깥이면 2.0 배에서 몸이 화면 밖으로 나간다
   // (땅콩이 수다 중에 왼쪽으로 1.14 까지 나갔다). 제일 바깥 친구의 자리 안으로 끌어온다.
   // 17바퀴 3바퀴 — 서는 자리를 화면에서 비어 있는 쪽으로 민다(자기 책상 옆 서랍 한 발은 그대로).
-  if (kind !== 'drawer') target = clearSpot(a, target);
+  if (kind !== 'drawer' && kind !== 'meeting') target = clearSpot(a, target);
   const edge = Math.max(...LAYOUT_SLOTS.map(slot => Math.abs(slot.dx)));
   target.x = THREE.MathUtils.clamp(target.x, -edge, edge);
   // 11바퀴 — 앞줄 친구 옆으로 수다 가면 **앞줄보다 더 앞**에 서게 되고, 3.0배에서는 그 몸이
@@ -1720,6 +1896,8 @@ function beginVisit(a, kind){
   // 13바퀴 재작업 — 앞줄 자리 자체가 화면 아래 끝이라, 앞줄까지 나가면 발이 0.01~0.06 잘린다
   // (checks outside). 앞줄보다 **0.9 뒤**까지만 나간다.
   target.z = Math.min(target.z, frontRow - 0.9);
+  // 1022 — 책상 안에 서지 않는다(놀람 → 무기 흐름에서 겹침으로 잡히던 것).
+  if (kind !== 'drawer') target = avoidFurniture(target);
   a.moveTo = target;
   a.visitKind = kind;
   a.movePhase = 'going';
@@ -1743,7 +1921,7 @@ function clampFacingToCamera(a, offset){
 }
 
 // 다음에 누군가 자리를 비워도 되는 시각(초). 늘 누군가 돌아다니지 않게 한다.
-let nextTripAllowedAt = 6;
+let nextTripAllowedAt = 0.8;      // 1022 — 6초를 기다리면 시작부터 4~5초를 다 같이 앉아 있다
 function lookOffsetToNeighbour(a){
   const others = actors.filter(o => o !== a);
   if (!others.length) return 0;
@@ -1760,7 +1938,9 @@ function lookOffsetToNeighbour(a){
 }
 
 function tickUtilityAI(a, dt, t){
-  if (a.movePhase !== 'idle'){ updateMovement(a, dt, t); return; }
+  if (a.movePhase !== 'idle'){ a.seatedFor = 0; updateMovement(a, dt, t); return; }
+  // 1022 — 앉아 있을수록 일어나고 싶어진다(사장님 10:21 "너무 앉아만 있어").
+  a.seatedFor = (a.seatedFor || 0) + dt;
   a.nextTickAt -= dt;
   if (a.nextTickAt <= 0){
     a.needs.work += 0.5 + Math.random()*0.4;
@@ -1770,13 +1950,23 @@ function tickUtilityAI(a, dt, t){
     // 2208 ①-2: 같은 동작을 둘이 동시에 하지 않는다 · 2206 ①-2: 자리를 비우는 건 한 번에 한 명
     //           (화면에서 친구끼리 겹쳐 보이는 일을 줄인다).
     const busyNow = new Set(actors.filter(o => o !== a && o.movePhase === 'idle').map(o => o.action));
-    const someoneAway = actors.some(o => o !== a && o.movePhase !== 'idle');
-    // 자리를 비우는 건 가끔이어야 한다 — 늘 누군가 돌아다니면 빈 책상이 생겨
-    // "책상·의자가 비어 있다"(2206 총괄 지적 ①)로 보인다. 한 번에 한 명 + 쉬는 시간.
-    const canStep   = !someoneAway;                                              // 자기 책상 옆 한 발(서랍)
-    const canTravel = canStep && actors.length > 1 && t >= nextTripAllowedAt;    // 멀리 다녀오기
+    // 1022 — 사장님 10:21 "지금애들이 너무 앉아만 있어".
+    // 예전엔 **한 번에 한 명만** 자리를 비울 수 있어서(2206 '빈 책상' 지적) 60초 동안
+    // 서 있는 친구가 평균 0.72 명뿐이었다(실측). 이제 여럿이 같이 움직인다 —
+    // 대신 한 명은 늘 자리에 남게 해서 사무실이 통째로 비어 보이지는 않게 한다.
+    const awayCount = actors.filter(o => o !== a && o.movePhase !== 'idle').length;
+    // 1022 2차 — 겹침은 **서 있는 동안**이 아니라 **걸어서 가로지르는 동안** 생긴다(실측).
+    //            서 있는 친구 수는 막지 않고, 동시에 '걷는' 친구만 둘로 제한한다.
+    const walkingCount = actors.filter(o => o !== a && (o.movePhase === 'going' || o.movePhase === 'returning')).length;
+    // 1022 2차 — 여섯까지로 막아 두니 **일곱째가 늘 앉아 있어야 했다**(실측: 서 있는 친구 6명인
+    //            시간이 1340 프레임, 그동안 남은 한 명은 앉은 시간으로 쌓였다). 막지 않는다.
+    const MAX_AWAY  = actors.length;
+    const canStep   = awayCount < MAX_AWAY;                                      // 자기 책상 옆 한 발(서랍)
+    const canTravel = canStep && walkingCount < 4 && actors.length > 1 && t >= nextTripAllowedAt; // 멀리 다녀오기
     // 17바퀴 3바퀴 — 친구마다 **자기 직무 일**을 고른다(사장님 11/27 19:59).
     const job = JOB_BY_FRIEND[a.key] || {};
+    // 앉아 있던 시간이 길수록(초) 돌아다니는 직무 일의 점수를 올린다 — 1 배에서 최대 3.5 배.
+    const sitBoost = 1 + Math.min(5.0, (a.seatedFor || 0) * 1.3);   // 1135 — 2초만 앉아 있어도 바로 일어나게
     const w = k => (job[k] ?? 1);                 // 그 친구가 그 일을 고를 점수(0 이면 아예 안 함)
     const candidates = [
       { k:'working',   v:(Math.min(1.00, a.needs.work) + Math.random()*0.35) * w('working') },
@@ -1792,15 +1982,20 @@ function tickUtilityAI(a, dt, t){
     if (canStep) candidates.push({ k:'drawer', v:(0.35 + Math.random()*0.35) * w('drawer') });
     if (canTravel){
       // 직무 일 — 그 친구 몫인 것만(점수 0 이면 아예 후보에 안 올라간다).
-      for (const k of ['carrying','shelf','photographing','calling','reporting','inspecting','greeting'])
-        if (w(k) > 0) candidates.push({ k, v:(1.25 + Math.random()*0.70) * w(k) });
+      for (const k of ['carrying','shelf','photographing','calling','reporting','inspecting','greeting',
+                       'rounds','meeting','mailbox','board'])
+        if (w(k) > 0) candidates.push({ k, v:(2.05 + Math.random()*0.80) * w(k) * sitBoost });
       // 커피·수다는 누구나 가끔(쉬는 시간) — 직무 일보다 낮게.
       candidates.push({ k:'chatting', v:0.26 + Math.random()*0.22 });
       candidates.push({ k:'coffee',   v:0.26 + Math.random()*0.22 });
     }
     // 바로 전에 한 것·지금 남이 하는 것은 뺀다. 다 빠지면 그냥 일한다.
     // 자기 일(quirk)·일하기(working)는 친구마다 다른 몸짓이라 겹쳐도 된다 — 빼지 않는다.
-    const free = candidates.filter(c => c.k !== a.lastAction &&
+    // 1022 — 돌아다니는 직무 일은 **이어서 또 해도 된다**(상품을 더 살피고, 또 한 장 찍는다).
+    //        할 일이 두세 가지뿐인 친구가 '바로 전에 했다'는 이유로 자리에 앉아 버리던 것을 막는다.
+    const REPEATABLE = new Set(['carrying','shelf','photographing','calling','reporting',
+                                'inspecting','greeting','rounds','mailbox','board']);
+    const free = candidates.filter(c => (c.k !== a.lastAction || (REPEATABLE.has(c.k) && Math.random() < 0.65)) &&
       (c.k === 'quirk' || c.k === 'working' || !busyNow.has(c.k)));
     const pool = free.length ? free : candidates.filter(c => c.k !== a.lastAction);
     (pool.length ? pool : candidates).sort((x, y) => y.v - x.v);
@@ -1822,7 +2017,9 @@ function tickUtilityAI(a, dt, t){
       // 17바퀴 — 사장님 11/27 17:56 "사람없을떈여기저기돌아다니면서사실적으로".
       // 16~26초 쉬면 한 바퀴 내내 거의 앉아만 있어 보였다 → 5~10초로 줄인다
       // (한 번에 한 명 규칙은 그대로라 겹침은 늘지 않는다).
-      if (ok) nextTripAllowedAt = t + (trip === 'drawer' ? 1.5 + Math.random()*1.5 : 2 + Math.random()*2);
+      // 1022 — 2~4초씩 쉬면 '한 번에 한 명' 규칙을 풀어도 여전히 띄엄띄엄이다. 0.2~0.8 초로 줄인다.
+      if (ok) nextTripAllowedAt = t + (trip === 'drawer' ? 0.4 + Math.random()*0.4 : 0.05 + Math.random()*0.2);
+      if (ok && chosen === 'meeting') inviteToMeeting(a);
       if (!ok) a.nextTickAt = 2 + Math.random()*2;
     } else {
       const [lo, hi] = IDLE_ACTIONS[chosen]?.dur || [3, 6];

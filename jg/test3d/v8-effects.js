@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 
 export class WindowMess {
+  // 1135 — 유리창이 커지면 자국판도 같은 크기로(늘이지 않고 그림판 비율을 다시 잡는다).
+  resize(width,height){
+    if(Math.abs(width-this.width)<.02 && Math.abs(height-this.height)<.02)return;
+    this.width=width;this.height=height;
+    this.canvas.height=Math.max(64,Math.round(this.canvas.width*height/width));
+    this.mesh.scale.set(width/this.baseWidth,height/this.baseHeight,1);
+    this.mesh.position.set(0,this.bottom+height/2,this.z+.045);
+    this.texture.needsUpdate=true;
+  }
+
   constructor(scene,{width,height,z,bottom}){
     this.width=width;this.height=height;this.z=z;this.bottom=bottom;this.hits=0;this.byKind={throw:0,gun:0,bazooka:0};
     // 13바퀴 재작업 — 영상검사 ③ '자국이 11바퀴보다 18~22% 적다'를 가르기 위해 ?mess= 로 크기를 바꿀 수 있게.
@@ -14,6 +24,7 @@ export class WindowMess {
     this.material=gradeMaterial(new THREE.MeshBasicMaterial({map:this.texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
     this.mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),this.material);
     this.mesh.position.set(0,bottom+height/2,z+.045);this.mesh.renderOrder=3;scene.add(this.mesh);
+    this.baseWidth=width;this.baseHeight=height;
   }
   impact(point,kind='throw'){
     this.hits++;this.byKind[kind]=(this.byKind[kind] || 0)+1;

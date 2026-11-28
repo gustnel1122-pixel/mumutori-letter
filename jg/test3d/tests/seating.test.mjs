@@ -83,7 +83,13 @@ test('the idle action list covers the actions the owner asked for', () => {
   for (const name of ['lookAside','stretch','yawn','chairSpin','drawer','quirk'])
     has(html, name + ':', name + ' 가 있어야 한다(2208 1-2)');
   has(html, 'busyNow.has(c.k)', '같은 동작을 둘이 동시에 하지 않아야 한다');
-  has(html, 'someoneAway', '자리를 비우는 건 한 번에 한 명');
+  // 1022 — 사장님 11/28 10:21 "지금애들이 너무 앉아만 있어 진짜각자역할에 맞게 회사생활하는것처럼".
+  //        '한 번에 한 명만 자리를 비운다'(someoneAway) 규칙을 사장님 말대로 풀었다.
+  //        대신 **여럿이 동시에 움직이는 것**이 코드에 남아 있는지를 본다.
+  has(html, 'awayCount', '여럿이 같이 자리를 비울 수 있어야 한다(1022)');
+  has(html, 'MAX_AWAY', '자리 비움 상한이 있어야 한다(1022)');
+  for (const name of ['rounds','meeting','mailbox','board'])
+    has(html, name + ':', name + ' 가 있어야 한다(1022 돌아다니는 직무 일)');
   has(html, 'nextTripAllowedAt', '늘 누군가 돌아다니지 않게 쉬는 시간이 있어야 한다');
 });
 

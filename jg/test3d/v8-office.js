@@ -165,7 +165,8 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
   });
   // 바주카는 움직이는 물건이라 '고정 가구'로 구워 두면 안 된다(길 계산에 두 번 들어가
   // 주인이 자기 바주카를 못 지나가게 막혔다). 두 대 모두 뺀다 — 실제 사각형은 v8-runtime 이 매 프레임 만든다.
-  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.userData.isLauncher && !o.isLight);
+  // 1135 — 창틀(isWindowFrame)은 유리창이 커지면 같이 움직여야 하므로 굽기에서 뺀다.
+  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.userData.isLauncher && !o.userData.isWindowFrame && !o.isLight);
   const bake=createStaticBake(scene,floor);
   let obstacles=[];
   function rebuild(desks,crates){

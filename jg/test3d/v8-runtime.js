@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {SceneDirector,AdaptiveQuality,SCENES,ATTACK_SECONDS,ENCOUNTER_SECONDS} from './v8-director.js?v=20261123-8e';
 import {createEmotionRig,EMOTIONS,setEyeTune} from './v8-emotions.js?v=20261128-8h';
-import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261128-8h';
-import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261126-13';
+import {furnishOffice,makePeaGun,makeAcornBazooka} from './v8-office.js?v=20261128-8i';
+import {WindowMess,SeedProjectiles} from './v8-effects.js?v=20261128-8i';
 import {createRenderPipeline} from './v8-render.js?v=20261123-8e';
 import {gradeMaterial} from './v8-lighting.js?v=20261123-8e';
 import {MotionWorld} from './v8-motion.js?v=20261123-8e';
@@ -27,7 +27,9 @@ function handOffset(a){
   return handSwing.set(base.x*ext,base.y+lift,base.z*ext);
 }
 export function createV8(config){
-  const {scene,renderer,camera,dirLight,windowZ,windowWidth,windowHeight,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
+  const {scene,renderer,camera,dirLight,windowZ,windowBottom,getActors,bazookaGroup,resize,resetActors}=config;
+  // 1135 — 유리창은 화면을 채우도록 나중에 커질 수 있다. 씨앗이 맞는 범위·자국판도 같이 따라가게 변수로 둔다.
+  let windowWidth=config.windowWidth, windowHeight=config.windowHeight;
   // 14바퀴 — 눈 값은 잠금 파일(locked/characters.lock.json)에서 온 것만 쓴다.
   setEyeTune(config.eyeTune||{});
   const office=furnishOffice(config),director=new SceneDirector(),quality=new AdaptiveQuality(),pipeline=createRenderPipeline(renderer,scene,camera);
@@ -374,7 +376,13 @@ export function createV8(config){
       const pushing=frame.progress<.20;   // 2350 실측 — 45%·32% 면 상자까지 못 돌아왔다(미는 1초 뒤 책상은 혼자 미끄러져 나간다)
       const grabAt=chestGoal||a.pickupPosition;
       const pushSpot=pushing?deskPushSpot(a):null;
-      a.motionGoal=pushSpot||(a.held?(operators.includes(a.key)?a.homePos:battleStation(a)):grabAt);
+      // 1135 ① — 놀랄 때 **자리에 없던 친구**는 먼저 자기 자리로 빠르게 돌아온 뒤 책상을 민다
+      //          (총괄 결정). 돌아오는 데 주는 시간은 1.5초까지.
+      const here=motion.agents.get(a.key)?.position;
+      const awayFromDesk=!!here && frame.age<1.5 &&
+        Math.hypot(here.x-a.homePos.x,here.z-a.homePos.z)>.8;
+      a.motionGoal=awayFromDesk?a.homePos
+        :(pushSpot||(a.held?(operators.includes(a.key)?a.homePos:battleStation(a)):grabAt));
       a.movePhase='moving';
       if(pushing){
         // 미는 모습: 앞으로 기울이고 살짝 낮춘다(두 손으로 밀어내는 느낌).
@@ -802,6 +810,8 @@ export function createV8(config){
   }
   const api={
     chestSpot(a){return weaponChestSpot(a);},        // 2350 검사용 — 무기 상자 앞 자리
+    setWindowSize(w,h){windowWidth=w;windowHeight=h;mess.resize?.(w,h);return {windowWidth,windowHeight};},
+    // 1135 — 창틀은 '정적 굽기'에 들어가 있어서 크기를 바꾸면 **다시 구워야** 화면에 반영된다.
     navigation(){return JSON.parse(JSON.stringify({obstacles:motion.obstacles,agents:[...motion.agents.values()]}));},
     demo(){emotionOverride=null;document.getElementById('startOverlay').style.display='none';return director.begin(true);},
     emotion(name){if(name && !EMOTIONS[name])throw new Error('Unknown emotion');if(director.active)return {ignored:true,reason:'shared encounter mode',emotion:frame.emotion};emotionOverride=name || null;document.getElementById('startOverlay').style.display='none';resetActors();return name || 'auto';},
