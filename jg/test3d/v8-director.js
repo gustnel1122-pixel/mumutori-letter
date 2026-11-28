@@ -4,19 +4,16 @@ export const SCENES = Object.freeze([
   // 0224 P30 "무서움을 눈 각도로 내지 말 것" — determined 가 눈을 가늘게·기울게 만들고 있었다.
   // 7바퀴 ③ — 0.5초면 반응 시차(0~0.45초)가 끝나기도 전에 장면이 넘어가 '일곱이 동시에' 놀란 것처럼 보였다.
   {id:'notice',emotion:'surprised',duration:1,label:'앗, 손님이다!'},
-  {id:'equip',emotion:'determined',duration:5,label:'씨앗 보관함으로!'},
-  {id:'ready',emotion:'determined',duration:1,label:'모두 자리 잡기'},
-  {id:'throw',emotion:'excited',duration:4.5,label:'씨앗 던지기'},
-  {id:'gun',emotion:'excited',duration:6,label:'완두콩 깍지 총'},
-  {id:'fetch',emotion:'determined',duration:3.5,label:'도토리 바주카 가져오기'},
-  {id:'bazooka',emotion:'excited',duration:6.5,label:'도토리 바주카'},   // 0224: 공격을 12.5초 → 17초로
+  {id:'equip',emotion:'determined',duration:5,label:'씨앗 바구니 챙기기'},
+  {id:'ready',emotion:'determined',duration:1,label:'각자 자리에 바구니 놓기'},
+  {id:'throw',emotion:'excited',duration:17,label:'씨앗 던지기'},
   {id:'mess',emotion:'proud',duration:2,label:'창문이 엉망!'},
   {id:'escape',emotion:'surprised',duration:3,label:'들켰다, 다 같이 숨자!'},
   {id:'hide',emotion:'surprised',duration:2,label:'쉿… 손님이 지나가길 기다려요'},
   {id:'peek',emotion:'surprised',duration:3.5,label:'한 명씩 빼꼼'},
   {id:'recover',emotion:'working',duration:3,label:'유리창 닦고 다시 일하기'},
 ]);
-export const ATTACK_SECONDS=SCENES.filter(s=>['throw','gun','bazooka'].includes(s.id)).reduce((n,s)=>n+s.duration,0);
+export const ATTACK_SECONDS=SCENES.find(s=>s.id==='throw').duration;
 export const ENCOUNTER_SECONDS=SCENES.reduce((n,s)=>n+s.duration,0);
 const starts=Object.fromEntries(SCENES.map((s,i)=>[s.id,SCENES.slice(0,i).reduce((n,v)=>n+v.duration,0)]));
 

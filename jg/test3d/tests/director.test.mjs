@@ -14,8 +14,8 @@ test('any detected person starts the same surprised battle within one frame',()=
 test('battle emotions never include tired or working, and all attack stages run',()=>{
   const d=new SceneDirector();d.begin();const stages=new Set();
   for(let t=0;t<33;t+=.02){const s=d.update(.02,3);stages.add(s.id);if(s.mode==='battle')assert.ok(!['tired','working'].includes(s.emotion));}
-  for(const id of ['equip','ready','throw','gun','fetch','bazooka','mess','escape'])assert.ok(stages.has(id),id);
-  assert.equal(ATTACK_SECONDS,17);   // 0224: 공격을 12.5초 → 17초로 늘림
+  assert.deepEqual([...stages],['notice','equip','ready','throw','mess','escape','hide']);
+  assert.equal(ATTACK_SECONDS,17);
 });
 test('persistent visitor keeps the group hidden; two seconds absent releases them',()=>{
   const d=new SceneDirector();d.begin();assert.equal(advance(d,80,2).id,'hide');assert.equal(d.encounters,1);
@@ -23,7 +23,9 @@ test('persistent visitor keeps the group hidden; two seconds absent releases the
   advance(d,8,0);assert.equal(d.snapshot().id,'work');d.update(.02,1);assert.equal(d.encounters,2);
 });
 test('a returning visitor during peek sends everyone back to cover',()=>{
-  const d=new SceneDirector();d.begin();advance(d,35.5,0);assert.equal(d.snapshot().id,'peek');
+  const d=new SceneDirector();d.begin();
+  const untilPeek=SCENES.slice(0,SCENES.findIndex(s=>s.id==='peek')).reduce((sum,s)=>sum+s.duration,0);
+  assert.equal(advance(d,untilPeek+.1,0).id,'peek');
   assert.equal(d.update(.02,1).id,'escape');assert.equal(d.encounters,1);
 });
 test('camera-free demo follows all stages and completes without a presence feed',()=>{

@@ -150,7 +150,7 @@
 
 <script type="module">
 import * as THREE from "three";
-import {createV8} from './v8-runtime.js?v=20261128-desk-return';
+import {createV8} from './v8-runtime.js?v=20261128-seed-basket';
 import {WorkerDetector,afterPaint} from './v8-detection.js?v=20261122-8b';
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 // 얼굴 인식: jg/index.html과 동일한 MediaPipe 조합·버전(2026-11-16 확인, 그대로 고정)
@@ -599,8 +599,7 @@ function fitWindowToView(){
 layoutWindow(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 // ---- 화분(양옆, 전판처럼) — 단순 도형 ----
-// 2315 — 무기 보관함(사장님 11/27 23:14 "무기를 가져와서 쏘게"). 평소엔 바주카가 이 안에 있다.
-function buildWeaponLocker(x, z){
+function buildStorageChest(x, z){
   const g = new THREE.Group();
   g.userData.isLocker = true;   // 0152 — 검사에서 '받침'으로 셀 수 있게(그림은 그대로)
   const woodMat = new THREE.MeshLambertMaterial({ color: 0xD9B98C });
@@ -614,7 +613,6 @@ function buildWeaponLocker(x, z){
     band.position.set(sx, 0.5, 0); g.add(band);
   }
   g.position.set(x, 0, z);
-  g.userData.isWeaponLocker = true;
   scene.add(g);
   return g;
 }
@@ -639,26 +637,6 @@ function buildPlant(x, z, scale){
 buildPlant(-11.2, .2, 0.95);
 buildPlant(11.2, .2, 0.9);
 
-// ---- 씨앗 바주카(새 소품 — 단순 원통, 정본 색상 계열), 코너 선반 위 ----
-const bazookaGroup = new THREE.Group();
-const shelfMat = new THREE.MeshLambertMaterial({ color: 0x9F5528 });
-const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.35), shelfMat);
-const BAZOOKA_POS = new THREE.Vector3(4.6, 0.48, WINDOW_Z + 0.2);
-shelf.position.copy(BAZOOKA_POS);
-// The wheeled launchers use the floor; no floating shelf crosses the window.
-const bazookaBodyMat = new THREE.MeshLambertMaterial({ color: 0xCFAE7A });
-const bazookaBody = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.6, 10), bazookaBodyMat);
-bazookaBody.rotation.z = Math.PI/2;
-bazookaBody.position.set(0, 0.12, 0);
-bazookaGroup.add(bazookaBody);
-const bazookaCapMat = new THREE.MeshLambertMaterial({ color: 0x682301 });
-const bazookaCap = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.08, 10), bazookaCapMat);
-bazookaCap.rotation.z = Math.PI/2;
-bazookaCap.position.set(-0.3, 0.12, 0);
-bazookaGroup.add(bazookaCap);
-bazookaGroup.position.copy(BAZOOKA_POS);
-bazookaGroup.rotation.y = 2.3;
-scene.add(bazookaGroup);
 
 // ---- 커피 코너(창가 — "커피" 행동의 목적지, 작은 원탁+머그 2개) ----
 // 11바퀴 — 3.0배에서 커피 코너(-10.6, z 1.5)가 **통나무 세워 둔 자리**(-12.1, z 3.6)와 붙어
@@ -782,13 +760,13 @@ function updateThought(a){
 // 캐릭터 정본 제약(정본 §6-2·§6-3): 몸=머리(목 없음)·짧은 팔(손가락 없음)·입 유무 캐릭터별 다름.
 // 다른 회사 캐릭터 요소 없음 — 공식 3D 모델 그대로, AI로 다시 그리지 않음.
 const FRIEND_DEFS = {
-  dotori:     { file:'dotori.glb',     name:'도토리',     canThrow:true,  duckMul:0.4 },
-  bam:        { file:'bam.glb',        name:'밤',         canThrow:true },
-  ddangkong:  { file:'ddangkong.glb',  name:'땅콩',       canThrow:true },
-  byeongari:  { file:'byeongari.glb',  name:'병아리콩',   canThrow:true },
-  wandukong3: { file:'wandukong3.glb', name:'완두콩삼형제', canThrow:true },
-  haebaragi:  { file:'haebaragi.glb',  name:'해바라기씨', canThrow:false },
-  ssal:       { file:'ssal.glb',       name:'쌀',         canThrow:true },
+  dotori:     { file:'dotori.glb',     name:'도토리', duckMul:0.4 },
+  bam:        { file:'bam.glb',        name:'밤' },
+  ddangkong:  { file:'ddangkong.glb',  name:'땅콩' },
+  byeongari:  { file:'byeongari.glb',  name:'병아리콩' },
+  wandukong3: { file:'wandukong3.glb', name:'완두콩삼형제' },
+  haebaragi:  { file:'haebaragi.glb',  name:'해바라기씨' },
+  ssal:       { file:'ssal.glb',       name:'쌀' },
 };
 const FRIEND_ORDER = ['dotori','bam','ddangkong','byeongari','wandukong3','haebaragi','ssal'];
 
@@ -893,41 +871,12 @@ const LAYOUT_SPREAD = VARIANT === 'f' ? 1 : 1 + (ACTOR_SCALE_G / 1.35 - 1) * SPR
 const LAYOUT_SLOTS = (LAYOUT_SLOTS_BY_CAM[CAMERA_LEVEL] || LAYOUT_SLOTS_BY_CAM.lowered)
   .map((slot, i) => VARIANT === 'f' ? slot
     : {...slot, dx: +(slot.dx * LAYOUT_SPREAD).toFixed(3), yaw: THREE.MathUtils.degToRad(SEAT_YAW_DEG[i])});
-// 바주카 주인은 병아리(자리 3)·쌀(자리 6)이다.
-// v8f 까지는 주인 자리를 따라 옮겼는데, 쌀은 바주카가 바로 뒤에 서서 화면에서 겹쳐 보였다.
-// v8g 는 양쪽 끝 빈자리(친구 화면 칸 밖)에 세워 두고, 가지러 갈 때만 앞으로 끌고 나온다.
-const LAUNCHER_OWNER_SLOTS = [3, 6];
-const LAUNCHER_SPOTS = VARIANT === 'f'
-  ? {parked:[[-8 + (LAYOUT_SLOTS[3].dx - LAYOUT_SLOTS_BY_CAM['0'][3].dx), 3.1],
-             [ 0 + (LAYOUT_SLOTS[6].dx - LAYOUT_SLOTS_BY_CAM['0'][6].dx), -6.2]],
-     deployed:[[-8 + (LAYOUT_SLOTS[3].dx - LAYOUT_SLOTS_BY_CAM['0'][3].dx), -0.8],
-               [ 0 + (LAYOUT_SLOTS[6].dx - LAYOUT_SLOTS_BY_CAM['0'][6].dx), -6.8]]}
-  // 쏘는 자리도 화면에서 다른 친구 칸과 겹치지 않는 곳으로 — 8.0,-0.8 은 해바라기씨와 같은 칸이었다.
-  // 1241 ① — 오른쪽 쏘는 자리를 안쪽·뒤로 옮긴다(9.5,2.6 은 카메라에 가까워서 통나무를 옆으로
-  // 밀면 화면 밖 1.03 으로 나갔다). 해바라기씨 집(x 6.7)과는 아직 1.9 떨어져 칸이 겹치지 않는다.
-  // 0206 ① — 친구가 커지고 자리가 벌어지면 통나무도 같이 밀어내야 한다(2.0 배에서 병아리콩이
-  // 왼쪽 통나무와 화면에서 61% 겹쳤다). 자리와 같은 비율로 옮기되 화면 밖으로 나가는지는 잰다.
-  // 통나무는 화면에서 제일 바깥 점이라 여기를 벌리면 카메라가 곧바로 물러난다 →
-  // 가로로는 **그대로 두고**, 친구와 겹치지 않게 **뒤로**(z) 물려 세운다.
-  // 0206 ④ — 세워 두는 자리는 **아무것도 없는 앞쪽 양끝 구석**으로. 뒤(z -6.6)에 두면 화면에서
-  // 화이트보드(-11.3, z -1.0)·스탠드와 같은 칸에 겹쳐 보였고, 예전 자리(±10.5, z 3.0)는
-  // 친구가 커진 뒤로 바깥 친구와 겹쳤다. 휴지통(±11.3, z 0.75)과도 앞뒤로 떨어뜨린다.
-  // (±13.0, 3.6) 은 카메라에 가까워 화면 밖(1.16)으로 나갔다 → 같은 가로 자리라도 **뒤로** 물리면
-  // 멀어져서 화면 안에 들어온다. 화이트보드(-11.3, z -1.0)·휴지통(±11.3, z 0.75)과는 깊이로 떨어진다.
-  // 뒤쪽(z -2.6 · -4.2)에 세우면 바깥 통로가 막혀 도망 길 찾기가 실패한다(도토리가 방을 가로질러
-  // 왼쪽 끝까지 가야 한다). **앞쪽 양끝 구석**(z 3.6)이 통로를 안 막는 유일한 자리다.
-  // 0206 10바퀴 — 9바퀴 검토 ③: **쏘는 자리**의 통나무가 휴지통을 통째로·화분을 반쯤 가렸다.
-  // 미는 거리가 몸 크기만큼 늘었으니(2.0 배에서 +2.9) 쏘는 자리를 그만큼 안쪽으로 당긴다.
-  // 왼쪽은 화이트보드(-11.3, z -1.0), 오른쪽은 스탠드 책상·화분(x 11~12, z ~1)을 피한다.
-  // 쏘는 자리를 안쪽으로 당기면 통나무가 친구와 겹친다(실측 13 → 63). 자리는 그대로 두고
-  // 대신 **휴지통·종이를 통나무가 서는 칸 밖으로** 비켰다(v8-office.js).
-  // 13바퀴 — 쏘는 자리(-8.0 · 8.6)가 가운데줄 친구(세계 ±7.1) 바로 옆이라, 도망 **출발부터**
-  // 미는 친구와 그 이웃이 겹쳤다(왼쪽 23장 · 오른쪽 23장, 좌우가 번갈아 나타났다).
-  // 쏘는 자리를 바깥 끝으로 빼서 출발선을 떼어 놓는다.
-  : {parked:[[-13.4, 3.6], [13.4, 3.6]], deployed:[[-10.0, -0.8], [10.0, 1.1]]};   // 13바퀴 — 숨는 자리를 자기 쪽으로 바꿔 출발 겹침이 없어졌으니 조금 안쪽으로(도망 거리 확보)   // 11바퀴: 바깥(±10.7)으로 옮겨 봤지만 겹침 72→73 으로 그대로였다
-
-// 2315 — 무기 보관함 둘(바주카가 평소에 들어가 있는 곳) — 자리 값이 정해진 뒤에 세운다.
-for (const [lx, lz] of LAUNCHER_SPOTS.parked) buildWeaponLocker(lx, lz);
+// Existing storage chests keep their places and walking clearance.
+const STORAGE_CHESTS=VARIANT==='f'
+  ? [[-8+(LAYOUT_SLOTS[3].dx-LAYOUT_SLOTS_BY_CAM['0'][3].dx),3.1],
+     [LAYOUT_SLOTS[6].dx-LAYOUT_SLOTS_BY_CAM['0'][6].dx,-6.2]]
+  : [[-13.4,3.6],[13.4,3.6]];
+for(const [x,z] of STORAGE_CHESTS)buildStorageChest(x,z);
 
 const DESK_TOP_Y = 0.42;       // 친구 키 0.95 기준 배 높이
 const DESK_FORWARD = 0.3;      // 책상은 캐릭터 앞·옆. 얼굴은 가리지 않고 실제 일하는 방향과 맞춘다.
@@ -1271,7 +1220,7 @@ function createActor(key, slot){
     phase: Math.random()*Math.PI*2,
     needs: { work: Math.random()*1.5, rest: Math.random()*1.2, chat: Math.random(), coffee: Math.random() },
     action: 'working', lastAction: null, actionT: 0, nextTickAt: 1 + Math.random()*2,
-    partnerIndex: null, throwCooldown: Math.random()*0.6,
+    partnerIndex: null,
     hideAmt: 0,
     // 이동(서류 나르기·수다·커피) 상태
     movePhase: 'idle', moveFrom: null, moveTo: null, moveDur: 0, moveElapsed: 0, busyT: 0, visitKind: null, visitTargetActor: null,
@@ -1375,10 +1324,7 @@ function updateCameraFraming(n){
     bounds.expandByPoint(iconTop); framePoints.push(iconTop); // 생각 아이콘 여유
   }
   for (const obj of scene.children){
-    // 11바퀴 — 통나무는 앞쪽(z 3.6)이라 카메라에서 제일 가깝고, 꽉 맞추면 **얘가 카메라를 밀어낸다**
-    // (실측: 거리를 정한 점이 통나무 모서리 x -12.78, z 7.56 이었다). 책상과 같이 '조금 잘려도 되는 것'
-    // 으로 두고, 정말 화면 안에 있는지는 `smooth` 의 `launcherFrame` 으로 따로 잰다.
-    if (obj.userData.isLauncher || obj.userData.isDesk) includeBox(obj.userData.homeBounds || new THREE.Box3().setFromObject(obj), true);
+    if (obj.userData.isDesk || obj.userData.isLocker) includeBox(obj.userData.homeBounds || new THREE.Box3().setFromObject(obj), true);
   }
   // 적은 인원에서도 커피를 마시러 이동한 친구가 화면 밖으로 사라지지 않게 한다.
   includeBox(new THREE.Box3(
@@ -1814,10 +1760,8 @@ function beginVisit(a, kind){
     // 어느 쪽으로 나갈지는 짐작하지 말고 **화면에서 옆 친구와 더 멀어지는 쪽**으로 고른다
     // (한 발 나갔다가 옆 친구와 붙어 보이는 일이 실측에서 나왔다).
     const screenX = v => { const q = v.clone(); q.y = 0.6; return q.project(camera).x; };
-    // 11바퀴 — 옆 친구만 보고 고르면 **통나무 쪽으로** 나가 버린다(3.0배에서 병아리콩이 그랬다).
-    // 세워 둔 통나무도 '비켜야 할 것'에 넣는다.
     const others = actors.filter(o => o !== a).map(o => screenX(o.wrapper.position))
-      .concat(scene.children.filter(o => o.userData.isLauncher).map(o => screenX(o.position)));
+      .concat(scene.children.filter(o => o.userData.isLocker).map(o => screenX(o.position)));
     const pick = side => {
       const t = a.homePos.clone().add(new THREE.Vector3(side*1.05, 0, 1.75));
       return {t, gap: others.length ? Math.min(...others.map(o => Math.abs(o - screenX(t)))) : 1};
@@ -1898,7 +1842,7 @@ function beginVisit(a, kind){
   // 13바퀴 재작업 — 앞줄 자리 자체가 화면 아래 끝이라, 앞줄까지 나가면 발이 0.01~0.06 잘린다
   // (checks outside). 앞줄보다 **0.9 뒤**까지만 나간다.
   target.z = Math.min(target.z, frontRow - 0.9);
-  // 1022 — 책상 안에 서지 않는다(놀람 → 무기 흐름에서 겹침으로 잡히던 것).
+  // 1022 — 책상 안에 서지 않는다(놀라는 장면에서 겹침으로 잡히던 것).
   if (kind !== 'drawer') target = avoidFurniture(target);
   a.moveTo = target;
   a.visitKind = kind;
@@ -2043,7 +1987,7 @@ function updateMonitorFlicker(t){
 }
 
 v8=createV8({scene,renderer,camera,dirLight,floor,windowMesh:bigWindow,windowZ:WINDOW_Z,windowWidth:WINDOW_WIDTH,windowHeight:WINDOW_HEIGHT,windowBottom:WINDOW_BOTTOM,
-  bazookaGroup,actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,launcherSpots:LAUNCHER_SPOTS,layoutSpread:LAYOUT_SPREAD,seedsOn:SEEDS_ON,pathOn:PATH_ON,
+  actorScale:COMPOSITION.actorScale,deskScale:COMPOSITION.deskScale,seated:COMPOSITION.seated,layoutSpread:LAYOUT_SPREAD,seedsOn:SEEDS_ON,pathOn:PATH_ON,
   // 14바퀴 — 눈 값은 잠금 파일에서만.
   eyeTune:Object.fromEntries(Object.entries(LOCK.캐릭터).map(([k,v])=>[k,{size:v.눈.크기,fix:v.눈.눈꼬리,open:v.눈.세로열기}])),
   getActors:()=>actors,resize:onResize,resetActors:onReturnToIdle});
@@ -2091,8 +2035,8 @@ function renderLoop(){
   lastFrameId=frame.id;
   for(const a of actors){
     a.actionT+=dt;
-    if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);applyPose(a,dt);if(a.weapon)a.weapon.visible=false;}
-    else if(frame.id==='lookup' && !v8.preview){applyLookup(a,t);if(a.weapon)a.weapon.visible=false;}
+    if(frame.id==='work' && !v8.preview){applyReturnToNormal(a,dt);if(a.hideAmt<=.01)tickUtilityAI(a,dt,t);applyPose(a,dt);}
+    else if(frame.id==='lookup' && !v8.preview){applyLookup(a,t);}
     else v8.animateActor(a,dt,t);
     a.shadow.position.set(a.wrapper.position.x,.01,a.wrapper.position.z);
     const contact = (a.seatY || 0) * (a.poseSeat ?? 0);          // 의자에 앉아 있으면 의자가 바닥에 닿아 있다

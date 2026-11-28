@@ -93,10 +93,9 @@ test('the idle action list covers the actions the owner asked for', () => {
   has(html, 'nextTripAllowedAt', '늘 누군가 돌아다니지 않게 쉬는 시간이 있어야 한다');
 });
 
-test('the battle the owner asked for is still in place', () => {
-  has(runtime, "attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)", '공격 땐 유리창을 본다');
-  // 1241 ⑦ — 오른쪽 통나무는 가장 가까운 해바라기씨가 가져온다(쌀이 가져오면 두 친구 앞을
-  // 가로질러 화면에서 겹쳤다). 왼쪽은 그대로 병아리콩.
-  has(runtime, "operators=['byeongari','haebaragi']", '바주카는 가지러 가는 주인이 있다');
+test('friends face the window and throw from their own stations after setting down their baskets', () => {
+  has(runtime, "attacking?Math.atan2(-state.position.x*.06,windowZ-state.position.z)", '씨앗은 유리창에 던진다');
+  has(runtime, "a.motionGoal=a.station", '각자 자기 자리에서 던진다');
+  has(runtime, "if(!SEEDS_ON || frame.id!=='throw' || !a.basketPlaced", '바구니를 내려놓고 던진다');
   has(html, 'VARIANT === \'f\'', '?ver=f 되돌리기가 있어야 한다');
 });

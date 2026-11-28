@@ -83,7 +83,6 @@ export function createDeskMoves(camera){
     if(d.actor?.crate){
       const {actor,tabletop}=d;
       actor.crate.position.set(tabletop.x+dx,tabletop.y,tabletop.z+dz);
-      actor.weaponRest.set(actor.crate.position.x,tabletop.y+.35,actor.crate.position.z);
     }
   }
 

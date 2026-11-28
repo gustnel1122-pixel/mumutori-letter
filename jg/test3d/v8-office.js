@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {loadOfficeAssets} from './v8-assets.js?v=20261123-8e';
 import {gradeMaterial,createStaticBake} from './v8-lighting.js?v=20261123-8e';
+import {SEED_STYLES,seedGeometry} from './v8-effects.js?v=20261128-seed-basket';
 
 function mat(color){return gradeMaterial(new THREE.MeshLambertMaterial({color}));}
 function box(parent,w,h,d,x,y,z,material){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);parent.add(m);return m;}
@@ -12,7 +13,7 @@ function grainTexture(){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
 }
 
-export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom,bazookaGroup}){
+export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,windowWidth,windowHeight,windowBottom}){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
   let env=null;
   scene.environment=null;
@@ -163,10 +164,8 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     place(furnishings,'sideTableDrawers',[1.05,1.15,.65],new THREE.Vector3(11.3,0,-.8));
     place(furnishings,'lampRoundTable',[.4,.65,.4],new THREE.Vector3(11.3,1.15,-.8));
   });
-  // 바주카는 움직이는 물건이라 '고정 가구'로 구워 두면 안 된다(길 계산에 두 번 들어가
-  // 주인이 자기 바주카를 못 지나가게 막혔다). 두 대 모두 뺀다 — 실제 사각형은 v8-runtime 이 매 프레임 만든다.
   // 1135 — 창틀(isWindowFrame)은 유리창이 커지면 같이 움직여야 하므로 굽기에서 뺀다.
-  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && o!==bazookaGroup && !o.userData.isLauncher && !o.userData.isWindowFrame && !o.isLight);
+  const fixed=scene.children.filter(o=>o!==floor && o!==windowMesh && o!==glass && !o.userData.isWindowFrame && !o.isLight);
   const bake=createStaticBake(scene,floor);
   let obstacles=[];
   function rebuild(desks,crates){
@@ -198,24 +197,52 @@ export function furnishOffice({scene,renderer,dirLight,floor,windowMesh,windowZ,
     bake.rebuild([...fixed]);
   }
   return {quality,upgradeTree,glass,props:furnishings,environment:env,ready,desk,assets,place,covers,rebuild,get obstacles(){return obstacles;},bake,
-    get info(){return {...assets.info,anisotropy:assets.anisotropy,props:['CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그','직접 만든 종이·장난감']};}};
+    get info(){return {...assets.info,anisotropy:assets.anisotropy,props:['CC0 책상·회전의자·모니터·키보드·마우스·책·화분·책장·상자·머그','직접 만든 종이·씨앗 바구니']};}};
 }
 
-export function makePeaGun(){
-  const g=new THREE.Group();g.name='authored-pea-pod-toy';const pod=mat(0x6d9e48,.55),rim=mat(0xb5d675,.62),grip=mat(0xe0bc7b);
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.055,.29,3,8),pod);body.rotation.x=Math.PI/2;g.add(body);
-  for(let i=0;i<4;i++){const pea=new THREE.Mesh(new THREE.SphereGeometry(.041,8,6),rim);pea.position.set(.025,.035,-.11+i*.075);g.add(pea);}
-  box(g,.055,.11,.06,0,-.075,-.06,grip);
-  const lip=new THREE.Mesh(new THREE.TorusGeometry(.052,.013,5,10),rim);lip.position.z=.20;g.add(lip);
-  return g;
-}
+export function makeSeedBasket(key){
+  const basket=new THREE.Group();
+  basket.name='seed-basket-'+key;
+  basket.scale.z=.79;
+  const reed=mat(0xbe823e),lightReed=mat(0xe2ad63),darkReed=mat(0x9a5b30);
+  const profile=[[0,.015],[.34,.015],[.38,.06],[.45,.27],[.49,.47],
+    [.49,.50],[.445,.50],[.414,.28],[.335,.07],[0,.07]];
+  basket.add(new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r,y])=>new THREE.Vector2(r,y)),32),reed));
+  for(let row=0;row<8;row++){
+    const u=row/7;
+    const band=new THREE.Mesh(new THREE.TorusGeometry(.373+.115*u,row===7?.047:.021,7,32),
+      row===0?darkReed:lightReed);
+    band.rotation.x=Math.PI/2;band.position.y=.055+.445*u;basket.add(band);
+  }
+  const weave=new THREE.InstancedMesh(new THREE.CapsuleGeometry(.019,.060,2,5),darkReed,28*7);
+  const marker=new THREE.Object3D();
+  for(let row=0;row<7;row++)for(let i=0;i<28;i++){
+    const a=(i+(row%2)*.5)*Math.PI*2/28;
+    const r=.380+row*.016;
+    marker.position.set(r*Math.cos(a),.085+row*.063,r*Math.sin(a));
+    marker.rotation.set(0,-a,.24*(row%2?1:-1));
+    marker.updateMatrix();
+    weave.setMatrixAt(row*28+i,marker.matrix);
+  }
+  basket.add(weave);
+  const arch=new THREE.EllipseCurve(0,.46,.47,.43,0,Math.PI).getPoints(24)
+    .map(p=>new THREE.Vector3(p.x,p.y,0));
+  basket.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arch),24,.039,8,false),lightReed));
 
-export function makeAcornBazooka(){
-  const g=new THREE.Group();g.name='authored-acorn-shell-toy';
-  const shell=mat(0xd0a368,.53),cap=mat(0x8c5530,.72),rim=mat(0xe6d1a4,.48);
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,.85,12,1,true),shell);body.rotation.x=Math.PI/2;g.add(body);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(.185,.035,6,14),rim);ring.position.z=.43;g.add(ring);
-  const back=new THREE.Mesh(new THREE.SphereGeometry(.23,12,8),cap);back.scale.set(1,1,.55);back.position.z=-.45;g.add(back);
-  for(const x of [-.18,.18]){const foot=box(g,.06,.4,.08,x,-.28,-.08,wood);foot.rotation.z=x<0?-.3:.3;}
-  return g;
+  const style=SEED_STYLES[key],shape=seedGeometry(style.shape);
+  const seeds=new THREE.InstancedMesh(shape,mat(0xffffff),26);
+  const color=new THREE.Color(style.color);
+  for(let i=0;i<seeds.count;i++){
+    const a=i*2.39996,r=Math.sqrt((i+.5)/seeds.count)*.407;
+    marker.position.set(r*Math.cos(a),.48+.09*(1-r/.407)+.04*Math.sin(i*3.15),r*Math.sin(a));
+    marker.rotation.set(1.15*Math.cos(i),a,.8*Math.sin(i));
+    marker.scale.fromArray(style.scale).multiplyScalar(1.42+.36*(i%3)/2);
+    marker.updateMatrix();
+    seeds.setMatrixAt(i,marker.matrix);
+    seeds.setColorAt(i,color.clone().multiplyScalar(.83+.08*(i%5)));
+  }
+  basket.add(seeds);
+  const throwingSeed=new THREE.Mesh(shape,mat(style.color));
+  throwingSeed.scale.fromArray(style.scale).multiplyScalar(2.4);
+  return {basket,throwingSeed,seedPile:seeds,seedCapacity:seeds.count};
 }
